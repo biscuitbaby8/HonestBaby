@@ -120,7 +120,7 @@ export default function ProductDetail() {
       </section>
 
       <section>
-        <PriceAlert productId={product.id} currentPrice={prices[product.id]?.amazon?.price} />
+        <PriceAlert productId={product.id} currentPrice={product.price || mockPrices[product.id]?.amazon?.price} />
       </section>
 
       {/* Footer Specification */}
@@ -132,18 +132,23 @@ export default function ProductDetail() {
         <dl className="text-sm divide-y divide-slate-50">
           <div className="py-2 flex justify-between">
             <dt className="text-slate-500">重量</dt>
-            <dd className="font-medium text-slate-800">{product.weight} kg</dd>
+            <dd className="font-medium text-slate-800">{product.weight || '--'} kg</dd>
           </div>
           <div className="py-2 flex justify-between">
             <dt className="text-slate-500">JANコード</dt>
-            <dd className="font-medium text-slate-800">{product.jan}</dd>
+            <dd className="font-medium text-slate-800">{product.specs?.jan || product.jan || '未登録'}</dd>
           </div>
-          {product.dimensions && (
+          {product.dimensions ? (
             <div className="py-2 flex justify-between">
               <dt className="text-slate-500">展開時サイズ</dt>
               <dd className="font-medium text-slate-800 text-right">
                 W{product.dimensions.width} × D{product.dimensions.depth} × H{product.dimensions.height} cm
               </dd>
+            </div>
+          ) : (
+            <div className="py-2 flex justify-between">
+              <dt className="text-slate-500">サイズ情報</dt>
+              <dd className="font-medium text-slate-400">詳細スペックを確認中</dd>
             </div>
           )}
         </dl>
