@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Star, ExternalLink, ShieldCheck } from 'lucide-react';
-import { products } from '../data/products';
-import { prices } from '../data/prices';
+import { ChevronLeft, Star, ExternalLink, ShieldCheck, Loader2 } from 'lucide-react';
+import { products as mockProducts } from '../data/products';
+import { prices as mockPrices } from '../data/prices';
+import { getProductById } from '../api/rakuten';
 import DrawbackSummary from '../components/DrawbackSummary';
 import FitChecker from '../components/FitChecker';
 import PriceComparison from '../components/PriceComparison';
@@ -11,7 +13,35 @@ import PriceAlert from '../components/PriceAlert';
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const product = products.find(p => p.id === id);
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadProduct() {
+      setLoading(true);
+      const localProduct = mockProducts.find(p => p.id === id);
+      if (localProduct) {
+        setProduct(localProduct);
+        setLoading(false);
+      } else if (id.startsWith('r-')) {
+        const remoteProduct = await getProductById(id);
+        setProduct(remoteProduct);
+        setLoading(false);
+      } else {
+        setLoading(false);
+      }
+    }
+    loadProduct();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+        <Loader2 className="animate-spin" size={32} />
+        <p className="text-sm font-medium">詳細情報を取得中...</p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -22,7 +52,7 @@ export default function ProductDetail() {
     );
   }
 
-  const currentPrice = prices[product.id]?.amazon?.price || 0; // Using Amazon as baseline
+  const currentPrice = product.price || mockPrices[product.id]?.amazon?.price || 0;
 
   return (
     <article className="pb-10 fade-in">
@@ -43,11 +73,11 @@ export default function ProductDetail() {
       <header className="mt-6 mb-8">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs font-black text-brand-coral bg-brand-coral/10 px-2 py-0.5 rounded uppercase tracking-wider">
-            {product.brand}
+            {product.brand || product.shopName || 'Rakuten'}
           </span>
           <div className="flex items-center gap-1 bg-yellow-50 text-yellow-600 text-xs font-bold px-2 py-0.5 rounded">
             <Star size={12} className="fill-yellow-500 text-yellow-500" />
-            {product.rating}
+            {product.rating || '評価なし'}
           </div>
         </div>
         <h1 className="text-2xl font-black text-slate-800 leading-tight">
@@ -56,7 +86,7 @@ export default function ProductDetail() {
         
         {/* Feature Chips */}
         <div className="flex flex-wrap gap-2 mt-4">
-          {product.features.map(feature => (
+          {(product.features || ['送料無料', 'ポイント還元']).map(feature => (
             <span key={feature} className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full border border-slate-200">
               {feature}
             </span>
@@ -67,7 +97,13 @@ export default function ProductDetail() {
       {/* Main Analysis Sections */}
       <section>
         <h2 className="sr-only">レビューと欠点分析</h2>
-        <DrawbackSummary drawbacks={product.drawbacksSummary} />
+        {product.drawbacksSummary ? (
+          <DrawbackSummary drawbacks={product.drawbacksSummary} />
+        ) : (
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm text-sm text-slate-500 italic">
+            この商品の詳細な欠便分析は現在AIが生成中です...
+          </div>
+        )}
       </section>
 
       <section>

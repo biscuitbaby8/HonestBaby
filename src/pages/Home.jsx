@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Home() {
+  const [keyword, setKeyword] = useState('');
+  const navigate = useNavigate();
   const categories = [
     { name: 'ベビーカー', icon: '🛒' },
     { name: 'チャイルドシート', icon: '💺' },
@@ -11,22 +14,31 @@ export default function Home() {
     { name: 'その他', icon: '📦' },
   ];
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (keyword.trim()) {
+      navigate(`/products?q=${encodeURIComponent(keyword)}`);
+    }
+  };
+
   return (
     <div className="space-y-8 pb-10 fade-in">
       {/* Hero Search Section */}
       <section className="bg-gradient-to-r from-brand-coral to-rose-400 rounded-3xl p-6 text-white text-center shadow-xl transform transition-transform hover:scale-[1.01] mt-2">
         <h2 className="text-2xl font-bold mb-2">何をお探しですか？</h2>
         <p className="text-sm opacity-90 mb-6 font-medium">AIがお買い物のお悩み相談に乗ります</p>
-        <div className="relative max-w-sm mx-auto">
+        <form onSubmit={handleSearch} className="relative max-w-sm mx-auto">
           <input 
             type="text" 
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
             placeholder="例: 1DKに収まるベビーカー..."
             className="w-full py-4 pl-5 pr-12 rounded-full text-brand-navy shadow-inner focus:outline-none focus:ring-4 focus:ring-white/50 border-none transition-all placeholder:text-slate-400"
           />
-          <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-brand-navy text-white p-2.5 rounded-full hover:bg-slate-800 transition-colors">
+          <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-brand-navy text-white p-2.5 rounded-full hover:bg-slate-800 transition-colors">
             <Search size={20} />
           </button>
-        </div>
+        </form>
       </section>
 
       {/* Categories */}
