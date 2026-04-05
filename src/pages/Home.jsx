@@ -8,9 +8,9 @@ export default function Home() {
   const categories = [
     { name: 'ベビーカー', icon: '🛒' },
     { name: 'チャイルドシート', icon: '💺' },
-    { name: '抱っこ紐', icon: '👶' },
-    { name: 'ベビーベッド', icon: '🛏️' },
-    { name: 'おもちゃ', icon: '🧸' },
+    { name: 'オムツ', icon: '🍼' },
+    { name: '粉ミルク', icon: '🥛' },
+    { name: 'おしりふき', icon: '🧻' },
     { name: 'その他', icon: '📦' },
   ];
 

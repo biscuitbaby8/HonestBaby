@@ -9,6 +9,7 @@ import FitChecker from '../components/FitChecker';
 import PriceComparison from '../components/PriceComparison';
 import UsedMarket from '../components/UsedMarket';
 import PriceAlert from '../components/PriceAlert';
+import UnitCostCalculator from '../components/UnitCostCalculator';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -61,12 +62,12 @@ export default function ProductDetail() {
         <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-full">
           <ChevronLeft size={24} />
         </button>
-        <span className="text-xs font-bold text-slate-500">{product.category}</span>
+        <span className="text-xs font-bold text-slate-500">{product.category || 'その他'}</span>
       </nav>
 
       {/* Hero Image */}
       <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 aspect-square w-full relative">
-        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+        <img src={product.imageUrl || product.image} alt={product.name} className="w-full h-full object-cover" />
       </div>
 
       {/* Header Info */}
@@ -83,6 +84,9 @@ export default function ProductDetail() {
         <h1 className="text-2xl font-black text-slate-800 leading-tight">
           {product.name}
         </h1>
+        <div className="mt-2">
+          <UnitCostCalculator itemPrice={currentPrice} itemName={product.name} />
+        </div>
         
         {/* Feature Chips */}
         <div className="flex flex-wrap gap-2 mt-4">

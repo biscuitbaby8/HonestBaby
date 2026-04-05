@@ -6,6 +6,8 @@ import Scanner from './pages/Scanner'
 import Profile from './pages/Profile'
 import ProductList from './pages/ProductList'
 import ProductDetail from './pages/ProductDetail'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
 
 function App() {
   return (
@@ -18,6 +20,8 @@ function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="products" element={<ProductList />} />
           <Route path="product/:id" element={<ProductDetail />} />
+          <Route path="privacy" element={<Privacy />} />
+          <Route path="terms" element={<Terms />} />
           <Route path="settings" element={<div className="p-4">設定 (未実装)</div>} />
         </Route>
       </Routes>
