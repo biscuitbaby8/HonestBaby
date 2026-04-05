@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Filter, Loader2 } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
-import { searchProducts } from '../api/rakuten';
+import { searchRakutenProducts } from '../api/rakuten';
 import { products as mockProducts } from '../data/products';
 
 const GENRE_MAP = {
@@ -27,7 +27,7 @@ export default function ProductList() {
       setLoading(true);
       try {
         const genreId = GENRE_MAP[categoryFilter];
-        const results = await searchProducts({ 
+        const results = await searchRakutenProducts({ 
           keyword: searchKeyword || categoryFilter || 'ベビー用品',
           categoryId: genreId,
           sort: filterMode === 'lowest_price' ? '+itemPrice' : 'standard'

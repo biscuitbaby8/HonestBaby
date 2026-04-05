@@ -6,7 +6,7 @@
 const BASE_URL = 'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170426';
 const APP_ID = import.meta.env.VITE_RAKUTEN_APP_ID;
 
-export const searchProducts = async ({ keyword, categoryId, hits = 20, sort = 'standard' }) => {
+export const searchRakutenProducts = async ({ keyword, categoryId, hits = 20, sort = 'standard' }) => {
   if (!APP_ID) {
     console.error('Rakuten App ID is missing. Check your .env file.');
     return [];
