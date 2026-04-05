@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Sparkles } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Sparkles, Loader2 } from 'lucide-react';
 import { products } from '../data/products';
+import { getChatResponse } from '../api/gemini';
 
 export default function Chat() {
   const [messages, setMessages] = useState([
     {
       id: '1',
-      sender: 'ai',
-      text: 'こんにちは！HonestBaby AIです。予算やライフスタイル、気になる商品を教えていただければ、忖度なしでアドバイスします。\n\n例: 「1DKに収まるベビーカーはどれですか？」'
+      role: 'ai',
+      content: 'こんにちは！HonestBaby AIです。予算やライフスタイル、気になる商品を教えていただければ、忖度なしでアドバイスします。\n\n例: 「1DKに収まるベビーカーはどれですか？」'
     }
   ]);
   const [input, setInput] = useState('');
@@ -18,36 +19,52 @@ export default function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isTyping) return;
 
-    const userMessage = { id: Date.now().toString(), sender: 'user', text: input };
-    setMessages(prev => [...prev, userMessage]);
+    const userMessage = { id: Date.now().toString(), role: 'user', content: input };
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInput('');
     setIsTyping(true);
 
-    // Mock AI response
-    setTimeout(() => {
-      setIsTyping(false);
+    try {
+      // Call Real Gemini API
+      // We pass the last few messages for context
+      const chatHistory = updatedMessages.slice(-6).map(m => ({
+        role: m.role,
+        content: m.content
+      }));
       
-      let aiResponseText = 'すみません、もう少し具体的にお伺いしてもよろしいですか？（モックデータのため限定的な回答となります）';
+      const response = await getChatResponse(chatHistory);
+      
+      // Simple heuristic to attach a product card if the AI mentions a known product
       let relatedProduct = null;
-
-      if (userMessage.text.includes('1DK') || userMessage.text.includes('コンパクト') || userMessage.text.includes('ベビーカー')) {
-        aiResponseText = `1DKのお部屋にお住まいですね。玄関のスペースも限られているかと思います。\n\n当データベースの寸法データとユーザー照合結果から、「${products[0].name}」がおすすめです。超軽量かつ折りたたみ時の幅が${products[0].dimensions.foldedWidth}cmと非常にコンパクトです。\n\nただし、**段差に弱い点**と**荷物収納力が低い点**には注意が必要です。`;
-        relatedProduct = products[0];
+      for (const p of products) {
+        if (response.includes(p.name)) {
+          relatedProduct = p;
+          break;
+        }
       }
 
       setMessages(prev => [
         ...prev, 
         { 
           id: (Date.now() + 1).toString(), 
-          sender: 'ai', 
-          text: aiResponseText,
+          role: 'ai', 
+          content: response,
           product: relatedProduct
         }
       ]);
-    }, 1500);
+    } catch (error) {
+      console.error(error);
+      setMessages(prev => [
+        ...prev,
+        { id: Date.now().toString(), role: 'ai', content: '申し訳ありません、接続エラーが発生しました。' }
+      ]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (
@@ -63,15 +80,15 @@ export default function Chat() {
       {/* Message List */}
       <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-1 scrollbar-hide pb-10">
         {messages.map(msg => (
-          <div key={msg.id} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+          <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {/* Avatar */}
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${msg.sender === 'user' ? 'bg-brand-navy text-white' : 'bg-brand-coral text-white'}`}>
-              {msg.sender === 'user' ? <UserIcon size={16} /> : <Bot size={16} />}
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${msg.role === 'user' ? 'bg-brand-navy text-white' : 'bg-brand-coral text-white'}`}>
+              {msg.role === 'user' ? <UserIcon size={16} /> : <Bot size={16} />}
             </div>
             
             {/* Message Bubble */}
-            <div className={`max-w-[75%] rounded-2xl p-3 text-sm shadow-sm ${msg.sender === 'user' ? 'bg-brand-navy text-white rounded-tr-none' : 'bg-white border border-slate-100 rounded-tl-none text-slate-700 whitespace-pre-wrap leading-relaxed'}`}>
-              {msg.text}
+            <div className={`max-w-[75%] rounded-2xl p-3 text-sm shadow-sm ${msg.role === 'user' ? 'bg-brand-navy text-white rounded-tr-none' : 'bg-white border border-slate-100 rounded-tl-none text-slate-700 whitespace-pre-wrap leading-relaxed'}`}>
+              {msg.content}
 
               {/* Product Card Suggestion */}
               {msg.product && (
@@ -79,7 +96,7 @@ export default function Chat() {
                   <img src={msg.product.imageUrl} alt={msg.product.name} className="w-full h-24 object-cover" />
                   <div className="p-2.5">
                     <div className="text-xs font-bold text-slate-800 line-clamp-1 mb-1">{msg.product.name}</div>
-                    <div className="text-[10px] text-red-500 font-bold bg-red-50 inline-block px-1.5 py-0.5 rounded">⚠️ {msg.product.drawbacksSummary.tldr}</div>
+                    <div className="text-[10px] text-red-500 font-bold bg-red-50 inline-block px-1.5 py-0.5 rounded">⚠️ {msg.product.drawbacksSummary?.tldr || '要確認ポイントあり'}</div>
                   </div>
                 </div>
               )}
@@ -108,7 +125,7 @@ export default function Chat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="メッセージを入力..."
+          placeholder="AIに相談する..."
           className="w-full bg-white border border-slate-200 py-3.5 pl-4 pr-12 rounded-full focus:outline-none focus:ring-2 focus:ring-brand-coral shadow-sm text-sm"
         />
         <button 
