@@ -1,30 +1,28 @@
 /**
- * Rakuten Ichiba Item Search API client
- * ─ UUID形式のアプリIDに対応
+ * Rakuten Ichiba Item Search API client (Standard 2026)
+ * Doc: https://openapi.rakuten.co.jp/
  */
 
 const APP_ID = import.meta.env.VITE_RAKUTEN_APP_ID;
+const ACCESS_KEY = import.meta.env.VITE_RAKUTEN_ACCESS_KEY; // Required for UUID IDs
 const AFFILIATE_ID = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID;
 
-// 新旧両方のエンドポイントを試す
-const ENDPOINTS = [
-  'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601',
-  'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170426',
-];
+// Modern OpenAPI endpoint (v1)
+const BASE_URL = 'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401';
 
-async function fetchWithFallback(params) {
-  for (const endpoint of ENDPOINTS) {
-    try {
-      const response = await fetch(`${endpoint}?${params.toString()}`);
-      if (response.ok) {
-        return await response.json();
-      }
-      console.warn(`Endpoint ${endpoint} returned ${response.status}, trying next...`);
-    } catch (e) {
-      console.warn(`Endpoint ${endpoint} failed:`, e.message);
+async function fetchRakuten(params) {
+  try {
+    const response = await fetch(`${BASE_URL}?${params.toString()}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Rakuten API Error (${response.status}):`, errorText);
+      return null;
     }
+    return await response.json();
+  } catch (e) {
+    console.error('Rakuten fetch failed:', e);
+    return null;
   }
-  throw new Error('All Rakuten API endpoints failed');
 }
 
 function buildParams(extra = {}) {
@@ -33,7 +31,12 @@ function buildParams(extra = {}) {
     format: 'json',
     ...extra,
   });
-  // affiliateIdは空文字を送らない
+  
+  // UUID apps require accessKey
+  if (ACCESS_KEY) {
+    params.set('accessKey', ACCESS_KEY);
+  }
+  
   if (AFFILIATE_ID) {
     params.set('affiliateId', AFFILIATE_ID);
   }
@@ -64,23 +67,25 @@ function normalizeItem(item, categoryId) {
 
 export const searchRakutenProducts = async ({ keyword, categoryId, hits = 20, sort = 'standard' }) => {
   if (!APP_ID) {
-    console.error('楽天アプリIDが未設定です。.envファイルを確認してください。');
+    console.error('Rakuten Application ID is missing.');
     return [];
   }
 
-  const extra = {
+  const params = buildParams({
     keyword: keyword || 'ベビー用品',
     hits: hits.toString(),
-    sort,
+    sort: sort,
     imageFlag: '1',
-  };
-  if (categoryId) extra.genreId = categoryId;
+  });
+  
+  if (categoryId) params.set('genreId', categoryId);
 
   try {
-    const data = await fetchWithFallback(buildParams(extra));
+    const data = await fetchRakuten(params);
+    if (!data) return [];
     return (data.Items || []).map(item => normalizeItem(item, categoryId));
   } catch (error) {
-    console.error('楽天API通信に失敗しました:', error);
+    console.error('Error in searchRakutenProducts:', error);
     return [];
   }
 };
@@ -90,16 +95,15 @@ export const getProductById = async (id) => {
   if (!APP_ID) return null;
 
   const itemCode = id.replace('r-', '');
+  const params = buildParams({ itemCode });
 
   try {
-    const data = await fetchWithFallback(buildParams({
-      itemCode,
-    }));
-    const info = data.Items?.[0];
+    const data = await fetchRakuten(params);
+    const info = data?.Items?.[0];
     if (!info) return null;
     return normalizeItem(info, '');
   } catch (error) {
-    console.error('商品詳細の取得に失敗しました:', error);
+    console.error('Error in getProductById:', error);
     return null;
   }
 };

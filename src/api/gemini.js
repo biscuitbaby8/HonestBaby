@@ -1,11 +1,11 @@
 /**
- * Google Gemini API client (REST)
- * Doc: https://ai.google.dev/gemini-api/docs/api-overview
+ * Google Gemini API client (REST v1)
  */
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const MODEL = 'gemini-1.5-flash';
-const BASE_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
+// Using v1 (stable) instead of v1beta to avoid model-not-found issues
+const BASE_URL = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
 
 const SYSTEM_PROMPT = `
 あなたは子育てグッズ専門の「忖度なしコンサルタント」です。
@@ -20,7 +20,7 @@ const SYSTEM_PROMPT = `
 
 export const getChatResponse = async (history) => {
   if (!API_KEY) {
-    console.error('Gemini API Key is missing. Check your .env file.');
+    console.error('Gemini API Key is missing.');
     return '現在、AI相談機能がメンテナンス中です。APIキーの設定を確認してください。';
   }
 
@@ -30,39 +30,27 @@ export const getChatResponse = async (history) => {
     parts: [{ text: msg.content }]
   }));
 
-  // Add system prompt to the first user message or as a separate instruction if supported
-  // For Gemini 1.5 Flash, we can use system_instruction if available, or just prepend to the first message.
+  // Prepend system prompt for context
   contents.unshift({
     role: 'user',
-    parts: [{ text: `[System Instruction] ${SYSTEM_PROMPT}` }]
+    parts: [{ text: `[システム設定] ${SYSTEM_PROMPT}\n上記の役割になりきって回答してください。` }]
   });
 
   try {
     const response = await fetch(BASE_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: contents,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        },
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents }),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
+      console.error('Gemini API error:', errorData);
       throw new Error(`Gemini API error: ${errorData.error?.message || response.status}`);
     }
 
     const data = await response.json();
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    return aiResponse || '申し訳ありません、返答を生成できませんでした。';
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '返答を生成できませんでした。';
   } catch (error) {
     console.error('Failed to fetch from Gemini API:', error);
     return '接続エラーが発生しました。時間をおいて再度お試しください。';
