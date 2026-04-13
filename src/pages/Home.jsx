@@ -17,6 +17,10 @@ export default function Home() {
     { name: '粉ミルク', icon: '🍼' },
     { name: 'おしりふき', icon: '🧻' },
     { name: 'その他', icon: '📦' },
+    { name: 'おもちゃ(0〜3ヶ月)', icon: '🧸' },
+    { name: 'おもちゃ(3〜6ヶ月)', icon: '🧩' },
+    { name: 'おもちゃ(6〜12ヶ月)', icon: '🪀' },
+    { name: 'おもちゃ(1歳〜)', icon: '🚙' },
   ];
 
   // おすすめ商品を自動取得
