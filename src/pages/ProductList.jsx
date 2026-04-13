@@ -1,17 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Filter, Loader2 } from 'lucide-react';
+import { SlidersHorizontal, Loader2, SearchX } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import { searchRakutenProducts } from '../api/rakuten';
-import { products as mockProducts } from '../data/products';
 
+// 楽天の正式ジャンルID
 const GENRE_MAP = {
-  'ベビーカー': '200424',
-  'チャイルドシート': '200425',
-  '抱っこ紐': '200426',
-  'ベビーベッド': '200427',
-  'おもちゃ': '200428',
+  'ベビーカー': '566382',
+  'チャイルドシート': '566380',
+  '抱っこ紐': '566381',
+  'オムツ': '502978',
+  '粉ミルク': '502981',
+  'おしりふき': '502979',
+  'ベビーベッド': '502954',
+  'その他': '',
 };
+
+const SORT_OPTIONS = [
+  { label: 'おすすめ順', value: 'standard' },
+  { label: '価格が安い順', value: '+itemPrice' },
+  { label: '価格が高い順', value: '-itemPrice' },
+  { label: 'レビュー数順', value: '-reviewCount' },
+];
 
 export default function ProductList() {
   const [searchParams] = useSearchParams();
@@ -20,104 +30,83 @@ export default function ProductList() {
   
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterMode, setFilterMode] = useState('all');
+  const [sortMode, setSortMode] = useState('standard');
 
   useEffect(() => {
     async function loadProducts() {
       setLoading(true);
       try {
-        const genreId = GENRE_MAP[categoryFilter];
+        const genreId = GENRE_MAP[categoryFilter] || '';
+        const keyword = searchKeyword || categoryFilter || 'ベビー用品';
+        
         const results = await searchRakutenProducts({ 
-          keyword: searchKeyword || categoryFilter || 'ベビー用品',
-          categoryId: genreId,
-          sort: filterMode === 'lowest_price' ? '+itemPrice' : 'standard'
+          keyword,
+          categoryId: genreId || undefined,
+          hits: 30,
+          sort: sortMode,
         });
         
-        // Merge with mock products if it's a matching category to show "Honest Reviews"
-        const localMatches = mockProducts.filter(p => 
-          p.category === categoryFilter || 
-          (searchKeyword && p.name.includes(searchKeyword))
-        );
-        
-        // dedupe and prioritize local (mock) products for rich data
-        const combined = [...localMatches, ...results.filter(r => !localMatches.some(l => l.specs?.jan === r.specs?.jan))];
-        setProducts(combined);
+        setProducts(results);
       } catch (error) {
         console.error(error);
-        setProducts(mockProducts); // Fallback
+        setProducts([]);
       } finally {
         setLoading(false);
       }
     }
     loadProducts();
-  }, [categoryFilter, searchKeyword, filterMode]);
+  }, [categoryFilter, searchKeyword, sortMode]);
+
+  const title = searchKeyword 
+    ? `「${searchKeyword}」の検索結果` 
+    : (categoryFilter ? `${categoryFilter}` : 'すべての商品');
 
   return (
-    <div className="space-y-6 pb-10 fade-in">
+    <div className="space-y-4 pb-10 fade-in">
+      {/* ヘッダー */}
       <div className="flex items-center justify-between mt-2">
-        <h2 className="text-xl font-bold text-slate-800">
-          {searchKeyword ? `「${searchKeyword}」の検索結果` : (categoryFilter ? `${categoryFilter}の一覧` : 'すべての商品')}
-        </h2>
-        <button className="flex items-center gap-1 text-sm font-medium text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200">
-          <Filter size={14} />
-          絞り込み
-        </button>
+        <h2 className="text-lg font-black text-slate-800">{title}</h2>
+        {!loading && (
+          <span className="text-xs text-slate-400">{products.length}件</span>
+        )}
       </div>
 
-      {/* Quick Sort Chips */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-        <Chip 
-          label="おすすめ順" 
-          active={filterMode === 'all'} 
-          onClick={() => setFilterMode('all')} 
-        />
-        <Chip 
-          label="評価が高い順" 
-          active={filterMode === 'highest_rated'} 
-          onClick={() => setFilterMode('highest_rated')} 
-        />
-        <Chip 
-          label="実質最安値順" 
-          active={filterMode === 'lowest_price'} 
-          onClick={() => setFilterMode('lowest_price')} 
-        />
+      {/* 並び替え */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        {SORT_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => setSortMode(opt.value)}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors ${
+              sortMode === opt.value
+                ? 'bg-brand-navy text-white'
+                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
+      {/* 商品一覧 */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
           <Loader2 className="animate-spin" size={32} />
-          <p className="text-sm font-medium">最新データを取得中...</p>
+          <p className="text-sm font-medium">商品を検索中...</p>
+        </div>
+      ) : products.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3">
+          {products.map(product => (
+            <ProductCard key={product.id} product={product} />
+          ))}
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-2 gap-4">
-            {products.map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-          
-          {products.length === 0 && (
-            <div className="text-center py-10 text-slate-500">
-              該当する商品が見つかりませんでした。
-            </div>
-          )}
-        </>
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
+          <SearchX size={40} />
+          <p className="text-sm font-medium">該当する商品が見つかりませんでした</p>
+          <p className="text-xs text-slate-300">別のキーワードで検索してみてください</p>
+        </div>
       )}
     </div>
-  );
-}
-
-function Chip({ label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${
-        active 
-          ? 'bg-brand-navy text-white' 
-          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-      }`}
-    >
-      {label}
-    </button>
   );
 }
