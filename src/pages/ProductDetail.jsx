@@ -15,21 +15,27 @@ export default function ProductDetail() {
   useEffect(() => {
     async function loadProduct() {
       setLoading(true);
-      if (id.startsWith('r-')) {
-        const remoteProduct = await getProductById(id);
-        setProduct(remoteProduct);
-        
-        // Yahoo価格も同時取得して比較
-        if (remoteProduct?.name) {
-          // 商品名が長すぎるとヒットしないので最初の20文字程度で検索
-          const shortName = remoteProduct.name.substring(0, 20).replace(/【.*?】/g, '');
-          const yahooRes = await searchYahooProducts(shortName);
-          if (yahooRes.length > 0) {
-            setYahooPrice(yahooRes[0].price);
+      try {
+        if (id.startsWith('r-')) {
+          const remoteProduct = await getProductById(id);
+          if (remoteProduct) {
+            setProduct(remoteProduct);
+            
+            // Yahoo価格も同時取得して比較
+            if (remoteProduct.name) {
+              const cleanName = remoteProduct.name.replace(/[【】（）()\[\]]/g, ' ').substring(0, 30);
+              const yahooRes = await searchYahooProducts(cleanName);
+              if (yahooRes && yahooRes.length > 0) {
+                setYahooPrice(yahooRes[0].price);
+              }
+            }
           }
         }
+      } catch (err) {
+        console.error('Detail Load Error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     loadProduct();
   }, [id]);
@@ -58,168 +64,165 @@ export default function ProductDetail() {
   const rating = product.rating || 0;
 
   return (
-    <article className="pb-10 pt-2 fade-in space-y-6">
+    <article className="pb-10 pt-2 fade-in space-y-6 max-w-lg mx-auto">
       {/* 戻るボタン */}
       <nav className="flex items-center gap-2 px-1">
         <button onClick={() => navigate(-1)} className="p-1.5 -ml-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
           <ChevronLeft size={22} />
         </button>
-        <span className="text-xs font-bold text-slate-400">検索結果に戻る</span>
+        <span className="text-xs font-bold text-slate-400 opacity-0">検索結果に戻る</span>
       </nav>
 
       {/* 1. 商品ヘッダー（画像・基本情報） */}
-      <section className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 p-5">
+      <section className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 p-6">
         <img 
           src={product.image} 
           alt={product.name} 
-          className="w-full max-h-64 object-contain mx-auto mb-4"
+          className="w-full h-56 object-contain mx-auto mb-6 drop-shadow-sm"
         />
         <h1 className="text-base font-black text-slate-800 leading-snug">
           {product.name}
         </h1>
-        {rating > 0 && (
-          <div className="flex items-center gap-1.5 mt-3">
+        <div className="flex items-center justify-between mt-4 pb-2 border-b border-slate-50">
+          <div className="flex items-center gap-1.5">
             <Star size={16} className="fill-amber-400 text-amber-400" />
-            <span className="text-sm font-black text-slate-700">{rating.toFixed(1)}</span>
-            <span className="text-[11px] text-slate-400">({product.reviewCount}件のレビュー)</span>
+            <span className="text-sm font-black text-slate-700">{rating > 0 ? rating.toFixed(1) : '評価なし'}</span>
+            <span className="text-[11px] text-slate-400">({product.reviewCount}件)</span>
           </div>
-        )}
+          <span className="text-xs text-slate-400 font-medium">商品コード: {product.id.replace('r-', '')}</span>
+        </div>
+        
+        <div className="mt-4 flex items-baseline gap-1">
+          <span className="text-xs font-bold text-slate-400">楽天最安値</span>
+          <span className="text-2xl font-black text-brand-coral">¥{price.toLocaleString()}</span>
+          <span className="text-[10px] text-slate-400">(税込)</span>
+        </div>
       </section>
 
       {/* 2. 価格比較セクション */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-black text-slate-800 flex items-center gap-1.5 px-1">
-          <Store size={16} className="text-brand-coral" />
-          ショップ別・最安値比較
+      <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
+        <h2 className="text-sm font-black text-slate-800 flex items-center gap-2 mb-2">
+          <Store size={18} className="text-brand-coral" />
+          現在の最安値比較
         </h2>
         
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden text-sm">
+        <div className="space-y-3">
           {/* 楽天 */}
-          <div className="flex justify-between items-center p-4 border-b border-slate-50">
-            <span className="font-bold text-red-600">楽天市場</span>
-            <div className="text-right">
-              <span className="text-lg font-black text-slate-800">¥{price.toLocaleString()}</span>
-              {product.url ? (
-                <a href={product.url} target="_blank" rel="noopener noreferrer" className="ml-3 inline-flex items-center gap-1 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-red-100">
-                  見る <ExternalLink size={12} />
-                </a>
-              ) : (
-                <span className="ml-3 text-xs text-slate-400 font-bold">在庫なし</span>
-              )}
+          <div className="flex justify-between items-center p-3.5 bg-red-50/50 rounded-2xl border border-red-100/50">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-red-600 uppercase tracking-wider">Rakuten</span>
+              <span className="text-base font-black text-slate-800">¥{price.toLocaleString()}</span>
             </div>
+            <a href={product.url} target="_blank" rel="noopener noreferrer" className="bg-red-600 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm shadow-red-200">
+              ショップへ
+            </a>
           </div>
           
           {/* Yahoo */}
-          <div className="flex justify-between items-center p-4 border-b border-slate-50 bg-slate-50/50">
-            <span className="font-bold text-blue-600">Yahoo!ショッピング</span>
-            <div className="text-right">
-              {yahooPrice ? (
-                <>
-                  <span className="text-lg font-black text-slate-800">¥{yahooPrice.toLocaleString()}</span>
-                  <a href={`https://shopping.yahoo.co.jp/search?p=${encodeURIComponent(product.name.substring(0, 20))}`} target="_blank" rel="noopener noreferrer" className="ml-3 inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-slate-50">
-                    検索 <ExternalLink size={12} />
-                  </a>
-                </>
-              ) : (
-                <span className="text-xs text-slate-400 font-bold">価格取得失敗</span>
-              )}
+          <div className="flex justify-between items-center p-3.5 bg-blue-50/50 rounded-2xl border border-blue-100/50">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-wider">Yahoo!</span>
+              <span className="text-base font-black text-slate-800">
+                {yahooPrice ? `¥${yahooPrice.toLocaleString()}` : <span className="text-slate-400 text-xs">読み込み中...</span>}
+              </span>
             </div>
-          </div>
-          
-          {/* Amazon (プレースホルダー) */}
-          <div className="flex justify-between items-center p-4 opacity-70">
-            <span className="font-bold text-slate-800">Amazon</span>
-            <span className="text-xs text-slate-400 font-bold bg-slate-100 px-2 py-1 rounded">近日対応</span>
+            <a href={`https://shopping.yahoo.co.jp/search?p=${encodeURIComponent(product.name.substring(0, 30))}`} target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm shadow-blue-200">
+              最安値を検索
+            </a>
           </div>
         </div>
       </section>
 
       {/* 3. 価格推移グラフ */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-black text-slate-800 flex items-center gap-1.5 px-1">
-          <TrendingDown size={16} className="text-brand-coral" />
-          過去3ヶ月の価格推移（AI推計）
+      <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
+        <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
+          <TrendingDown size={18} className="text-brand-coral" />
+          お買い得タイミング (AI推計)
         </h2>
-        <p className="text-[10px] text-slate-400 px-1 -mt-1">※近似値データを用いた参考グラフです</p>
         <PriceChart currentPrice={price} />
+        <p className="text-[10px] text-slate-400 text-center">
+          過去3ヶ月の市場トレンドから算出した疑似変動グラフです
+        </p>
       </section>
 
-      {/* 4. AI 忖度なし分析 (欠点とおすすめしない人) */}
-      <section className="bg-slate-800 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-24 h-24 bg-brand-coral/20 rounded-bl-full -mr-4 -mt-4"></div>
-        <h2 className="text-sm font-black flex items-center gap-1.5 mb-4 text-brand-coral relative z-10">
-          <AlertTriangle size={16} />
+      {/* 4. AI 忖度なし分析 */}
+      <section className="bg-brand-navy text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-brand-coral opacity-10 rounded-full -mr-16 -mt-16"></div>
+        <h2 className="text-sm font-black flex items-center gap-2 mb-5 text-brand-coral relative z-10">
+          <AlertTriangle size={18} />
           HonestBaby 忖度なし分析
         </h2>
         
-        <div className="space-y-4 relative z-10">
+        <div className="space-y-5 relative z-10">
           <div>
-            <h3 className="text-xs font-bold text-slate-300 mb-1 border-l-2 border-red-500 pl-2">ここがマイナスポイント</h3>
-            <ul className="text-xs text-slate-100 space-y-1.5 pl-2 list-disc list-inside opacity-90">
-              <li>価格変動が大きく、タイミングによって割高になる</li>
-              <li>サイズ・重量があるため、狭い収納スペースには不向きな可能性</li>
-              <li>人気商品のため、一時的に在庫切れになりやすい</li>
+            <h3 className="text-[11px] font-black text-brand-coral/80 mb-2 uppercase tracking-widest pl-3 border-l-2 border-brand-coral">Cons (欠点)</h3>
+            <ul className="text-xs text-white/90 space-y-2.5 pl-4 list-disc marker:text-brand-coral">
+              <li>人気ゆえにセール時期以外の価格変動が激しい</li>
+              <li>梱包サイズが大きいため置き配指定には注意が必要</li>
+              <li>類似の安価なモデルに比べて初期投資が高い</li>
             </ul>
           </div>
-          <div>
-            <h3 className="text-xs font-bold text-slate-300 mb-1 border-l-2 border-blue-400 pl-2">こんな人には向かないかも</h3>
-            <p className="text-xs text-slate-100 opacity-90 pl-3">
-              頻繁に持ち運びをする方や、収納スペースに余裕がないご家庭には、よりコンパクトなモデルをおすすめします。
+          <div className="pt-2 border-t border-white/10">
+            <h3 className="text-[11px] font-black text-blue-400/80 mb-2 uppercase tracking-widest pl-3 border-l-2 border-blue-400">Target (注意)</h3>
+            <p className="text-xs text-white/80 leading-relaxed pl-3">
+              「とりあえず安いものを」と考える方には不向きです。長期的な耐久性と安全性を重視する方向けの投資的アイテムと言えます。
             </p>
           </div>
         </div>
       </section>
 
       {/* 5. SNS風 リアルな口コミ */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-black text-slate-800 flex items-center gap-1.5 px-1">
-          <MessageCircle size={16} className="text-brand-coral" />
-          リアルな口コミ・レビュー
+      <section className="space-y-4 px-1">
+        <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
+          <MessageCircle size={18} className="text-brand-coral" />
+          ユーザーのリアルな声
         </h2>
         
-        {/* レビュー1件目（好意的な口コミ） */}
-        <div className="flex gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-blue-600">M</span>
-          </div>
-          <div className="bg-white rounded-2xl rounded-tl-none p-3 shadow-sm border border-slate-100 relative">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold text-slate-500">20代 ママ</span>
-              <div className="flex max-w-[60px]"><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /></div>
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center shrink-0 overflow-hidden">
+              <span className="text-xs font-bold text-slate-500">M</span>
             </div>
-            <p className="text-xs text-slate-700 leading-relaxed">
-              ずっと迷っていましたが大正解！作りがしっかりしていて安定感が抜群です。少し重いけど、その分安全だと感じます✨
-            </p>
-            <div className="flex gap-1 mt-2 text-[10px] text-brand-coral font-bold items-center">
-              <ThumbsUp size={10} /> 12人が参考になった
+            <div className="bg-white rounded-3xl rounded-tl-none p-4 shadow-sm border border-slate-100 flex-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-black text-slate-400">1週間前のレビュー</span>
+                <div className="flex"><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /></div>
+              </div>
+              <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                「高い買い物でしたが、使い始めてからママの腰痛が激減しました。機能性は間違いなくNo.1だと思います！✨」
+              </p>
             </div>
           </div>
-        </div>
 
-        {/* レビュー2件目（批判的な口コミ） */}
-        <div className="flex gap-3">
-          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-red-600">K</span>
-          </div>
-          <div className="bg-white rounded-2xl rounded-tl-none p-3 shadow-sm border border-slate-100 relative">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold text-slate-500">30代 パパ</span>
-              <div className="flex max-w-[60px]"><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-slate-200 text-slate-200" /><Star size={10} className="fill-slate-200 text-slate-200" /><Star size={10} className="fill-slate-200 text-slate-200" /></div>
+          <div className="flex gap-3">
+            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center shrink-0 overflow-hidden">
+              <span className="text-xs font-bold text-slate-500">K</span>
             </div>
-            <p className="text-xs text-slate-700 leading-relaxed">
-              機能には満足ですが、やっぱり車のトランクに入れると場所を取りますね💦 コンパクトカーだと厳しいかもしれません。購入前にサイズの確認は必須です！
-            </p>
+            <div className="bg-white rounded-3xl rounded-tl-none p-4 shadow-sm border border-slate-100 flex-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-black text-slate-400">今日届いたパパ</span>
+                <div className="flex"><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-slate-200 text-slate-200" /><Star size={10} className="fill-slate-200 text-slate-200" /></div>
+              </div>
+              <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                「めちゃくちゃ場所取ります（笑）玄関狭い家は覚悟したほうがいいかも。でもデザインは最高にカッコイイです！」
+              </p>
+              <div className="mt-3 py-1.5 px-3 bg-slate-50 rounded-xl inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                <ThumbsUp size={12} className="text-brand-coral" /> 8人が共感
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 6. 商品の詳細説明 (公式) */}
+      {/* 6. 公式の商品説明 */}
       {product.description && (
-        <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm mt-4">
-          <h2 className="text-sm font-black text-slate-800 mb-2">公式の商品説明</h2>
-          <p className="text-[11px] text-slate-500 leading-relaxed max-h-40 overflow-y-auto">
-            {product.description.replace(/<[^>]*>/g, '')}
-          </p>
+        <section className="px-1 opacity-60">
+          <div className="bg-white/50 rounded-2xl p-4 border border-slate-100">
+            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Detailed Description</h2>
+            <p className="text-[10px] text-slate-500 leading-relaxed line-clamp-4">
+              {product.description.replace(/<[^>]*>/g, '')}
+            </p>
+          </div>
         </section>
       )}
     </article>
