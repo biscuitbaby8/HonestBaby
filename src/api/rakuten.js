@@ -16,12 +16,12 @@ async function fetchRakuten(params) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Rakuten API Error (${response.status}):`, errorText);
-      return null;
+      return { error: `HTTP ${response.status}: ${errorText}` };
     }
     return await response.json();
   } catch (e) {
     console.error('Rakuten fetch failed:', e);
-    return null;
+    return { error: e.message };
   }
 }
 
@@ -82,11 +82,12 @@ export const searchRakutenProducts = async ({ keyword, categoryId, hits = 20, so
 
   try {
     const data = await fetchRakuten(params);
+    if (data && data.error) return { error: data.error };
     if (!data) return [];
     return (data.Items || []).map(item => normalizeItem(item, categoryId));
   } catch (error) {
     console.error('Error in searchRakutenProducts:', error);
-    return [];
+    return { error: error.message };
   }
 };
 

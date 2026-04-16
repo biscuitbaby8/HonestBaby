@@ -35,6 +35,7 @@ export default function ProductList() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState('standard');
+  const [apiError, setApiError] = useState(null);
 
   useEffect(() => {
     async function loadProducts() {
@@ -60,7 +61,13 @@ export default function ProductList() {
           sort: sortMode,
         });
         
-        setProducts(results);
+        if (results && results.error) {
+          setApiError(results.error);
+          setProducts([]);
+        } else {
+          setApiError(null);
+          setProducts(results || []);
+        }
       } catch (error) {
         console.error(error);
         setProducts([]);
@@ -119,6 +126,12 @@ export default function ProductList() {
           <SearchX size={40} />
           <p className="text-sm font-medium">該当する商品が見つかりませんでした</p>
           <p className="text-xs text-slate-300">別のキーワードで検索してみてください</p>
+          {apiError && (
+            <div className="mt-4 p-4 bg-red-50 text-red-600 rounded-xl text-xs w-full overflow-auto max-w-sm">
+              <span className="font-bold block mb-1">=== API エラー情報 ===</span>
+              {apiError}
+            </div>
+          )}
         </div>
       )}
     </div>
