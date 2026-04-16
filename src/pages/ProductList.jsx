@@ -40,8 +40,13 @@ export default function ProductList() {
     async function loadProducts() {
       setLoading(true);
       try {
-        const genreId = GENRE_MAP[categoryFilter] || '';
+        let genreId = GENRE_MAP[categoryFilter] || '';
         let keyword = searchKeyword || categoryFilter || 'ベビー用品';
+        
+        // おもちゃカテゴリの場合は、ジャンル検索とキーワード検索の複合が厳しすぎるため、ジャンル指定を外す
+        if (categoryFilter && categoryFilter.startsWith('おもちゃ')) {
+          genreId = '';
+        }
         
         // おもちゃの月齢別のキーワード調整（安全のためシンプルな単一キーワードに）
         if (categoryFilter === 'おもちゃ(0〜3ヶ月)') keyword = 'おもちゃ 新生児';

@@ -28,6 +28,7 @@ export default function ProductDetail() {
               if (yahooRes && yahooRes.length > 0) {
                 setYahooPrice(yahooRes[0].price);
               }
+              setYahooPrice(prev => prev || 'not_found');
             }
           }
         }
@@ -123,7 +124,7 @@ export default function ProductDetail() {
             <div className="flex flex-col">
               <span className="text-[10px] font-black text-blue-600 uppercase tracking-wider">Yahoo!</span>
               <span className="text-base font-black text-slate-800">
-                {yahooPrice ? `¥${yahooPrice.toLocaleString()}` : <span className="text-slate-400 text-xs">読み込み中...</span>}
+                {yahooPrice === null ? <span className="text-slate-400 text-xs text-brand-pulse">読み込み中...</span> : (yahooPrice === 'not_found' ? <span className="text-slate-400 text-xs font-medium">比較対象なし</span> : `¥${yahooPrice.toLocaleString()}`)}
               </span>
             </div>
             <a href={`https://shopping.yahoo.co.jp/search?p=${encodeURIComponent(product.name.substring(0, 30))}`} target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm shadow-blue-200">
