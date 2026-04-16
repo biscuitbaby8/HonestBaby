@@ -43,11 +43,11 @@ export default function ProductList() {
         const genreId = GENRE_MAP[categoryFilter] || '';
         let keyword = searchKeyword || categoryFilter || 'ベビー用品';
         
-        // おもちゃの月齢別のキーワード調整
-        if (categoryFilter === 'おもちゃ(0〜3ヶ月)') keyword = 'おもちゃ 0歳 3ヶ月 新生児';
-        if (categoryFilter === 'おもちゃ(3〜6ヶ月)') keyword = 'おもちゃ 3ヶ月 6ヶ月';
-        if (categoryFilter === 'おもちゃ(6〜12ヶ月)') keyword = 'おもちゃ 6ヶ月 1歳';
-        if (categoryFilter === 'おもちゃ(1歳〜)') keyword = 'おもちゃ 1歳 2歳';
+        // おもちゃの月齢別のキーワード調整（安全のためシンプルな単一キーワードに）
+        if (categoryFilter === 'おもちゃ(0〜3ヶ月)') keyword = 'おもちゃ 新生児';
+        if (categoryFilter === 'おもちゃ(3〜6ヶ月)') keyword = 'おもちゃ 3ヶ月';
+        if (categoryFilter === 'おもちゃ(6〜12ヶ月)') keyword = 'おもちゃ 6ヶ月';
+        if (categoryFilter === 'おもちゃ(1歳〜)') keyword = 'おもちゃ 1歳';
         const results = await searchRakutenProducts({ 
           keyword,
           categoryId: genreId || undefined,
