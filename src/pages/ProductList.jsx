@@ -6,48 +6,44 @@ import { searchRakutenProducts } from '../api/rakuten';
 
 const CATEGORY_CONFIG = {
   'ベビーカー': {
-    main: { keyword: 'ベビーカー 本体 A型 B型 -カバー -シート -マット -フック -収納 -バッグ -レイン', minPrice: 10000 },
+    main: { keyword: 'ベビーカー', minPrice: 10000, categoryId: '566382' },
     accTabs: ['レインカバー', 'フック', 'シート', 'バッグ', 'ドリンクホルダー']
   },
   'チャイルドシート': {
-    main: { keyword: 'チャイルドシート 本体 -マット -カバー -保護', minPrice: 8000 },
+    main: { keyword: 'チャイルドシート', minPrice: 8000, categoryId: '566380' },
     accTabs: ['保護マット', 'カバー', '日よけ', 'クッション']
   },
   '抱っこ紐': {
-    main: { keyword: '抱っこ紐 ベビーキャリア 本体 -よだれカバー -ケープ -収納', minPrice: 4000 },
+    main: { keyword: '抱っこ紐', minPrice: 4000, categoryId: '566381' },
     accTabs: ['よだれカバー', '防寒ケープ', '収納カバー']
   },
   'ベビーベッド': {
-    main: { keyword: 'ベビーベッド 本体 -布団 -シーツ -ガード -メリー', minPrice: 8000 },
+    main: { keyword: 'ベビーベッド', minPrice: 8000, categoryId: '502954' },
     accTabs: ['布団セット', '防水シーツ', 'ベッドガード', 'メリー']
   },
   'オムツ': {
-    main: { keyword: 'おむつ 箱買い 梱 -ごみ箱 -ポーチ -防臭 -シート', minPrice: 2000 },
+    main: { keyword: 'おむつ 箱', minPrice: 2000, categoryId: '502978' },
     accTabs: ['ごみ箱', 'おむつポーチ', '防臭袋', 'おむつ替えシート']
   },
   '粉ミルク': {
-    main: { keyword: '粉ミルク 缶 大缶 -哺乳瓶 -ウォーマー', minPrice: 1500 },
+    main: { keyword: '粉ミルク 缶', minPrice: 1500, categoryId: '502981' },
     accTabs: ['哺乳瓶', 'ウォーマー', 'ミルケース', '消毒']
   },
   'おしりふき': {
-    main: { keyword: 'おしりふき 箱 -ウォーマー -ケース -フタ', minPrice: 1000 },
+    main: { keyword: 'おしりふき 箱', minPrice: 1000, categoryId: '502979' },
     accTabs: ['ウォーマー', 'ケース', 'フタ']
   },
   'おもちゃ(0〜3ヶ月)': {
-    main: { keyword: 'おもちゃ 新生児 -プレイマット -収納', minPrice: 0 },
-    accTabs: ['プレイマット', 'おもちゃ収納']
+    main: { keyword: 'おもちゃ 新生児', minPrice: 0, categoryId: '566395' }
   },
   'おもちゃ(3〜6ヶ月)': {
-    main: { keyword: 'おもちゃ 3ヶ月 -プレイマット -収納', minPrice: 0 },
-    accTabs: ['プレイマット', 'おもちゃ収納']
+    main: { keyword: 'おもちゃ 3ヶ月', minPrice: 0, categoryId: '566395' }
   },
   'おもちゃ(6〜12ヶ月)': {
-    main: { keyword: 'おもちゃ 6ヶ月 -プレイマット -収納', minPrice: 0 },
-    accTabs: ['プレイマット', 'おもちゃ収納']
+    main: { keyword: 'おもちゃ 6ヶ月', minPrice: 0, categoryId: '566395' }
   },
   'おもちゃ(1歳〜)': {
-    main: { keyword: 'おもちゃ 1歳 -プレイマット -収納', minPrice: 0 },
-    accTabs: ['プレイマット', 'おもちゃ収納']
+    main: { keyword: 'おもちゃ 1歳', minPrice: 0, categoryId: '566395' }
   }
 };
 
@@ -86,14 +82,16 @@ export default function ProductList() {
       try {
         let keyword = searchKeyword || categoryFilter || 'ベビー用品';
         let minPrice = undefined;
+        let categoryId = undefined;
         
         // タブに応じた強力な絞り込みロジック
-        const UNIVERSAL_NEGATIVE = '-レンタル -部品 -パーツ -交換 -延長 -オプション -中古';
+        const UNIVERSAL_NEGATIVE = '-レンタル -部品 -パーツ -交換 -延長 -オプション -中古 -カバー -シート -マット -フック -レイン -保護';
         
         if (!searchKeyword && config) {
           if (listTab === 'main') {
             keyword = config.main.keyword + ' ' + UNIVERSAL_NEGATIVE;
             minPrice = config.main.minPrice;
+            categoryId = config.main.categoryId;
           } else if (listTab === 'acc') {
             const baseName = categoryFilter.replace(/\(.*\)/, '');
             keyword = `${baseName} ${accSubTag}`;
@@ -102,7 +100,7 @@ export default function ProductList() {
         
         const results = await searchRakutenProducts({ 
           keyword,
-          categoryId: undefined, // ジャンルIDを一切使わない
+          categoryId,
           minPrice,
           hits: 30,
           sort: sortMode,
@@ -139,8 +137,8 @@ export default function ProductList() {
         )}
       </div>
 
-      {/* タブナビゲーション（本体 vs 周辺グッズ） */}
-      {!searchKeyword && config && (
+      {/* タブナビゲーション（本体 vs 周辺グッズ）おもちゃ等accTabsが無い場合は非表示 */}
+      {!searchKeyword && config && config.accTabs && (
         <div className="mb-2">
           <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner">
             <button
@@ -158,7 +156,7 @@ export default function ProductList() {
           </div>
           
           {/* 周辺グッズ用のサブタグ（チップ） */}
-          {listTab === 'acc' && config.accTabs && (
+          {listTab === 'acc' && (
             <div className="flex gap-2 overflow-x-auto scrollbar-hide mt-3 pb-1">
               {config.accTabs.map(tag => (
                 <button
