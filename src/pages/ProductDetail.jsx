@@ -149,6 +149,28 @@ export default function ProductDetail() {
               最安値を検索
             </a>
           </div>
+
+          {/* Amazon */}
+          <div className="flex justify-between items-center p-3.5 bg-slate-50/50 rounded-2xl border border-slate-200">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider">Amazon</span>
+              <span className="text-xs text-slate-400 font-medium">価格は公式サイトで確認</span>
+            </div>
+            <a href={`https://www.amazon.co.jp/s?k=${encodeURIComponent(product.name.replace(/[【】（）()\[\]]/g, ' ').substring(0, 30))}`} target="_blank" rel="noopener noreferrer" className="bg-slate-800 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm">
+              Amazonで検索
+            </a>
+          </div>
+
+          {/* Mercari */}
+          <div className="flex justify-between items-center p-3.5 bg-rose-50/50 rounded-2xl border border-rose-100/50">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider">メルカリ</span>
+              <span className="text-xs text-rose-400/80 font-medium">中古相場や掘り出し物を探す</span>
+            </div>
+            <a href={`https://jp.mercari.com/search?keyword=${encodeURIComponent(product.name.replace(/[【】（）()\[\]]/g, ' ').substring(0, 20))}`} target="_blank" rel="noopener noreferrer" className="bg-rose-500 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm shadow-rose-200">
+              メルカリで検索
+            </a>
+          </div>
         </div>
       </section>
 

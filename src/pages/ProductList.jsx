@@ -88,9 +88,11 @@ export default function ProductList() {
         let minPrice = undefined;
         
         // タブに応じた強力な絞り込みロジック
+        const UNIVERSAL_NEGATIVE = '-レンタル -部品 -パーツ -交換 -延長 -オプション -中古';
+        
         if (!searchKeyword && config) {
           if (listTab === 'main') {
-            keyword = config.main.keyword;
+            keyword = config.main.keyword + ' ' + UNIVERSAL_NEGATIVE;
             minPrice = config.main.minPrice;
           } else if (listTab === 'acc') {
             const baseName = categoryFilter.replace(/\(.*\)/, '');
