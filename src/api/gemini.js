@@ -4,9 +4,7 @@
  */
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-// Reverting to v1beta as it generally has better support for current flash models via REST
 const MODEL = 'gemini-1.5-flash';
-const BASE_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
 
 const SYSTEM_PROMPT = `
 あなたは子育てグッズ専門の「忖度なしコンサルタント」です。
@@ -29,8 +27,10 @@ export const getChatResponse = async (history) => {
     parts: [{ text: `[システム設定] ${SYSTEM_PROMPT}\n上記の役割になりきって回答してください。` }]
   });
 
+  const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
+  
   try {
-    const response = await fetch(BASE_URL, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents }),
@@ -64,8 +64,9 @@ export const generateProductReviewAnalysis = async (product) => {
     { "type": "bad", "text": "リアルな不満点や辛口口コミ", "author": "昨日のパパ", "stars": 3 }
   ]
 }`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${API_KEY}`;
   try {
-    const response = await fetch(BASE_URL, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] }),
