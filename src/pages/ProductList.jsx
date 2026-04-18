@@ -4,20 +4,51 @@ import { SlidersHorizontal, Loader2, SearchX } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import { searchRakutenProducts } from '../api/rakuten';
 
-// 楽天の正式ジャンルID
-const GENRE_MAP = {
-  'ベビーカー': '566382',
-  'チャイルドシート': '566380',
-  '抱っこ紐': '566381',
-  'オムツ': '502978',
-  '粉ミルク': '502981',
-  'おしりふき': '502979',
-  'ベビーベッド': '502954',
-  'おもちゃ(0〜3ヶ月)': '566395',
-  'おもちゃ(3〜6ヶ月)': '566395',
-  'おもちゃ(6〜12ヶ月)': '566395',
-  'おもちゃ(1歳〜)': '566395',
-  'その他': '',
+const CATEGORY_CONFIG = {
+  'ベビーカー': {
+    main: { keyword: 'ベビーカー 本体 A型 B型 -カバー -シート -マット -フック -収納 -バッグ -レイン', minPrice: 10000 },
+    accTabs: ['レインカバー', 'フック', 'シート', 'バッグ', 'ドリンクホルダー']
+  },
+  'チャイルドシート': {
+    main: { keyword: 'チャイルドシート 本体 -マット -カバー -保護', minPrice: 8000 },
+    accTabs: ['保護マット', 'カバー', '日よけ', 'クッション']
+  },
+  '抱っこ紐': {
+    main: { keyword: '抱っこ紐 ベビーキャリア 本体 -よだれカバー -ケープ -収納', minPrice: 4000 },
+    accTabs: ['よだれカバー', '防寒ケープ', '収納カバー']
+  },
+  'ベビーベッド': {
+    main: { keyword: 'ベビーベッド 本体 -布団 -シーツ -ガード -メリー', minPrice: 8000 },
+    accTabs: ['布団セット', '防水シーツ', 'ベッドガード', 'メリー']
+  },
+  'オムツ': {
+    main: { keyword: 'おむつ 箱買い 梱 -ごみ箱 -ポーチ -防臭 -シート', minPrice: 2000 },
+    accTabs: ['ごみ箱', 'おむつポーチ', '防臭袋', 'おむつ替えシート']
+  },
+  '粉ミルク': {
+    main: { keyword: '粉ミルク 缶 大缶 -哺乳瓶 -ウォーマー', minPrice: 1500 },
+    accTabs: ['哺乳瓶', 'ウォーマー', 'ミルケース', '消毒']
+  },
+  'おしりふき': {
+    main: { keyword: 'おしりふき 箱 -ウォーマー -ケース -フタ', minPrice: 1000 },
+    accTabs: ['ウォーマー', 'ケース', 'フタ']
+  },
+  'おもちゃ(0〜3ヶ月)': {
+    main: { keyword: 'おもちゃ 新生児 -プレイマット -収納', minPrice: 0 },
+    accTabs: ['プレイマット', 'おもちゃ収納']
+  },
+  'おもちゃ(3〜6ヶ月)': {
+    main: { keyword: 'おもちゃ 3ヶ月 -プレイマット -収納', minPrice: 0 },
+    accTabs: ['プレイマット', 'おもちゃ収納']
+  },
+  'おもちゃ(6〜12ヶ月)': {
+    main: { keyword: 'おもちゃ 6ヶ月 -プレイマット -収納', minPrice: 0 },
+    accTabs: ['プレイマット', 'おもちゃ収納']
+  },
+  'おもちゃ(1歳〜)': {
+    main: { keyword: 'おもちゃ 1歳 -プレイマット -収納', minPrice: 0 },
+    accTabs: ['プレイマット', 'おもちゃ収納']
+  }
 };
 
 const SORT_OPTIONS = [
@@ -36,27 +67,41 @@ export default function ProductList() {
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState('standard');
   const [apiError, setApiError] = useState(null);
+  const [listTab, setListTab] = useState('main'); // 'main' | 'acc'
+  const [accSubTag, setAccSubTag] = useState('');
+
+  const config = CATEGORY_CONFIG[categoryFilter];
+
+  // カテゴリが変わったときにタブとサブタグをリセット
+  useEffect(() => {
+    setListTab('main');
+    if (config?.accTabs) {
+      setAccSubTag(config.accTabs[0]);
+    }
+  }, [categoryFilter]);
 
   useEffect(() => {
     async function loadProducts() {
       setLoading(true);
       try {
-        // 楽天APIの仕様変更により特定ジャンルIDが0件になる現象への対処として、すべての検索からジャンル縛りを外し「キーワード」の純粋なテキスト検索に一本化します
         let keyword = searchKeyword || categoryFilter || 'ベビー用品';
+        let minPrice = undefined;
         
-        // カテゴリごとのキーワード最適化（ヒット率向上）
-        if (categoryFilter === 'チャイルドシート') keyword = 'チャイルドシート ベビー';
-        if (categoryFilter === 'オムツ') keyword = 'おむつ 赤ちゃん';
-        if (categoryFilter === '粉ミルク') keyword = '粉ミルク ベビー';
-        if (categoryFilter === 'おしりふき') keyword = 'おしりふき 赤ちゃん';
-        if (categoryFilter === 'おもちゃ(0〜3ヶ月)') keyword = 'おもちゃ 新生児';
-        if (categoryFilter === 'おもちゃ(3〜6ヶ月)') keyword = 'おもちゃ 3ヶ月';
-        if (categoryFilter === 'おもちゃ(6〜12ヶ月)') keyword = 'おもちゃ 6ヶ月';
-        if (categoryFilter === 'おもちゃ(1歳〜)') keyword = 'おもちゃ 1歳';
+        // タブに応じた強力な絞り込みロジック
+        if (!searchKeyword && config) {
+          if (listTab === 'main') {
+            keyword = config.main.keyword;
+            minPrice = config.main.minPrice;
+          } else if (listTab === 'acc') {
+            const baseName = categoryFilter.replace(/\(.*\)/, '');
+            keyword = `${baseName} ${accSubTag}`;
+          }
+        }
         
         const results = await searchRakutenProducts({ 
           keyword,
           categoryId: undefined, // ジャンルIDを一切使わない
+          minPrice,
           hits: 30,
           sort: sortMode,
         });
@@ -76,7 +121,7 @@ export default function ProductList() {
       }
     }
     loadProducts();
-  }, [categoryFilter, searchKeyword, sortMode]);
+  }, [categoryFilter, searchKeyword, sortMode, listTab, accSubTag]);
 
   const title = searchKeyword 
     ? `「${searchKeyword}」の検索結果` 
@@ -91,6 +136,45 @@ export default function ProductList() {
           <span className="text-xs text-slate-400">{products.length}件</span>
         )}
       </div>
+
+      {/* タブナビゲーション（本体 vs 周辺グッズ） */}
+      {!searchKeyword && config && (
+        <div className="mb-2">
+          <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner">
+            <button
+              onClick={() => setListTab('main')}
+              className={`flex-1 py-2.5 text-[11px] font-black rounded-lg transition-all ${listTab === 'main' ? 'bg-white shadow-sm text-brand-navy' : 'text-slate-500 hover:bg-slate-200/50'}`}
+            >
+              本体・メイン
+            </button>
+            <button
+              onClick={() => setListTab('acc')}
+              className={`flex-1 py-2.5 text-[11px] font-black rounded-lg transition-all ${listTab === 'acc' ? 'bg-white shadow-sm text-brand-navy' : 'text-slate-500 hover:bg-slate-200/50'}`}
+            >
+              周辺グッズ・関連
+            </button>
+          </div>
+          
+          {/* 周辺グッズ用のサブタグ（チップ） */}
+          {listTab === 'acc' && config.accTabs && (
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide mt-3 pb-1">
+              {config.accTabs.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setAccSubTag(tag)}
+                  className={`shrink-0 px-3.5 py-1.5 rounded-full text-[10px] font-bold transition-all ${
+                    accSubTag === tag
+                      ? 'bg-brand-coral text-white shadow-sm shadow-brand-coral/30'
+                      : 'bg-white text-slate-500 border border-slate-200 hover:border-brand-coral/40 hover:text-brand-coral'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 並び替え */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">

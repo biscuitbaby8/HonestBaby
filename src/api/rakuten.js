@@ -65,7 +65,7 @@ function normalizeItem(item, categoryId) {
   };
 }
 
-export const searchRakutenProducts = async ({ keyword, categoryId, hits = 20, sort = 'standard' }) => {
+export const searchRakutenProducts = async ({ keyword, categoryId, minPrice, maxPrice, hits = 20, sort = 'standard' }) => {
   if (!APP_ID) {
     console.error('Rakuten Application ID is missing.');
     return [];
@@ -79,6 +79,8 @@ export const searchRakutenProducts = async ({ keyword, categoryId, hits = 20, so
   });
   
   if (categoryId) params.set('genreId', categoryId);
+  if (minPrice) params.set('minPrice', minPrice);
+  if (maxPrice) params.set('maxPrice', maxPrice);
 
   try {
     const data = await fetchRakuten(params);
