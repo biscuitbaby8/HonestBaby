@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Star, ExternalLink, Loader2, Store, TrendingDown, MessageCircle, ThumbsUp, ThumbsDown, AlertTriangle } from 'lucide-react';
 import { getProductById } from '../api/rakuten';
 import { searchYahooProducts } from '../api/yahoo';
+import { generateProductReviewAnalysis } from '../api/gemini';
 import PriceChart from '../components/PriceChart';
 
 export default function ProductDetail() {
@@ -10,7 +11,9 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [yahooPrice, setYahooPrice] = useState(null);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     async function loadProduct() {
@@ -21,6 +24,9 @@ export default function ProductDetail() {
           if (remoteProduct) {
             setProduct(remoteProduct);
             
+            // AI分析を非同期で開始
+            fetchAiAnalysis(remoteProduct);
+
             // Yahoo価格も同時取得して比較
             if (remoteProduct.name) {
               const cleanName = remoteProduct.name.replace(/[【】（）()\[\]]/g, ' ').substring(0, 30);
@@ -40,6 +46,18 @@ export default function ProductDetail() {
     }
     loadProduct();
   }, [id]);
+
+  async function fetchAiAnalysis(prod) {
+    setAiLoading(true);
+    try {
+      const data = await generateProductReviewAnalysis(prod);
+      if (data) setAiAnalysis(data);
+    } catch (err) {
+      console.error('AI Analysis Error:', err);
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -147,29 +165,38 @@ export default function ProductDetail() {
       </section>
 
       {/* 4. AI 忖度なし分析 */}
-      <section className="bg-brand-navy text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
+      <section className="bg-brand-navy text-white rounded-3xl p-6 shadow-xl relative overflow-hidden min-h-[240px]">
         <div className="absolute top-0 right-0 w-32 h-32 bg-brand-coral opacity-10 rounded-full -mr-16 -mt-16"></div>
         <h2 className="text-sm font-black flex items-center gap-2 mb-5 text-brand-coral relative z-10">
           <AlertTriangle size={18} />
           HonestBaby 忖度なし分析
         </h2>
         
-        <div className="space-y-5 relative z-10">
-          <div>
-            <h3 className="text-[11px] font-black text-brand-coral/80 mb-2 uppercase tracking-widest pl-3 border-l-2 border-brand-coral">Cons (欠点)</h3>
-            <ul className="text-xs text-white/90 space-y-2.5 pl-4 list-disc marker:text-brand-coral">
-              <li>人気ゆえにセール時期以外の価格変動が激しい</li>
-              <li>梱包サイズが大きいため置き配指定には注意が必要</li>
-              <li>類似の安価なモデルに比べて初期投資が高い</li>
-            </ul>
+        {aiLoading ? (
+          <div className="flex flex-col items-center justify-center py-10 opacity-60">
+            <Loader2 className="animate-spin mb-2" size={24} />
+            <p className="text-[10px] uppercase tracking-widest">AI分析中...</p>
           </div>
-          <div className="pt-2 border-t border-white/10">
-            <h3 className="text-[11px] font-black text-blue-400/80 mb-2 uppercase tracking-widest pl-3 border-l-2 border-blue-400">Target (注意)</h3>
-            <p className="text-xs text-white/80 leading-relaxed pl-3">
-              「とりあえず安いものを」と考える方には不向きです。長期的な耐久性と安全性を重視する方向けの投資的アイテムと言えます。
-            </p>
+        ) : aiAnalysis ? (
+          <div className="space-y-5 relative z-10 fade-in">
+            <div>
+              <h3 className="text-[11px] font-black text-brand-coral/80 mb-2 uppercase tracking-widest pl-3 border-l-2 border-brand-coral">Cons (欠点)</h3>
+              <ul className="text-xs text-white/90 space-y-2.5 pl-4 list-disc marker:text-brand-coral">
+                {aiAnalysis.cons.map((con, i) => (
+                  <li key={i}>{con}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="pt-2 border-t border-white/10">
+              <h3 className="text-[11px] font-black text-blue-400/80 mb-2 uppercase tracking-widest pl-3 border-l-2 border-blue-400">Target (注意)</h3>
+              <p className="text-xs text-white/80 leading-relaxed pl-3">
+                {aiAnalysis.target}
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="text-xs text-white/40 text-center py-10">分析データを取得できませんでした</div>
+        )}
       </section>
 
       {/* 5. SNS風 リアルな口コミ */}
@@ -180,38 +207,44 @@ export default function ProductDetail() {
         </h2>
         
         <div className="space-y-4">
-          <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center shrink-0 overflow-hidden">
-              <span className="text-xs font-bold text-slate-500">M</span>
-            </div>
-            <div className="bg-white rounded-3xl rounded-tl-none p-4 shadow-sm border border-slate-100 flex-1">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-black text-slate-400">1週間前のレビュー</span>
-                <div className="flex"><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /></div>
+          {aiLoading ? (
+            [1, 2].map(i => (
+              <div key={i} className="flex gap-3 animate-pulse">
+                <div className="w-10 h-10 rounded-full bg-slate-100 shrink-0"></div>
+                <div className="bg-white rounded-3xl p-4 flex-1 h-24 border border-slate-50"></div>
               </div>
-              <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                「高い買い物でしたが、使い始めてからママの腰痛が激減しました。機能性は間違いなくNo.1だと思います！✨」
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center shrink-0 overflow-hidden">
-              <span className="text-xs font-bold text-slate-500">K</span>
-            </div>
-            <div className="bg-white rounded-3xl rounded-tl-none p-4 shadow-sm border border-slate-100 flex-1">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-black text-slate-400">今日届いたパパ</span>
-                <div className="flex"><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-amber-400 text-amber-400" /><Star size={10} className="fill-slate-200 text-slate-200" /><Star size={10} className="fill-slate-200 text-slate-200" /></div>
+            ))
+          ) : aiAnalysis?.reviews ? (
+            aiAnalysis.reviews.map((rev, i) => (
+              <div key={i} className="flex gap-3 fade-in">
+                <div className={`w-10 h-10 rounded-full border-2 border-white shadow-sm flex items-center justify-center shrink-0 overflow-hidden ${rev.type === 'good' ? 'bg-rose-100 text-rose-500' : 'bg-slate-100 text-slate-500'}`}>
+                  <span className="text-xs font-bold">{rev.author.charAt(0)}</span>
+                </div>
+                <div className="bg-white rounded-3xl rounded-tl-none p-4 shadow-sm border border-slate-100 flex-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-black text-slate-400">{rev.author}</span>
+                    <div className="flex">
+                      {[...Array(5)].map((_, si) => (
+                        <Star key={si} size={10} className={`${si < rev.stars ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'}`} />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">
+                    {rev.text}
+                  </p>
+                  {i === 1 && (
+                    <div className="mt-3 py-1.5 px-3 bg-slate-50 rounded-xl inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                      <ThumbsUp size={12} className="text-brand-coral" /> 8人が共感
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                「めちゃくちゃ場所取ります（笑）玄関狭い家は覚悟したほうがいいかも。でもデザインは最高にカッコイイです！」
-              </p>
-              <div className="mt-3 py-1.5 px-3 bg-slate-50 rounded-xl inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-                <ThumbsUp size={12} className="text-brand-coral" /> 8人が共感
-              </div>
+            ))
+          ) : (
+            <div className="text-xs text-slate-400 text-center py-10 bg-white rounded-3xl border border-dashed border-slate-100 italic">
+              AIがSNSから口コミを集約中... (再読み込みしてください)
             </div>
-          </div>
+          )}
         </div>
       </section>
 

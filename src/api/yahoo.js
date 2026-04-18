@@ -4,26 +4,20 @@
 
 const CLIENT_ID = import.meta.env.VITE_YAHOO_CLIENT_ID;
 
-// Yahoo!ショッピング商品検索API v3
-const BASE_URL = 'https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch';
+// Vercel Serverless Function経由でCORSを回避
+const BASE_URL = 'https://honest-baby.vercel.app/api/yahoo';
 
 export const searchYahooProducts = async (keyword) => {
-  if (!CLIENT_ID) {
-    console.warn('Yahoo Client ID is missing. Setup VITE_YAHOO_CLIENT_ID.');
-    return [];
-  }
+  if (!keyword) return [];
 
   const params = new URLSearchParams({
-    appid: CLIENT_ID,
     query: keyword,
-    results: '5',
-    sort: '+price', // 安い順
   });
 
   try {
     const response = await fetch(`${BASE_URL}?${params.toString()}`);
     if (!response.ok) {
-      console.error('Yahoo API responded with:', response.status);
+      console.error('Yahoo Proxy responded with:', response.status);
       return [];
     }
     const data = await response.json();

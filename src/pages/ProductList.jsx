@@ -44,7 +44,11 @@ export default function ProductList() {
         // 楽天APIの仕様変更により特定ジャンルIDが0件になる現象への対処として、すべての検索からジャンル縛りを外し「キーワード」の純粋なテキスト検索に一本化します
         let keyword = searchKeyword || categoryFilter || 'ベビー用品';
         
-        // おもちゃの月齢別のキーワード調整（安全のためシンプルな単一キーワードに）
+        // カテゴリごとのキーワード最適化（ヒット率向上）
+        if (categoryFilter === 'チャイルドシート') keyword = 'チャイルドシート ベビー';
+        if (categoryFilter === 'オムツ') keyword = 'おむつ 赤ちゃん';
+        if (categoryFilter === '粉ミルク') keyword = '粉ミルク ベビー';
+        if (categoryFilter === 'おしりふき') keyword = 'おしりふき 赤ちゃん';
         if (categoryFilter === 'おもちゃ(0〜3ヶ月)') keyword = 'おもちゃ 新生児';
         if (categoryFilter === 'おもちゃ(3〜6ヶ月)') keyword = 'おもちゃ 3ヶ月';
         if (categoryFilter === 'おもちゃ(6〜12ヶ月)') keyword = 'おもちゃ 6ヶ月';

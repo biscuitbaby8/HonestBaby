@@ -49,3 +49,36 @@ export const getChatResponse = async (history) => {
     return '現在、AIの機嫌が悪いようです（接続エラー）。少し時間をおいて再度お試しください。';
   }
 };
+
+export const generateProductReviewAnalysis = async (product) => {
+  const prompt = `あなたは「HonestBaby」という忖度なし・中立的・辛口なベビー用品レビューAIです。以下の商品に関する「SNS風のリアルな口コミ2件（良いものと悪いもの）」と、「欠点(Cons)」「注意点(Target)」を以下のJSON形式で返してください。決してMarkdownなどで囲まず、純粋なJSON文字列のみ出力すること。
+商品名: ${product.name}
+価格: ${product.price}
+説明: ${product.description || ''}
+
+{
+  "cons": ["欠点1やデメリット", "欠点2", "欠点3"],
+  "target": "どういう家庭には向かないか、気をつけるべき点（2〜3文）",
+  "reviews": [
+    { "type": "good", "text": "リアルな良い口コミ（絵文字も少し）", "author": "1週間前のレビュー", "stars": 5 },
+    { "type": "bad", "text": "リアルな不満点や辛口口コミ", "author": "昨日のパパ", "stars": 3 }
+  ]
+}`;
+  try {
+    const response = await fetch(BASE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!responseText) return null;
+    // JSON部分だけを抽出する安全策
+    const jsonStr = responseText.match(/\{[\s\S]*\}/)?.[0] || responseText;
+    return JSON.parse(jsonStr);
+  } catch (err) {
+    console.error('Failed to parse Gemini Review Analysis:', err);
+    return null;
+  }
+};
