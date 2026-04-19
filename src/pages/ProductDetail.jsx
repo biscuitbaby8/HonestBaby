@@ -33,8 +33,9 @@ export default function ProductDetail() {
               const yahooRes = await searchYahooProducts(cleanName);
               if (yahooRes && yahooRes.length > 0) {
                 setYahooPrice(yahooRes[0].price);
+              } else {
+                setYahooPrice('not_found');
               }
-              setYahooPrice(prev => prev || 'not_found');
             }
           }
         }

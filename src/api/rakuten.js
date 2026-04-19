@@ -7,8 +7,8 @@ const APP_ID = import.meta.env.VITE_RAKUTEN_APP_ID;
 const ACCESS_KEY = import.meta.env.VITE_RAKUTEN_ACCESS_KEY; // Required for UUID IDs
 const AFFILIATE_ID = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID;
 
-// Modern OpenAPI endpoint (v1)
-const BASE_URL = 'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401';
+// Stable standard endpoint
+const BASE_URL = 'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601';
 
 async function fetchRakuten(params) {
   try {
