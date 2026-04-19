@@ -6,31 +6,31 @@ import { searchRakutenProducts } from '../api/rakuten';
 
 const CATEGORY_CONFIG = {
   'ベビーカー': {
-    main: { keyword: 'ベビーカー', minPrice: 10000, categoryId: '566382' },
+    main: { keyword: 'ベビーカー -カバー -フック -マット -レイン', minPrice: 10000, categoryId: '566382' },
     accTabs: ['レインカバー', 'フック', 'シート', 'バッグ', 'ドリンクホルダー']
   },
   'チャイルドシート': {
-    main: { keyword: 'チャイルドシート', minPrice: 8000, categoryId: '566380' },
+    main: { keyword: 'チャイルドシート -カバー -保護', minPrice: 8000, categoryId: '566380' },
     accTabs: ['保護マット', 'カバー', '日よけ', 'クッション']
   },
   '抱っこ紐': {
-    main: { keyword: '抱っこ紐', minPrice: 4000, categoryId: '566381' },
+    main: { keyword: '抱っこ紐 -ケープ -カバー', minPrice: 4000, categoryId: '566381' },
     accTabs: ['よだれカバー', '防寒ケープ', '収納カバー']
   },
   'ベビーベッド': {
-    main: { keyword: 'ベビーベッド', minPrice: 8000, categoryId: '502954' },
+    main: { keyword: 'ベビーベッド -メリー -布団', minPrice: 8000, categoryId: '502954' },
     accTabs: ['布団セット', '防水シーツ', 'ベッドガード', 'メリー']
   },
   'オムツ': {
-    main: { keyword: 'おむつ 箱', minPrice: 2000, categoryId: '502978' },
+    main: { keyword: 'おむつ -ごみ箱 -ポーチ -防臭', minPrice: 2000, categoryId: '502978' },
     accTabs: ['ごみ箱', 'おむつポーチ', '防臭袋', 'おむつ替えシート']
   },
   '粉ミルク': {
-    main: { keyword: '粉ミルク 缶', minPrice: 1500, categoryId: '502981' },
+    main: { keyword: '粉ミルク -哺乳瓶 -ウォーマー', minPrice: 1500, categoryId: '502981' },
     accTabs: ['哺乳瓶', 'ウォーマー', 'ミルケース', '消毒']
   },
   'おしりふき': {
-    main: { keyword: 'おしりふき 箱', minPrice: 1000, categoryId: '502979' },
+    main: { keyword: 'おしりふき -ウォーマー -ケース -フタ', minPrice: 1000, categoryId: '502979' },
     accTabs: ['ウォーマー', 'ケース', 'フタ']
   },
   'おもちゃ(0〜3ヶ月)': {
@@ -84,8 +84,8 @@ export default function ProductList() {
         let minPrice = undefined;
         let categoryId = undefined;
         
-        // タブに応じた強力な絞り込みロジック
-        const UNIVERSAL_NEGATIVE = '-レンタル -部品 -パーツ -交換 -延長 -オプション -中古 -カバー -シート -マット -フック -レイン -保護';
+        // タブに応じた強力な絞り込みロジック（共通マイナス検索からは「-シート」など危険な単語を排除）
+        const UNIVERSAL_NEGATIVE = '-レンタル -部品 -パーツ -交換 -延長 -オプション -中古';
         
         if (!searchKeyword && config) {
           if (listTab === 'main') {
