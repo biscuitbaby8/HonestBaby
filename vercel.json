@@ -1,0 +1,15 @@
+{
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.honestbaby-care.com"
+        }
+      ],
+      "destination": "https://honestbaby-care.com/:path*",
+      "permanent": true
+    }
+  ]
+}
