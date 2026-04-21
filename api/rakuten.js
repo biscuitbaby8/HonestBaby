@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   // Rakuten Ichiba Item Search API V2
-  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170426?applicationId=${appId}&keyword=${encodeURIComponent(query)}&hits=1&sort=%2BitemPrice&affiliateId=${affiliateId || ''}`;
+  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170426?applicationId=${appId}&keyword=${encodeURIComponent(query)}&hits=15&sort=%2BitemPrice&affiliateId=${affiliateId || ''}`;
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
