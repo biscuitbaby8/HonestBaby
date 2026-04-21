@@ -35,6 +35,7 @@ const LEGAL_PAGES = {
 const App = () => {
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
+  const [dbError, setDbError] = useState(null);
 
   // Navigation States
   const [activeTab, setActiveTab] = useState('home'); 
@@ -90,48 +91,55 @@ const App = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       setDbLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          shops:shops_prices(*),
-          honestReviews:reviews(*),
-          snsReviews:sns_reviews(*)
-        `);
-      
-      if (error) {
-        console.error("Error fetching products from Supabase:", error);
-      } else if (data) {
-        const formatted = data.map(p => ({
-          ...p,
-          rating: Number(p.rating),
-          subCategory: p.sub_category,
-          reviewsCount: p.reviews_count,
-          image: p.image_url,
-          aiAnalysis: p.ai_analysis,
-          giftTags: p.gift_tags || [],
-          usedPrice: p.used_price_estimate,
-          unitCount: p.unit_count,
-          unitName: p.unit_name,
-          shops: (p.shops || []).map(s => ({
-            ...s,
-            name: s.shop_name,
-            type: s.shop_type,
-            lowestPrice: s.lowest_price
-          })),
-          honestReviews: (p.honestReviews || []).map(r => ({
-            ...r,
-            user: r.user_name,
-            date: new Date(r.created_at).toLocaleDateString()
-          })),
-          snsReviews: (p.snsReviews || []).map(r => ({
-            ...r,
-            user: r.user_handle
-          }))
-        }));
-        setDbProducts(formatted);
+      setDbError(null);
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select(`
+            *,
+            shops:shops_prices(*),
+            honestReviews:reviews(*),
+            snsReviews:sns_reviews(*)
+          `);
+        
+        if (error) throw error;
+
+        if (data) {
+          const formatted = data.map(p => ({
+            ...p,
+            rating: Number(p.rating),
+            subCategory: p.sub_category,
+            reviewsCount: p.reviews_count,
+            image: p.image_url,
+            aiAnalysis: p.ai_analysis,
+            giftTags: p.gift_tags || [],
+            usedPrice: p.used_price_estimate,
+            unitCount: p.unit_count,
+            unitName: p.unit_name,
+            shops: (p.shops || []).map(s => ({
+              ...s,
+              name: s.shop_name,
+              type: s.shop_type,
+              lowestPrice: s.lowest_price
+            })),
+            honestReviews: (p.honestReviews || []).map(r => ({
+              ...r,
+              user: r.user_name,
+              date: new Date(r.created_at).toLocaleDateString()
+            })),
+            snsReviews: (p.snsReviews || []).map(r => ({
+              ...r,
+              user: r.user_handle
+            }))
+          }));
+          setDbProducts(formatted);
+        }
+      } catch (err) {
+        console.error("Error fetching products from Supabase:", err);
+        setDbError(err.message || String(err));
+      } finally {
+        setDbLoading(false);
       }
-      setDbLoading(false);
     };
 
     fetchProducts();
@@ -302,13 +310,37 @@ ${productContext}
   // --- 各画面レンダリング ---
 
   const renderHome = () => {
+    if (dbError) {
+      return (
+        <div className="bg-[#FFF5F5] border border-[#F2ABAC] p-10 rounded-[3rem] text-center my-10 animate-in fade-in zoom-in duration-500">
+          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-[#FFEBEB]">
+            <Info className="w-8 h-8 text-[#F2ABAC]" />
+          </div>
+          <h3 className="font-serif font-black text-[#5A4C4C] text-xl mb-3">接続エラー</h3>
+          <p className="text-xs text-[#8E8282] mb-8 leading-relaxed font-bold px-4">
+            データベースとの接続に失敗しました。<br/>
+            Vercelの環境変数（URLとKey）に間違いがないか、<br/>
+            末尾に不要なスラッシュがないか再確認してください。
+          </p>
+          <div className="bg-white/50 p-4 rounded-2xl mb-8 text-left border border-[#F4EFEB]">
+            <p className="text-[10px] font-black text-[#A5A19E] uppercase tracking-tighter mb-1">Error Detail:</p>
+            <code className="text-[10px] text-[#F2ABAC] break-all leading-tight font-mono">{dbError}</code>
+          </div>
+          <button onClick={() => window.location.reload()} className="bg-[#7B8E76] px-10 py-4 rounded-full text-xs font-black text-white shadow-lg active:scale-95 transition-all">
+            再読み込みして確認
+          </button>
+        </div>
+      );
+    }
+
     if (dbLoading) {
       return (
-        <div className="flex flex-col items-center py-20 text-[#A5A19E]">
-          <div className="w-8 h-8 border-4 border-[#F2ABAC] border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-xs font-bold uppercase tracking-widest whitespace-pre-line text-center">
-            データを読み込んでいます...{"\n"}(Supabaseに接続中)
-          </p>
+        <div className="flex flex-col items-center py-32 text-[#A5A19E] animate-in fade-in duration-700">
+          <div className="w-10 h-10 border-4 border-[#F2ABAC]/20 border-t-[#F2ABAC] rounded-full animate-spin mb-6"></div>
+          <div className="space-y-2 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F2ABAC]/60">Connecting to Hub</p>
+            <p className="text-xs font-bold text-[#A5A19E]">データを読み込んでいます...</p>
+          </div>
         </div>
       );
     }
