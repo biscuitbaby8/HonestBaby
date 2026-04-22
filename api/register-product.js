@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         image_url: product.image,
         description: product.aiAnalysis || '',
         rating: product.rating || 4.5,
-        review_count: 10,
+        reviews_count: 10,
         is_market_wide: true // 自動登録フラグ
       }])
       .select();

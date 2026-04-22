@@ -4,7 +4,7 @@ TRUNCATE products CASCADE;
 -- 主要カテゴリーの「種」となるマスターデータを投入 (初期100点程度)
 -- これにより、APIが動く前からサイトの「型」ができあがります
 
-INSERT INTO products (name, category, brand, image_url, description, rating, review_count) VALUES
+INSERT INTO products (name, category, brand, image_url, description, rating, reviews_count) VALUES
 ('サイベックス リベル 2024', 'ベビーカー', 'Cybex', 'https://m.media-amazon.com/images/I/61eL-S1l3LL._AC_SL1500_.jpg', '世界中で大人気の軽量・コンパクトベビーカー。自転車のカゴにも入るサイズ感が魅力です。', 4.9, 120),
 ('コンビ スゴカル Switch', 'ベビーカー', 'Combi', 'https://m.media-amazon.com/images/I/61jP7o-hVfL._AC_SL1500_.jpg', '独自の振動吸収構造で、赤ちゃんも快適。軽量で持ち運びも楽々です。', 4.8, 85),
 ('アップリカ マジカルエアー', 'ベビーカー', 'Aprica', 'https://m.media-amazon.com/images/I/61mNnO+k-WL._AC_SL1200_.jpg', '超軽量なB型ベビーカー。ワンタッチ開閉で電車やバスの移動もスムーズ。', 4.7, 92),
