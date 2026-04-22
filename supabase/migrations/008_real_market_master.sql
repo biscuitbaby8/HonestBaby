@@ -16,7 +16,7 @@ INSERT INTO products (name, category, brand, image_url, description, rating, rev
 ('明治 ほほえみ らくらくキューブ', 'ミルク・授乳', 'Meiji', 'https://m.media-amazon.com/images/I/71X-M+3mE3L._AC_SL1500_.jpg', '計量いらずで調乳が簡単なキューブタイプ。お出かけにも便利。', 4.9, 640);
 
 -- 価格データの紐付け（目安）
-INSERT INTO shops_prices (product_id, shop_name, shop_type, lowest_price, url)
-SELECT id, '楽天市場', 'rakuten', 27500, 'https://item.rakuten.co.jp/common-url/' FROM products WHERE brand = 'Cybex';
-INSERT INTO shops_prices (product_id, shop_name, shop_type, lowest_price, url)
-SELECT id, 'Yahoo!ショッピング', 'yahoo', 27000, 'https://shopping.yahoo.co.jp/common-url/' FROM products WHERE brand = 'Cybex';
+INSERT INTO shops_prices (product_id, shop_name, shop_type, lowest_price, sellers)
+SELECT id, '楽天市場', 'mall', 27500, '[{"name": "楽天市場", "price": 27500, "url": "https://item.rakuten.co.jp/common-url/"}]'::jsonb FROM products WHERE brand = 'Cybex';
+INSERT INTO shops_prices (product_id, shop_name, shop_type, lowest_price, sellers)
+SELECT id, 'Yahoo!ショッピング', 'mall', 27000, '[{"name": "Yahoo!ショッピング", "price": 27000, "url": "https://shopping.yahoo.co.jp/common-url/"}]'::jsonb FROM products WHERE brand = 'Cybex';

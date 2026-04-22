@@ -51,9 +51,13 @@ export default async function handler(req, res) {
       const shopInserts = product.shops.map(s => ({
         product_id: productId,
         shop_name: s.name,
-        shop_type: s.name.includes('楽天') ? 'rakuten' : s.name.includes('Yahoo') ? 'yahoo' : 'amazon',
+        shop_type: 'mall',
         lowest_price: s.price,
-        url: s.url
+        sellers: JSON.stringify([{
+          name: s.name,
+          price: s.price,
+          url: s.url
+        }])
       }));
 
       await supabase.from('shops_prices').insert(shopInserts);
