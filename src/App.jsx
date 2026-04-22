@@ -236,10 +236,15 @@ const App = () => {
         };
       });
 
-      setRemoteProducts(finalProducts);
+      // AIの結果が空、またはパース失敗時のフォールバック: 生データをそのまま表示
+      if (finalProducts.length === 0 && rawItems.length > 0) {
+        setRemoteProducts(rawItems.slice(0, 10).map(i => ({ ...i, category: catName, isMarketWide: true })));
+      } else {
+        setRemoteProducts(finalProducts);
+      }
     } catch (e) {
       console.error("Market-Wide Fetch error:", e);
-      setRemoteError(e.message);
+      setRemoteError(`${e.message} (API Check Required)`);
     } finally {
       setIsRemoteLoading(false);
     }
@@ -623,14 +628,14 @@ ${productContext}
 
         <div className="grid grid-cols-2 gap-4 mb-8">
           {/* 市場網羅・ランキング商品を優先表示 */}
-          {remoteProducts.length > 0 && remoteProducts.map((p) => (
+          {remoteProducts.length > 0 ? remoteProducts.map((p) => (
             <ProductCard key={p.id} product={p} />
-          ))}
-
-          {/* DB Products (旧・こだわりリスト) は補助的に表示 */}
-          {filtered.length > 0 && filtered.map((p, idx) => (
-            <ProductCard key={p.id} product={p} localRank={sortOrder === "popular" ? idx + 1 : null} />
-          ))}
+          )) : (
+            /* リモートが空で、ロードもしていない場合のみDB商品を表示 */
+            !isRemoteLoading && filtered.map((p, idx) => (
+              <ProductCard key={p.id} product={p} localRank={sortOrder === "popular" ? idx + 1 : null} />
+            ))
+          )}
 
           {/* Empty State */}
           {!isRemoteLoading && filtered.length === 0 && remoteProducts.length === 0 && (
@@ -640,8 +645,12 @@ ${productContext}
 
         {/* 配信確認用フッター */}
         <div className="text-center py-10 opacity-30">
-          <p className="text-[9px] font-black tracking-widest text-[#A5A19E]">HONEST BABY PLATFORM v1.4.22 (AUTOPILOT)</p>
-          <p className="text-[8px] text-[#A5A19E] mt-1 uppercase">Market-Scale Aggregator Enabled</p>
+          <p className="text-[9px] font-black tracking-widest text-[#A5A19E]">HONEST BABY PLATFORM v1.4.23 (DIAGNOSTIC)</p>
+          <div className="flex justify-center gap-4 mt-2">
+            <span className={`text-[7px] px-2 py-0.5 rounded-full ${dbError ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-600'}`}>DB:{dbError ? 'ERR' : 'OK'}</span>
+            <span className={`text-[7px] px-2 py-0.5 rounded-full ${remoteError ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-600'}`}>API:{remoteError ? 'ERR' : 'OK'}</span>
+          </div>
+          <p className="text-[8px] text-[#A5A19E] mt-2 uppercase">Market-Scale Aggregator + AI Fallback</p>
         </div>
       </div>
     );
