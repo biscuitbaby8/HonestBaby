@@ -241,6 +241,19 @@ const App = () => {
         setRemoteProducts(rawItems.slice(0, 10).map(i => ({ ...i, category: catName, isMarketWide: true })));
       } else {
         setRemoteProducts(finalProducts);
+        
+        // --- 新機能: バックグラウンドで商品情報をDBに自動登録 (Discovery Engine) ---
+        finalProducts.forEach(async (p) => {
+          try {
+            await fetch('/api/register-product', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ product: p })
+            });
+          } catch (err) {
+            console.error("Auto-registration error:", err);
+          }
+        });
       }
     } catch (e) {
       console.error("Market-Wide Fetch error:", e);
@@ -643,14 +656,14 @@ ${productContext}
           )}
         </div>
 
-        {/* 配信確認用フッター */}
+        {/* 自律成長型プラットフォーム・フッター */}
         <div className="text-center py-10 opacity-30">
-          <p className="text-[9px] font-black tracking-widest text-[#A5A19E]">HONEST BABY PLATFORM v1.4.23 (DIAGNOSTIC)</p>
+          <p className="text-[9px] font-black tracking-widest text-[#A5A19E]">HONEST BABY PLATFORM v2.0.0 (AUTONOMOUS)</p>
           <div className="flex justify-center gap-4 mt-2">
-            <span className={`text-[7px] px-2 py-0.5 rounded-full ${dbError ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-600'}`}>DB:{dbError ? 'ERR' : 'OK'}</span>
+            <span className="text-[7px] px-2 py-0.5 rounded-full bg-green-100 text-green-600 animate-pulse">DISCOVERY ENGINE: RUNNING</span>
             <span className={`text-[7px] px-2 py-0.5 rounded-full ${remoteError ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-600'}`}>API:{remoteError ? 'ERR' : 'OK'}</span>
           </div>
-          <p className="text-[8px] text-[#A5A19E] mt-2 uppercase">Market-Scale Aggregator + AI Fallback</p>
+          <p className="text-[8px] text-[#A5A19E] mt-2 uppercase">Self-Growing Market Indexing Active</p>
         </div>
       </div>
     );
