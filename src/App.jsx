@@ -478,7 +478,12 @@ ${productContext}
       onClick={() => setSelectedProduct(product)}
     >
       <div className="relative aspect-square bg-[#F9F6F3] p-4">
-        <img src={product.image} className="w-full h-full object-cover rounded-[1.5rem]" alt={product.name} />
+        <img 
+          src={product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} 
+          onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }}
+          className="w-full h-full object-cover rounded-[1.5rem]" 
+          alt={product.name} 
+        />
         <button 
           onClick={(e) => toggleFavorite(e, product)}
           className="absolute top-6 right-6 bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-sm z-10 hover:bg-rose-50 transition-colors"
