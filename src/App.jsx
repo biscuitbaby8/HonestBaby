@@ -502,7 +502,14 @@ ${productContext}
           <div className="col-span-2 bg-white rounded-[2.5rem] p-12 text-center border-2 border-dashed border-[#F2ABAC]/30 my-4 animate-pulse">
             <div className="w-12 h-12 bg-[#FFF5F5] rounded-full flex items-center justify-center mx-auto mb-4 text-[#F2ABAC]"><Sparkles className="w-6 h-6 animate-spin-slow" /></div>
             <p className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-[0.2em] mb-2">AI Analyzing Web Results...</p>
-            <p className="text-sm font-bold text-[#5A4C4C]">最新の${selectedCategory}を厳選中...</p>
+            <p className="text-sm font-bold text-[#5A4C4C]">最新の{selectedCategory}を厳選中...</p>
+          </div>
+        )}
+
+        {remoteError && (
+          <div className="col-span-2 bg-rose-50 border border-rose-100 p-6 rounded-[2rem] text-center my-4">
+            <p className="text-xs text-rose-400 font-bold mb-2">通信に失敗しました</p>
+            <p className="text-[10px] text-rose-300 font-mono break-all">{remoteError}</p>
           </div>
         )}
 
@@ -740,6 +747,13 @@ ${productContext}
                   <div className="w-12 h-12 bg-[#FFF5F5] rounded-full flex items-center justify-center mx-auto mb-4 text-[#F2ABAC]"><Sparkles className="w-6 h-6 animate-spin-slow" /></div>
                   <p className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-[0.2em] mb-2">AI Generating Best Selection...</p>
                   <p className="text-sm font-bold text-[#5A4C4C]">「{searchTerm}」をWebから厳選中...</p>
+                </div>
+              )}
+
+              {remoteError && (
+                <div className="bg-rose-50 border border-rose-100 p-6 rounded-[2rem] text-center mb-8">
+                  <p className="text-xs text-rose-400 font-bold mb-2">検索に失敗しました</p>
+                  <p className="text-[10px] text-rose-300 font-mono break-all">{remoteError}</p>
                 </div>
               )}
 
