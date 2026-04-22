@@ -1,9 +1,7 @@
--- 既存のテストデータを完全にクリア
+-- 既存のデータをクリア
 TRUNCATE products CASCADE;
 
--- 主要カテゴリーの「種」となるマスターデータを投入 (初期100点程度)
--- これにより、APIが動く前からサイトの「型」ができあがります
-
+-- 主要カテゴリーのマスターデータ投入
 INSERT INTO products (name, category, brand, image_url, description, rating, reviews_count) VALUES
 ('サイベックス リベル 2024', 'ベビーカー', 'Cybex', 'https://thumbnail.image.rakuten.co.jp/@0_mall/natural-living/cabinet/02/u955602_1.jpg', '世界中で大人気の軽量・コンパクトベビーカー。自転車のカゴにも入るサイズ感が魅力です。', 4.9, 120),
 ('コンビ スゴカル Switch', 'ベビーカー', 'Combi', 'https://thumbnail.image.rakuten.co.jp/@0_mall/netbaby/cabinet/818/a13818_1.jpg', '独自の振動吸収構造で、赤ちゃんも快適。軽量で持ち運びも楽々です。', 4.8, 85),
@@ -15,8 +13,25 @@ INSERT INTO products (name, category, brand, image_url, description, rating, rev
 ('ピジョン 母乳実感 哺乳びん', 'ミルク・授乳', 'Pigeon', 'https://thumbnail.image.rakuten.co.jp/@0_mall/pigeon-official/cabinet/02/1026750_1.jpg', '赤ちゃんが母乳を飲む時と同じ口の動きができる、研究に基づいた哺乳瓶。', 4.9, 850),
 ('明治 ほほえみ らくらくキューブ', 'ミルク・授乳', 'Meiji', 'https://thumbnail.image.rakuten.co.jp/@0_mall/rakuten24/cabinet/847/4902705116847.jpg', '計量いらずで調乳が簡単なキューブタイプ。お出かけにも便利。', 4.9, 640);
 
--- 価格データの紐付け（目安）
+-- 全ての商品にショップデータを紐付け（これで価格と比較が表示されます）
 INSERT INTO shops_prices (product_id, shop_name, shop_type, lowest_price, sellers)
-SELECT id, '楽天市場', 'mall', 27500, '[{"name": "楽天市場", "price": 27500, "url": "https://item.rakuten.co.jp/common-url/"}]'::jsonb FROM products WHERE brand = 'Cybex';
+SELECT id, '楽天市場', 'mall', 
+  CASE 
+    WHEN category = 'ベビーカー' THEN 27500 
+    WHEN category = '抱っこ紐' THEN 31900
+    WHEN category = 'おむつ' THEN 4980
+    ELSE 1980
+  END, 
+  '[{"name": "楽天市場", "price": 27000, "url": "https://www.rakuten.co.jp"}]'::jsonb 
+FROM products;
+
 INSERT INTO shops_prices (product_id, shop_name, shop_type, lowest_price, sellers)
-SELECT id, 'Yahoo!ショッピング', 'mall', 27000, '[{"name": "Yahoo!ショッピング", "price": 27000, "url": "https://shopping.yahoo.co.jp/common-url/"}]'::jsonb FROM products WHERE brand = 'Cybex';
+SELECT id, 'Yahoo!ショッピング', 'mall', 
+  CASE 
+    WHEN category = 'ベビーカー' THEN 27000 
+    WHEN category = '抱っこ紐' THEN 31000
+    WHEN category = 'おむつ' THEN 4800
+    ELSE 1800
+  END, 
+  '[{"name": "Yahoo!ショッピング", "price": 26500, "url": "https://shopping.yahoo.co.jp"}]'::jsonb 
+FROM products;

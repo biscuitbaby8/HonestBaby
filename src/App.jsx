@@ -373,7 +373,11 @@ const App = () => {
   };
 
   const isFavorite = (id) => favorites.some(f => f.id === id);
-  const getLowestPrice = (shops) => Math.min(...shops.map(s => s.lowestPrice));
+  const getLowestPrice = (shops) => {
+    if (!shops || shops.length === 0) return 0;
+    const prices = shops.map(s => s.lowestPrice).filter(p => p > 0);
+    return prices.length > 0 ? Math.min(...prices) : 0;
+  };
 
   const handleSendMessage = async () => {
     if (!userInput.trim()) return;
@@ -529,8 +533,9 @@ ${productContext}
              </p>
           )}
           <p className="text-xl font-black text-[#7B8E76] leading-none">
-            <span className="text-xs mr-0.5">¥</span>{getLowestPrice(product.shops).toLocaleString()}
-            <span className="text-[10px] text-[#A5A19E] ml-1 font-normal">〜</span>
+            <span className="text-xs mr-0.5">¥</span>
+            {getLowestPrice(product.shops) > 0 ? getLowestPrice(product.shops).toLocaleString() : "---"}
+            <span className="text-[10px] text-[#A5A19E] ml-1 font-normal">{getLowestPrice(product.shops) > 0 ? "〜" : ""}</span>
           </p>
         </div>
       </div>
