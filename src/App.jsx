@@ -169,10 +169,8 @@ const App = () => {
     fetchProducts();
   }, []);
 
-  // 市場網羅：初回読み込み時に「すべて」カテゴリのランキングを自動取得する
-  useEffect(() => {
-    fetchRankingsWithAI("すべて");
-  }, []);
+  // 初回ロード安定化: DBデータを最優先で表示する
+  // APIランキングは各カテゴリ選択時にのみ呼び出し、失敗してもDB商品は常に表示される
 
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
   const fetchRankingsWithAI = async (catName) => {
@@ -373,9 +371,27 @@ const App = () => {
   };
 
   const isFavorite = (id) => favorites.some(f => f.id === id);
+  // ステップ3: ショップデータ正規化 — API経由でもDB経由でも同じ形式に統一
+  const normalizeShop = (shop) => {
+    if (!shop) return { name: 'ショップ', type: 'mall', lowestPrice: 0, sellers: [] };
+    const name = shop.name || shop.shop_name || 'ショップ';
+    const type = shop.type || shop.shop_type || 'mall';
+    const lowestPrice = Number(shop.lowestPrice || shop.lowest_price || shop.price || 0);
+    const sellers = shop.sellers && shop.sellers.length > 0
+      ? shop.sellers
+      : (shop.url ? [{ name, price: lowestPrice, shipping: shop.shipping ?? 0, points: shop.points ?? 0, url: shop.url, note: shop.note || '' }] : []);
+    return { ...shop, name, type, lowestPrice, sellers };
+  };
+
+  const normalizeShops = (shops) => {
+    if (!shops || shops.length === 0) return [];
+    return shops.map(normalizeShop);
+  };
+
   const getLowestPrice = (shops) => {
     if (!shops || shops.length === 0) return 0;
-    const prices = shops.map(s => s.lowestPrice).filter(p => p > 0);
+    const normalized = normalizeShops(shops);
+    const prices = normalized.map(s => s.lowestPrice).filter(p => p > 0 && isFinite(p));
     return prices.length > 0 ? Math.min(...prices) : 0;
   };
 
@@ -650,15 +666,15 @@ ${productContext}
         )}
 
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {/* 市場網羅・ランキング商品を優先表示 */}
-          {remoteProducts.length > 0 ? remoteProducts.map((p) => (
+          {/* ステップ6: DB商品を常に最優先で表示 */}
+          {!isRemoteLoading && filtered.map((p, idx) => (
+            <ProductCard key={p.id} product={p} localRank={sortOrder === "popular" ? idx + 1 : null} />
+          ))}
+
+          {/* リモート（API）から取得した追加商品を下に表示 */}
+          {remoteProducts.length > 0 && remoteProducts.map((p) => (
             <ProductCard key={p.id} product={p} />
-          )) : (
-            /* リモートが空で、ロードもしていない場合のみDB商品を表示 */
-            !isRemoteLoading && filtered.map((p, idx) => (
-              <ProductCard key={p.id} product={p} localRank={sortOrder === "popular" ? idx + 1 : null} />
-            ))
-          )}
+          ))}
 
           {/* Empty State */}
           {!isRemoteLoading && filtered.length === 0 && remoteProducts.length === 0 && (
@@ -694,7 +710,7 @@ ${productContext}
             {sorted.map((p, idx) => (
               <div key={p.id} className="bg-white rounded-[2.5rem] p-4 flex gap-5 border border-[#F4EFEB] shadow-[0_4px_20px_rgb(0,0,0,0.02)] relative active:scale-95 transition-all cursor-pointer" onClick={() => setSelectedProduct(p)}>
                 <div className={`absolute -top-2 -left-2 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg border-2 border-white ${idx === 0 ? 'bg-[#F9DC5C] text-[#5A4C4C]' : idx === 1 ? 'bg-[#D4CDC7] text-white' : idx === 2 ? 'bg-[#D4AF37] text-white' : 'bg-[#7B8E76] text-white'}`}>{idx + 1}</div>
-                <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 bg-[#F9F6F3] p-2"><img src={p.image} className="w-full h-full object-cover rounded-xl" alt={p.name} /></div>
+                <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 bg-[#F9F6F3] p-2"><img src={p.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full h-full object-cover rounded-xl" alt={p.name} /></div>
                 <div className="flex-1 flex flex-col justify-center">
                   <span className="text-[9px] font-black text-[#A5A19E] uppercase tracking-widest">{p.category}</span>
                   <h4 className="text-sm font-bold text-[#5A4C4C] leading-tight mb-2 line-clamp-2">{p.name}</h4>
@@ -977,7 +993,7 @@ ${productContext}
           </div>
           <div className="flex-1 overflow-y-auto px-6 pb-32">
             <div className="bg-[#F9F6F3] rounded-[3rem] p-6 my-6">
-               <img src={selectedProduct.image} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
+               <img src={selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
             </div>
             
             <div className="flex justify-between items-start mb-8 px-1">
@@ -1030,7 +1046,7 @@ ${productContext}
               </div>
 
               <div className="space-y-4">
-                {selectedProduct.shops.map((shop, idx) => (
+                {normalizeShops(selectedProduct.shops).map((shop, idx) => (
                   <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
                     <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`} onClick={() => setExpandedMall(expandedMall === shop.name ? null : shop.name)}>
                       <div className="flex-1 pr-4">
@@ -1060,7 +1076,7 @@ ${productContext}
                         {selectedProduct.unitCount ? (
                            <p className="text-[10px] text-[#F2ABAC] font-black mt-2">1{selectedProduct.unitName}あたり ¥{Math.ceil(shop.lowestPrice / selectedProduct.unitCount)}</p>
                         ) : (
-                          <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">出品者: {shop.sellers.length}店舗</p>
+                          <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">出品者: {(shop.sellers || []).length}店舗</p>
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-2">
@@ -1086,7 +1102,7 @@ ${productContext}
                             </div>
                             <div className="flex flex-col items-end gap-2 border-l border-[#F4EFEB] pl-4">
                                <span className="text-sm font-black text-[#7B8E76]">¥{seller.price.toLocaleString()}</span>
-                               <a href={seller.url} className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
+                               <a href={seller.url || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
                                  ショップへ
                                </a>
                             </div>
@@ -1215,7 +1231,7 @@ ${productContext}
             </div>
             
             <div className="flex items-center gap-3 mb-6 bg-[#F9F6F3] p-3 rounded-[1.5rem]">
-              <img src={selectedProduct.image} className="w-12 h-12 object-cover rounded-xl" alt="product" />
+              <img src={selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
               <p className="text-xs font-black text-[#5A4C4C] line-clamp-1 flex-1">{selectedProduct.name}</p>
             </div>
 
