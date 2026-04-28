@@ -169,8 +169,10 @@ const App = () => {
     fetchProducts();
   }, []);
 
-  // 初回ロード安定化: DBデータを最優先で表示する
-  // APIランキングは各カテゴリ選択時にのみ呼び出し、失敗してもDB商品は常に表示される
+  // 初回ロード安定化: DBデータを表示しつつ、裏側で市場最新データをAPIで取得（Discovery Engine）
+  useEffect(() => {
+    fetchRankingsWithAI("すべて");
+  }, []);
 
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
   const fetchRankingsWithAI = async (catName) => {
@@ -666,14 +668,14 @@ ${productContext}
         )}
 
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {/* ステップ6: DB商品を常に最優先で表示 */}
-          {!isRemoteLoading && filtered.map((p, idx) => (
-            <ProductCard key={p.id} product={p} localRank={sortOrder === "popular" ? idx + 1 : null} />
-          ))}
-
-          {/* リモート（API）から取得した追加商品を下に表示 */}
+          {/* リモート（API）から取得した最新の市場トレンド商品を最優先（上部）に表示 */}
           {remoteProducts.length > 0 && remoteProducts.map((p) => (
             <ProductCard key={p.id} product={p} />
+          ))}
+
+          {/* DBに保存された商品（キャッシュ/過去のおすすめ）を下部に表示 */}
+          {!isRemoteLoading && filtered.map((p, idx) => (
+            <ProductCard key={p.id} product={p} localRank={sortOrder === "popular" ? idx + 1 : null} />
           ))}
 
           {/* Empty State */}
