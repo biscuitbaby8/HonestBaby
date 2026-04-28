@@ -26,7 +26,7 @@ export default async function handler(req, res) {
         name: item.Item.itemName,
         price: item.Item.itemPrice,
         image: item.Item.mediumImageUrls[0]?.imageUrl || "",
-        url: item.Item.itemUrl,
+        url: item.Item.affiliateUrl || item.Item.itemUrl,
         brand: "", // ランキングAPIにはブランド名が直接ないため、後でAI等で抽出
         category: "", // 呼び出し元が補完
         rating: parseFloat(item.Item.reviewAverage) || 4.5,

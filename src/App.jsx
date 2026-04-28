@@ -140,12 +140,19 @@ const App = () => {
             usedPrice: p.used_price_estimate,
             unitCount: p.unit_count,
             unitName: p.unit_name,
-            shops: (p.shops || []).map(s => ({
-              ...s,
-              name: s.shop_name,
-              type: s.shop_type,
-              lowestPrice: s.lowest_price
-            })),
+            shops: (p.shops || []).map(s => {
+              let sellers = s.sellers;
+              if (typeof sellers === 'string') {
+                try { sellers = JSON.parse(sellers); } catch { sellers = []; }
+              }
+              return {
+                ...s,
+                name: s.shop_name,
+                type: s.shop_type,
+                lowestPrice: s.lowest_price,
+                sellers: Array.isArray(sellers) ? sellers : []
+              };
+            }),
             honestReviews: (p.honestReviews || []).map(r => ({
               ...r,
               user: r.user_name,
@@ -263,23 +270,55 @@ const App = () => {
     }
   };
 
-  // --- 既存機能の拡張: AI搭載・自動検索ロジック ---
+  // URLからショップ名を判定するヘルパー
+  const getShopNameFromUrl = (url) => {
+    if (!url) return '外部ショップ';
+    if (url.includes('rakuten')) return '楽天市場';
+    if (url.includes('yahoo.co.jp') || url.includes('shopping.yahoo')) return 'Yahoo!ショッピング';
+    if (url.includes('amazon')) return 'Amazon';
+    return '外部ショップ';
+  };
+
+  // --- 既存機能の拡張: AI搭載・楽天＋Yahoo並列検索ロジック ---
   const fetchRemoteProductsWithAI = async (keyword) => {
     if (!keyword || keyword === "すべて") {
       setRemoteProducts([]);
       return;
     }
-    
+
     setIsRemoteLoading(true);
     setRemoteError(null);
-    
-    try {
-      // 1. 楽天APIから生データを取得 (15件)
-      const rakutenRes = await fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`);
-      const rakutenData = await rakutenRes.json();
-      const rawItems = rakutenData.Items || [];
 
-      if (rawItems.length === 0) {
+    try {
+      // 1. 楽天・Yahoo両方から並列取得
+      const [rakutenResult, yahooResult] = await Promise.allSettled([
+        fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`).then(r => r.json()),
+        fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}`).then(r => r.json())
+      ]);
+
+      const rakutenItems = rakutenResult.status === 'fulfilled'
+        ? (rakutenResult.value.Items || []).map(item => ({
+            name: item.Item.itemName,
+            price: item.Item.itemPrice,
+            url: item.Item.affiliateUrl || item.Item.itemUrl,
+            image: item.Item.mediumImageUrls[0]?.imageUrl || '',
+            source: 'rakuten'
+          }))
+        : [];
+
+      const yahooItems = yahooResult.status === 'fulfilled'
+        ? (yahooResult.value.products || []).map(item => ({
+            name: item.name,
+            price: item.price,
+            url: item.url,
+            image: item.image || '',
+            source: 'yahoo'
+          }))
+        : [];
+
+      const allItems = [...rakutenItems, ...yahooItems];
+
+      if (allItems.length === 0) {
         setRemoteProducts([]);
         setIsRemoteLoading(false);
         return;
@@ -289,25 +328,17 @@ const App = () => {
       const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!gApiKey) throw new Error("VITE_GEMINI_API_KEY is missing");
 
-      // 生データをAIが処理しやすい形に変換
-      const simplifiedItems = rawItems.map(item => ({
-        name: item.Item.itemName,
-        price: item.Item.itemPrice,
-        url: item.Item.affiliateUrl || item.Item.itemUrl,
-        image: item.Item.mediumImageUrls[0]?.imageUrl
-      }));
-
-      const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天の検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
+      const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
       ルール：
-      1. 重複（同じ商品の別店舗）は1つにまとめる。
+      1. 重複（同じ商品の別店舗）は1つにまとめる。ただしurlとsourceは必ず保持する。
       2. 「車輪だけ」「カバーだけ」などの付属品は除外し、「本体」のみを残す。
       3. 商品名を分かりやすく（例：〇〇 ベビーカー A型）に整える。
       4. AI分析として「どんな人におすすめか」を1文で作成。
-      
+
       出力形式 (JSONのみ):
-      [{"name": "...", "price": 0, "url": "...", "image": "...", "aiAnalysis": "...", "brand": "..."}]
-      
-      検索結果データ: ${JSON.stringify(simplifiedItems)}`;
+      [{"name": "...", "price": 0, "url": "...", "image": "...", "source": "rakuten or yahoo", "aiAnalysis": "...", "brand": "..."}]
+
+      検索結果データ: ${JSON.stringify(allItems.slice(0, 20))}`;
 
       const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
         method: "POST",
@@ -319,27 +350,29 @@ const App = () => {
 
       const aiData = await aiRes.json();
       const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-      // JSON部分だけを抽出
       const jsonMatch = aiText.match(/\[[\s\S]*\]/);
       const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 
-      // アプリ内の形式に変換
-      const formatted = cleanedProducts.map((p, i) => ({
-        id: `remote-${i}-${Date.now()}`,
-        name: p.name,
-        brand: p.brand || "メーカー不明",
-        category: keyword,
-        image: p.image,
-        rating: 4.0 + (Math.random() * 1.0),
-        reviews_count: Math.floor(Math.random() * 500) + 50,
-        ai_analysis: p.aiAnalysis,
-        shops: [{
-          shop_name: "楽天市場",
-          shop_type: "mall",
-          lowest_price: p.price,
-          url: p.url
-        }]
-      }));
+      // アプリ内の形式に変換（URLからショップ名を自動判定）
+      const formatted = cleanedProducts.map((p, i) => {
+        const shopName = getShopNameFromUrl(p.url);
+        return {
+          id: `remote-${i}-${Date.now()}`,
+          name: p.name,
+          brand: p.brand || "メーカー不明",
+          category: keyword,
+          image: p.image,
+          rating: 4.0 + (Math.random() * 1.0),
+          reviews_count: Math.floor(Math.random() * 500) + 50,
+          ai_analysis: p.aiAnalysis,
+          shops: [{
+            shop_name: shopName,
+            shop_type: 'mall',
+            lowest_price: p.price,
+            url: p.url
+          }]
+        };
+      });
 
       setRemoteProducts(formatted);
     } catch (err) {
@@ -379,8 +412,12 @@ const App = () => {
     const name = shop.name || shop.shop_name || 'ショップ';
     const type = shop.type || shop.shop_type || 'mall';
     const lowestPrice = Number(shop.lowestPrice || shop.lowest_price || shop.price || 0);
-    const sellers = shop.sellers && shop.sellers.length > 0
-      ? shop.sellers
+    let rawSellers = shop.sellers;
+    if (typeof rawSellers === 'string') {
+      try { rawSellers = JSON.parse(rawSellers); } catch { rawSellers = []; }
+    }
+    const sellers = Array.isArray(rawSellers) && rawSellers.length > 0
+      ? rawSellers
       : (shop.url ? [{ name, price: lowestPrice, shipping: shop.shipping ?? 0, points: shop.points ?? 0, url: shop.url, note: shop.note || '' }] : []);
     return { ...shop, name, type, lowestPrice, sellers };
   };
