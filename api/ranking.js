@@ -2,13 +2,15 @@ export default async function handler(req, res) {
   const { genreId } = req.query;
   const appId = process.env.RAKUTEN_APP_ID || process.env.VITE_RAKUTEN_APP_ID;
   const affiliateId = process.env.RAKUTEN_AFFILIATE_ID || process.env.VITE_RAKUTEN_AFFILIATE_ID;
+  const accessKey = process.env.RAKUTEN_ACCESS_KEY || process.env.VITE_RAKUTEN_ACCESS_KEY;
   
   if (!appId) {
     return res.status(500).json({ error: 'Missing Rakuten App ID' });
   }
 
-  // 楽天市場ランキングAPI
-  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&genreId=${genreId || '100533'}&affiliateId=${affiliateId || ''}`;
+  // 楽天市場ランキングAPI (最新版)
+  // 新仕様では applicationId と accessKey の両方が必要な場合があります
+  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey || ''}&genreId=${genreId || '100533'}&affiliateId=${affiliateId || ''}`;
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
