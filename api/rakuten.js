@@ -14,7 +14,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { 'Referer': 'https://honestbaby-care.com' }
+    });
     if (!response.ok) {
       const errorText = await response.text();
       return res.status(response.status).json({ error: errorText });
