@@ -737,7 +737,13 @@ ${productContext}
         {remoteError && (
           <div className="col-span-2 bg-rose-50 border border-rose-100 p-6 rounded-[2rem] text-center my-4">
             <p className="text-xs text-rose-400 font-bold mb-2">通信に失敗しました</p>
-            <p className="text-[10px] text-rose-300 font-mono break-all">{remoteError}</p>
+            <p className="text-[10px] text-rose-300 font-mono break-all mb-4">{remoteError}</p>
+            <button
+              onClick={() => fetchRankingsWithAI(selectedCategory)}
+              className="bg-[#7B8E76] text-white px-6 py-2.5 rounded-full text-xs font-black shadow-sm active:scale-95 transition-all"
+            >
+              もう一度試す
+            </button>
           </div>
         )}
 
