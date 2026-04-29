@@ -231,14 +231,38 @@ const App = () => {
     setRemoteError(null);
     
     try {
-      // 1. 各モールからランキング（売れ筋）を取得
-      const rankingRes = await fetch(`/api/ranking?genreId=${genre.id}`);
-      if (!rankingRes.ok) throw new Error("Ranking API Error");
-      const { products: rawItems } = await rankingRes.json();
+      // 1. 楽天ランキングAPIをブラウザから直接呼び出し（Refererはブラウザが自動付与）
+      const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
+      const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
+      const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
+      if (!appId) throw new Error("VITE_RAKUTEN_APP_ID not set");
 
-      if (!rawItems || rawItems.length === 0) {
-         setRemoteProducts([]);
-         return;
+      const rakutenUrl = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genre.id || '100533'}&affiliateId=${affiliateId}`;
+      const rankingRes = await fetch(rakutenUrl);
+      if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
+      const rankingData = await rankingRes.json();
+
+      if (!rankingData.Items) {
+        console.error('Rakuten ranking:', JSON.stringify(rankingData));
+        setRemoteProducts([]);
+        return;
+      }
+
+      const rawItems = rankingData.Items.map(item => ({
+        id: `ranking-${item.Item.itemCode}`,
+        name: item.Item.itemName,
+        price: item.Item.itemPrice,
+        image: item.Item.mediumImageUrls?.[0]?.imageUrl || "",
+        url: item.Item.affiliateUrl || item.Item.itemUrl,
+        brand: "",
+        category: "",
+        rating: parseFloat(item.Item.reviewAverage) || 4.5,
+        shops: [{ name: "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
+      }));
+
+      if (rawItems.length === 0) {
+        setRemoteProducts([]);
+        return;
       }
 
       // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
