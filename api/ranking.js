@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         shops: [{
           name: "楽天市場",
           price: item.Item.itemPrice,
-          url: item.Item.itemUrl
+          url: item.Item.affiliateUrl || item.Item.itemUrl
         }]
       }));
       res.status(200).json({ products });

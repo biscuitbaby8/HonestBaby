@@ -61,6 +61,10 @@ const App = () => {
   const [isRemoteLoading, setIsRemoteLoading] = useState(false);
   const [remoteError, setRemoteError] = useState(null);
 
+  // Cross-platform price comparison (product detail)
+  const [crossPlatformShops, setCrossPlatformShops] = useState([]);
+  const [isCrossLoading, setIsCrossLoading] = useState(false);
+
   // Navigation States
   const [activeTab, setActiveTab] = useState('home'); 
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -181,6 +185,45 @@ const App = () => {
     fetchRankingsWithAI("すべて");
   }, []);
 
+  // 商品詳細を開いたとき楽天＋Yahoo を並列検索してクロスプラットフォーム価格比較
+  useEffect(() => {
+    if (!selectedProduct) { setCrossPlatformShops([]); return; }
+    const fetchCross = async () => {
+      setIsCrossLoading(true);
+      try {
+        const keyword = selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ');
+        const [rakutenResult, yahooResult] = await Promise.allSettled([
+          fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`).then(r => r.json()),
+          fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}`).then(r => r.json())
+        ]);
+        const shops = [];
+        if (rakutenResult.status === 'fulfilled') {
+          const items = rakutenResult.value.products || [];
+          if (items.length > 0) {
+            const best = items.reduce((a, b) => (a.price <= b.price ? a : b));
+            shops.push({ name: '楽天市場', type: 'mall', lowestPrice: best.price,
+              sellers: [{ name: '楽天市場', price: best.price, shipping: 0, points: 0, url: best.url, note: '' }] });
+          }
+        }
+        if (yahooResult.status === 'fulfilled') {
+          const items = yahooResult.value.products || [];
+          if (items.length > 0) {
+            const best = items.reduce((a, b) => (a.price <= b.price ? a : b));
+            const seller = (best.shops && best.shops[0]) ||
+              { name: 'Yahoo!ショッピング', price: best.price, shipping: 0, points: 0, url: best.url, note: '' };
+            shops.push({ name: 'Yahoo!ショッピング', type: 'mall', lowestPrice: best.price, sellers: [seller] });
+          }
+        }
+        setCrossPlatformShops(shops);
+      } catch (e) {
+        console.warn('Cross-platform fetch failed:', e);
+      } finally {
+        setIsCrossLoading(false);
+      }
+    };
+    fetchCross();
+  }, [selectedProduct]);
+
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
   const fetchRankingsWithAI = async (catName) => {
     const genre = CATEGORY_TREE.find(c => c.name === catName) || CATEGORY_TREE[0];
@@ -198,69 +241,63 @@ const App = () => {
          return;
       }
 
-      // 2. AIによる大量データの選別と整理 (Gemini 1.5 Flashの高速性を活かす)
-      const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!gApiKey) throw new Error("VITE_GEMINI_API_KEY is missing");
+      // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
+      const immediateProducts = rawItems.slice(0, 10).map(i => ({
+        ...i,
+        category: catName,
+        isMarketWide: true
+      }));
+      setRemoteProducts(immediateProducts);
+      setIsRemoteLoading(false);
 
-      // 大量データをAIに渡すための簡略化
-      const simplified = rawItems.slice(0, 15).map(i => ({ name: i.name, price: i.price }));
-      
-      const prompt = `あなたはベビー用品の専門バイヤーです。
+      // Step 2: Gemini でバックグラウンド強化（失敗しても生データを維持）
+      const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!gApiKey) return;
+
+      try {
+        const simplified = rawItems.slice(0, 15).map(i => ({ name: i.name, price: i.price }));
+        const prompt = `あなたはベビー用品の専門バイヤーです。
       以下の商品リストから、「ギフトや自宅用として本当に自信を持っておすすめできるもの」を厳選し、
       以下のJSON形式のみで返してください。
-      
+
       [{"name": "整理された商品名", "price": 価格, "reason": "おすすめ理由1文", "brand": "ブランド名"}]
-      
+
       リスト: ${JSON.stringify(simplified)}`;
 
-      const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
-
-      const aiData = await aiRes.json();
-      const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-      const jsonMatch = aiText.match(/\[[\s\S]*\]/);
-      const curatedList = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-
-      // 3. 元のデータと紐付け
-      const finalProducts = curatedList.map((citem, idx) => {
-        const original = rawItems.find(r => r.name.includes(citem.name.substring(0, 8))) || rawItems[idx];
-        return {
-          id: `market-${original?.id || Math.random()}`,
-          name: citem.name,
-          category: catName,
-          subCategory: "本体",
-          brand: citem.brand || "人気ブランド",
-          image: original?.image || "",
-          rating: original?.rating || (4.5 + Math.random() * 0.5), // リアルな評価値を保持
-          shops: original?.shops || [],
-          aiAnalysis: citem.reason,
-          isMarketWide: true, // 市場網羅データフラグ
-          isBestSeller: idx < 3, // 上位3件をベストセラーとする
-          isTopRated: (original?.rating || 4.5) >= 4.8 // 高評価フラグ
-        };
-      });
-
-      // AIの結果が空、またはパース失敗時のフォールバック: 生データをそのまま表示
-      if (finalProducts.length === 0 && rawItems.length > 0) {
-        setRemoteProducts(rawItems.slice(0, 10).map(i => ({ ...i, category: catName, isMarketWide: true })));
-      } else {
-        setRemoteProducts(finalProducts);
-        
-        // --- 新機能: バックグラウンドで商品情報をDBに自動登録 (Discovery Engine) ---
-        finalProducts.forEach(async (p) => {
-          try {
-            await fetch('/api/register-product', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ product: p })
-            });
-          } catch (err) {
-            console.error("Auto-registration error:", err);
-          }
+        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+
+        const aiData = await aiRes.json();
+        const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+        const jsonMatch = aiText.match(/\[[\s\S]*\]/);
+        const curatedList = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+
+        if (curatedList.length > 0) {
+          const finalProducts = curatedList.map((citem, idx) => {
+            const original = rawItems.find(r => r.name.includes(citem.name.substring(0, 8))) || rawItems[idx];
+            return {
+              id: `market-${original?.id || Math.random()}`,
+              name: citem.name,
+              category: catName,
+              subCategory: "本体",
+              brand: citem.brand || "人気ブランド",
+              image: original?.image || "",
+              rating: original?.rating || (4.5 + Math.random() * 0.5),
+              shops: original?.shops || [],
+              aiAnalysis: citem.reason,
+              isMarketWide: true,
+              isBestSeller: idx < 3,
+              isTopRated: (original?.rating || 4.5) >= 4.8
+            };
+          });
+          setRemoteProducts(finalProducts);
+        }
+      } catch (geminiErr) {
+        console.warn("Gemini enhancement skipped:", geminiErr);
+        // 生データをそのまま維持
       }
     } catch (e) {
       console.error("Market-Wide Fetch error:", e);
@@ -700,7 +737,13 @@ ${productContext}
         {remoteError && (
           <div className="col-span-2 bg-rose-50 border border-rose-100 p-6 rounded-[2rem] text-center my-4">
             <p className="text-xs text-rose-400 font-bold mb-2">通信に失敗しました</p>
-            <p className="text-[10px] text-rose-300 font-mono break-all">{remoteError}</p>
+            <p className="text-[10px] text-rose-300 font-mono break-all mb-4">{remoteError}</p>
+            <button
+              onClick={() => fetchRankingsWithAI(selectedCategory)}
+              className="bg-[#7B8E76] text-white px-6 py-2.5 rounded-full text-xs font-black shadow-sm active:scale-95 transition-all"
+            >
+              もう一度試す
+            </button>
           </div>
         )}
 
@@ -1084,8 +1127,17 @@ ${productContext}
                 )}
               </div>
 
+              {isCrossLoading && (
+                <div className="text-center text-xs text-[#A5A19E] py-3 animate-pulse">各ショップの最安値を検索中...</div>
+              )}
+
               <div className="space-y-4">
-                {normalizeShops(selectedProduct.shops).map((shop, idx) => (
+                {(() => {
+                  const existingShops = normalizeShops(selectedProduct.shops);
+                  const existingNames = new Set(existingShops.map(s => s.name));
+                  const mergedShops = [...existingShops, ...crossPlatformShops.filter(s => !existingNames.has(s.name))];
+                  return mergedShops;
+                })().map((shop, idx) => (
                   <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
                     <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`} onClick={() => setExpandedMall(expandedMall === shop.name ? null : shop.name)}>
                       <div className="flex-1 pr-4">
