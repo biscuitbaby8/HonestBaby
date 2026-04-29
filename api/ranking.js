@@ -1,10 +1,10 @@
 import https from 'node:https';
 
-function httpsGet(url) {
+function httpsGet(url, referer) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
       headers: {
-        'Referer': 'https://honestbaby-care.com',
+        'Referer': referer || 'https://honestbaby-care.com',
         'User-Agent': 'Mozilla/5.0'
       }
     }, (res) => {
@@ -34,8 +34,10 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
+  const clientReferer = req.headers['referer'] || req.headers['origin'] || 'https://honestbaby-care.com';
+
   try {
-    const data = await httpsGet(url);
+    const data = await httpsGet(url, clientReferer);
 
     if (data.Items) {
       const products = data.Items.map(item => ({

@@ -13,9 +13,11 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
+  const clientReferer = req.headers['referer'] || req.headers['origin'] || 'https://honestbaby-care.com';
+
   try {
     const response = await fetch(url, {
-      headers: { 'Referer': 'https://honestbaby-care.com' }
+      headers: { 'Referer': clientReferer, 'User-Agent': 'Mozilla/5.0' }
     });
     if (!response.ok) {
       const errorText = await response.text();
