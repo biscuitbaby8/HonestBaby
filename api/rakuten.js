@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Missing Rakuten App ID (RAKUTEN_APP_ID or VITE_RAKUTEN_APP_ID) in server environment variables' });
   }
 
-  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170426?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=15&sort=%2BitemPrice&affiliateId=${affiliateId || ''}`;
+  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=15&sort=%2BitemPrice&affiliateId=${affiliateId || ''}`;
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');

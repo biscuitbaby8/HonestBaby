@@ -10,7 +10,7 @@ export default async function handler(req, res) {
 
   // 楽天市場ランキングAPI (最新版)
   // 新仕様では applicationId と accessKey の両方が必要な場合があります
-  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey || ''}&genreId=${genreId || '100533'}&affiliateId=${affiliateId || ''}`;
+  const url = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey || ''}&genreId=${genreId || '100533'}&affiliateId=${affiliateId || ''}`;
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
