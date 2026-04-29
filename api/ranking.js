@@ -38,7 +38,8 @@ export default async function handler(req, res) {
       }));
       res.status(200).json({ products });
     } else {
-      res.status(200).json({ products: [] });
+      console.error('Rakuten ranking API returned no Items:', JSON.stringify(data));
+      res.status(200).json({ products: [], debug: data });
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
