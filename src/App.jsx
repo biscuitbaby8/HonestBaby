@@ -192,14 +192,24 @@ const App = () => {
       setIsCrossLoading(true);
       try {
         const keyword = selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ');
+        const origPrice = selectedProduct.price || getLowestPrice(selectedProduct.shops) || 0;
+        const priceMin = origPrice > 0 ? origPrice * 0.25 : 0;
+        const priceMax = origPrice > 0 ? origPrice * 4 : Infinity;
+        const selectedWords = keyword.split(' ').filter(w => w.length >= 2).map(w => w.toLowerCase());
+        const nameMatches = (itemName) => {
+          const lower = (itemName || '').toLowerCase().replace(/[\s　]/g, '');
+          return selectedWords.some(w => lower.includes(w));
+        };
+        const priceInRange = (p) => origPrice === 0 || (p >= priceMin && p <= priceMax);
+
         const [rakutenResult, yahooResult] = await Promise.allSettled([
           fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`).then(r => r.json()),
           fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}`).then(r => r.json())
         ]);
         const shops = [];
         if (rakutenResult.status === 'fulfilled') {
-          const items = rakutenResult.value.products || [];
-          // ショップ名ごとに最安値を集めて最大5店舗を表示
+          const items = (rakutenResult.value.products || [])
+            .filter(item => nameMatches(item.name) && priceInRange(item.price));
           const byShop = {};
           for (const item of items) {
             const shopName = item.brand || '楽天市場';
@@ -215,7 +225,8 @@ const App = () => {
             });
         }
         if (yahooResult.status === 'fulfilled') {
-          const items = yahooResult.value.products || [];
+          const items = (yahooResult.value.products || [])
+            .filter(item => nameMatches(item.name) && priceInRange(item.price));
           const byShop = {};
           for (const item of items) {
             const shopName = item.brand || 'Yahoo!ショッピング';
@@ -266,8 +277,27 @@ const App = () => {
       .trim()
       .slice(0, 50);
 
-    const mapItems = (items, cat) => items
-      .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+    const mapItems = (items, cat) => {
+      const requiredKws = {
+        "おむつ":     ["おむつ", "オムツ"],
+        "ベビーカー": ["ベビーカー", "バギー", "ストローラー"],
+        "抱っこ紐":   ["抱っこ紐", "だっこひも", "スリング", "ヒップシート", "キャリア"],
+        "ウェア":     ["ロンパース", "カバーオール", "肌着", "コンビ"],
+        "ミルク・授乳": ["哺乳瓶", "搾乳", "授乳クッション", "母乳"],
+        "離乳食・食器": ["離乳食", "ベビーフード", "ベビーチェア"],
+        "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー"],
+        "おもちゃ":   ["おもちゃ", "知育", "ガラガラ", "メリー"],
+        "安全グッズ": ["ゲート", "コーナーガード", "ドアロック", "転倒防止"],
+        "お風呂用品": ["沐浴", "ベビーバス", "体温計", "保湿"],
+        "トイレ用品": ["おまる", "補助便座", "トイトレ"],
+        "車用品":     ["チャイルドシート"],
+        "マタニティ": ["マタニティ", "妊娠", "授乳ブラ", "葉酸"],
+        "ギフトセット": ["ギフト", "出産祝い"],
+      }[cat] || [];
+
+      return items
+        .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+        .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.Item.itemName.includes(kw)))
       .map(item => {
         const name = cleanName(item.Item.itemName);
         const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || "";
@@ -286,6 +316,7 @@ const App = () => {
           shops: [{ name: item.Item.shopName || "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
         };
       });
+    };
 
     try {
       const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
@@ -294,7 +325,10 @@ const App = () => {
       if (!appId) throw new Error("VITE_RAKUTEN_APP_ID not set");
 
       const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
-      const searchUrl = (keyword, page = 1) => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
+      const searchUrl = (keyword, page = 1, genreId = '') => {
+        const genrePart = genreId ? `&genreId=${genreId}` : '';
+        return `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1${genrePart}&affiliateId=${affiliateId}`;
+      };
 
       const normalizeKey = (name) => name.replace(/[\s　]/g, '').toLowerCase().slice(0, 25);
       const dedupeAndMergeShops = (items) => {
@@ -323,8 +357,8 @@ const App = () => {
       let rawItems;
       if (useSearch) {
         const [res1, res2] = await Promise.all([
-          fetch(searchUrl(keyword, 1)),
-          fetch(searchUrl(keyword, 2))
+          fetch(searchUrl(keyword, 1, genre.id)),
+          fetch(searchUrl(keyword, 2, genre.id))
         ]);
         if (!res1.ok) throw new Error(`Search API Error: ${res1.status}`);
         const data1 = await res1.json();
