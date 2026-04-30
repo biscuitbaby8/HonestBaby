@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Missing Rakuten App ID (RAKUTEN_APP_ID or VITE_RAKUTEN_APP_ID) in server environment variables' });
   }
 
-  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=15&sort=%2BitemPrice&affiliateId=${affiliateId || ''}`;
+  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1&affiliateId=${affiliateId || ''}`;
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -29,9 +29,9 @@ export default async function handler(req, res) {
       id: `rakuten-${item.Item.itemCode}`,
       name: item.Item.itemName,
       price: item.Item.itemPrice,
-      image: item.Item.mediumImageUrls?.[0]?.imageUrl || '',
+      image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
       url: item.Item.affiliateUrl || item.Item.itemUrl,
-      brand: item.Item.shopName || '',
+      brand: item.Item.shopName || '楽天市場',
       rating: parseFloat(item.Item.reviewAverage) || 4.5,
       source: 'rakuten',
       shops: [{

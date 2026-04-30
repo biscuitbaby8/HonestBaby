@@ -17,21 +17,21 @@ const apiKey = "";
 
 // 市場網羅のための詳細カテゴリツリー
 const CATEGORY_TREE = [
-  { name: "すべて",      id: "100533", keyword: "",                   icon: "🏠", subs: [] },
-  { name: "おむつ",      id: "101070", keyword: "ベビー おむつ 赤ちゃん",    icon: "🩲", subs: ["テープタイプ", "パンツタイプ", "夜用おむつ", "おしりふき"] },
-  { name: "ベビーカー",  id: "501062", keyword: "ベビーカー",         icon: "🚼", subs: ["A型", "B型", "AB型", "バギー"] },
-  { name: "抱っこ紐",    id: "209214", keyword: "抱っこ紐",           icon: "🤱", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート"] },
-  { name: "ウェア",      id: "110464", keyword: "ベビー服",           icon: "👕", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
-  { name: "ミルク・授乳",id: "101077", keyword: "哺乳瓶",             icon: "🍼", subs: ["哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
-  { name: "離乳食・食器",id: "101078", keyword: "離乳食",             icon: "🥣", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
-  { name: "寝具・ベッド",id: "101071", keyword: "ベビーベッド",       icon: "🛏️", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
-  { name: "おもちゃ",    id: "101074", keyword: "ベビー おもちゃ",   icon: "🧸", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
-  { name: "安全グッズ",  id: "101076", keyword: "ベビーゲート",       icon: "🔒", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止"] },
-  { name: "お風呂用品",  id: "101075", keyword: "ベビーバス",         icon: "🛁", subs: ["ベビーバス", "沐浴剤", "体温計", "保湿クリーム"] },
-  { name: "トイレ用品",  id: "101072", keyword: "ベビー おしりふき",   icon: "🚿", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
-  { name: "車用品",      id: "501063", keyword: "チャイルドシート",   icon: "🚗", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ"] },
-  { name: "マタニティ",  id: "101080", keyword: "マタニティ",         icon: "🤰", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ"] },
-  { name: "ギフトセット",id: "101079", keyword: "出産祝い ギフトセット", icon: "🎁", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
+  { name: "すべて",      id: "100533", keyword: "",                            icon: "🏠", subs: [] },
+  { name: "おむつ",      id: "101070", keyword: "紙おむつ 赤ちゃん",           icon: "🩲", subs: ["テープタイプ", "パンツタイプ", "夜用おむつ", "おしりふき"] },
+  { name: "ベビーカー",  id: "501062", keyword: "ベビーカー",                  icon: "🚼", subs: ["A型", "B型", "AB型", "バギー"] },
+  { name: "抱っこ紐",    id: "209214", keyword: "抱っこ紐 新生児",             icon: "🤱", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート"] },
+  { name: "ウェア",      id: "110464", keyword: "ベビー服 赤ちゃん",           icon: "👕", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
+  { name: "ミルク・授乳",id: "101077", keyword: "ベビー 哺乳瓶",              icon: "🍼", subs: ["哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
+  { name: "離乳食・食器",id: "101078", keyword: "離乳食 ベビーフード",         icon: "🥣", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
+  { name: "寝具・ベッド",id: "101071", keyword: "ベビーベッド 赤ちゃん布団",  icon: "🛏️", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
+  { name: "おもちゃ",    id: "101074", keyword: "赤ちゃん おもちゃ 知育",     icon: "🧸", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
+  { name: "安全グッズ",  id: "101076", keyword: "ベビー 安全グッズ ゲート",   icon: "🔒", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止"] },
+  { name: "お風呂用品",  id: "101075", keyword: "ベビー お風呂 沐浴",         icon: "🛁", subs: ["ベビーバス", "沐浴剤", "体温計", "保湿クリーム"] },
+  { name: "トイレ用品",  id: "101072", keyword: "ベビー おしりふき 赤ちゃん", icon: "🚿", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
+  { name: "車用品",      id: "501063", keyword: "チャイルドシート 新生児",     icon: "🚗", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ"] },
+  { name: "マタニティ",  id: "101080", keyword: "マタニティ 妊娠",             icon: "🤰", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ"] },
+  { name: "ギフトセット",id: "101079", keyword: "出産祝い ギフトセット 赤ちゃん", icon: "🎁", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
 ];
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
@@ -199,11 +199,20 @@ const App = () => {
         const shops = [];
         if (rakutenResult.status === 'fulfilled') {
           const items = rakutenResult.value.products || [];
-          if (items.length > 0) {
-            const best = items.reduce((a, b) => (a.price <= b.price ? a : b));
-            shops.push({ name: '楽天市場', type: 'mall', lowestPrice: best.price,
-              sellers: [{ name: '楽天市場', price: best.price, shipping: 0, points: 0, url: best.url, note: '' }] });
+          // ショップ名ごとに最安値を集めて最大5店舗を表示
+          const byShop = {};
+          for (const item of items) {
+            const shopName = item.brand || '楽天市場';
+            if (!byShop[shopName] || item.price < byShop[shopName].price) byShop[shopName] = item;
           }
+          Object.values(byShop)
+            .sort((a, b) => a.price - b.price)
+            .slice(0, 5)
+            .forEach(item => {
+              const sName = item.brand || '楽天市場';
+              shops.push({ name: sName, type: 'mall', lowestPrice: item.price,
+                sellers: [{ name: sName, price: item.price, shipping: 0, points: 0, url: item.url, note: '' }] });
+            });
         }
         if (yahooResult.status === 'fulfilled') {
           const items = yahooResult.value.products || [];
@@ -231,17 +240,31 @@ const App = () => {
     setRemoteError(null);
     setRemoteProducts([]);
 
-    const mapItems = (items, cat) => items.map(item => ({
-      id: `ranking-${item.Item.itemCode}`,
-      name: item.Item.itemName,
-      price: item.Item.itemPrice,
-      image: item.Item.mediumImageUrls?.[0]?.imageUrl || "",
-      url: item.Item.affiliateUrl || item.Item.itemUrl,
-      brand: "",
-      category: cat,
-      rating: parseFloat(item.Item.reviewAverage) || 4.5,
-      shops: [{ name: "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
-    }));
+    const parseDiaperCount = (name) => {
+      const packMatch = name.match(/(\d+)枚[×x＊*](\d+)/);
+      if (packMatch) return parseInt(packMatch[1]) * parseInt(packMatch[2]);
+      const m = name.match(/(\d+)枚/);
+      return m ? parseInt(m[1]) : null;
+    };
+
+    const mapItems = (items, cat) => items.map(item => {
+      const name = item.Item.itemName;
+      const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || "";
+      const unitCount = cat === "おむつ" ? parseDiaperCount(name) : null;
+      return {
+        id: `ranking-${item.Item.itemCode}`,
+        name,
+        price: item.Item.itemPrice,
+        image: rawImg.replace(/_ex=\d+x\d+/, '_ex=400x400'),
+        url: item.Item.affiliateUrl || item.Item.itemUrl,
+        brand: "",
+        category: cat,
+        rating: parseFloat(item.Item.reviewAverage) || 4.5,
+        unitCount,
+        unitName: unitCount ? "枚" : null,
+        shops: [{ name: "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
+      };
+    });
 
     try {
       const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
