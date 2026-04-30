@@ -229,36 +229,42 @@ const App = () => {
     const genre = CATEGORY_TREE.find(c => c.name === catName) || CATEGORY_TREE[0];
     setIsRemoteLoading(true);
     setRemoteError(null);
-    
+    setRemoteProducts([]);
+
+    const mapItems = (items, cat) => items.map(item => ({
+      id: `ranking-${item.Item.itemCode}`,
+      name: item.Item.itemName,
+      price: item.Item.itemPrice,
+      image: item.Item.mediumImageUrls?.[0]?.imageUrl || "",
+      url: item.Item.affiliateUrl || item.Item.itemUrl,
+      brand: "",
+      category: cat,
+      rating: parseFloat(item.Item.reviewAverage) || 4.5,
+      shops: [{ name: "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
+    }));
+
     try {
-      // 1. 楽天ランキングAPIをブラウザから直接呼び出し（Refererはブラウザが自動付与）
       const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
       const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
       const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
       if (!appId) throw new Error("VITE_RAKUTEN_APP_ID not set");
 
-      const rakutenUrl = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genre.id || '100533'}&affiliateId=${affiliateId}`;
-      const rankingRes = await fetch(rakutenUrl);
+      const buildUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
+
+      const rankingRes = await fetch(buildUrl(genre.id || '100533'));
       if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
       const rankingData = await rankingRes.json();
 
-      if (!rankingData.Items) {
-        console.error('Rakuten ranking:', JSON.stringify(rankingData));
-        setRemoteProducts([]);
-        return;
-      }
+      let rawItems = rankingData.Items ? mapItems(rankingData.Items, catName) : [];
 
-      const rawItems = rankingData.Items.map(item => ({
-        id: `ranking-${item.Item.itemCode}`,
-        name: item.Item.itemName,
-        price: item.Item.itemPrice,
-        image: item.Item.mediumImageUrls?.[0]?.imageUrl || "",
-        url: item.Item.affiliateUrl || item.Item.itemUrl,
-        brand: "",
-        category: "",
-        rating: parseFloat(item.Item.reviewAverage) || 4.5,
-        shops: [{ name: "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
-      }));
+      // 結果が0件のとき親カテゴリ（ベビー全体）でフォールバック
+      if (rawItems.length === 0 && genre.id !== '100533') {
+        const fallbackRes = await fetch(buildUrl('100533'));
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          rawItems = fallbackData.Items ? mapItems(fallbackData.Items, catName) : [];
+        }
+      }
 
       if (rawItems.length === 0) {
         setRemoteProducts([]);
@@ -266,11 +272,7 @@ const App = () => {
       }
 
       // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
-      const immediateProducts = rawItems.slice(0, 10).map(i => ({
-        ...i,
-        category: catName,
-        isMarketWide: true
-      }));
+      const immediateProducts = rawItems.slice(0, 10).map(i => ({ ...i, isMarketWide: true }));
       setRemoteProducts(immediateProducts);
       setIsRemoteLoading(false);
 
@@ -448,13 +450,7 @@ const App = () => {
     setSelectedCategory(cat);
     setSelectedSubCategory("すべて");
     setSortOrder("standard");
-    
-    // 市場網羅モードでは常にランキングもチェック
-    if (cat !== "すべて") {
-      fetchRankingsWithAI(cat);
-    } else {
-      setRemoteProducts([]);
-    }
+    fetchRankingsWithAI(cat);
   };
 
   const toggleFavorite = (e, product) => {
@@ -703,7 +699,7 @@ ${productContext}
     });
     
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
-    const showRemote = selectedCategory !== "すべて" && (remoteProducts.length > 0 || isRemoteLoading);
+    const showRemote = remoteProducts.length > 0 || isRemoteLoading;
 
     if (sortOrder === "popular") filtered = [...filtered].sort((a, b) => b.rating - a.rating);
 
