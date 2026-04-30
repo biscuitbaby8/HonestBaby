@@ -254,12 +254,17 @@ const App = () => {
       return m ? parseInt(m[1]) : null;
     };
 
-    const NG_KEYWORDS = ['ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍'];
+    const NG_KEYWORDS = [
+      'ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍',
+      'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース'
+    ];
     const cleanName = (name) => name
-      .replace(/【[^】]{0,40}】/g, '')
-      .replace(/\s+/g, ' ')
+      .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
+      .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
+      .replace(/\s*(送料無料|あす楽|即納|限定|新品|正規品|公式|人気|売れ筋|ランキング1位).*$/, '')
+      .replace(/[\s　]+/g, ' ')
       .trim()
-      .slice(0, 45);
+      .slice(0, 50);
 
     const mapItems = (items, cat) => items
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
@@ -278,7 +283,7 @@ const App = () => {
           rating: parseFloat(item.Item.reviewAverage) || 4.5,
           unitCount,
           unitName: unitCount ? "枚" : null,
-          shops: [{ name: "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
+          shops: [{ name: item.Item.shopName || "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
         };
       });
 
@@ -289,18 +294,49 @@ const App = () => {
       if (!appId) throw new Error("VITE_RAKUTEN_APP_ID not set");
 
       const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
-      const searchUrl = (keyword) => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=standard&hits=30&availability=1&affiliateId=${affiliateId}`;
+      const searchUrl = (keyword, page = 1) => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
+
+      const normalizeKey = (name) => name.replace(/[\s　]/g, '').toLowerCase().slice(0, 25);
+      const dedupeAndMergeShops = (items) => {
+        const map = new Map();
+        for (const item of items) {
+          const key = normalizeKey(item.name);
+          if (!map.has(key)) {
+            map.set(key, { ...item, shops: [...item.shops] });
+          } else {
+            const existing = map.get(key);
+            const newShops = item.shops.filter(s => !existing.shops.some(es => es.url === s.url));
+            existing.shops.push(...newShops);
+            if (item.price < existing.price) {
+              existing.price = item.price;
+              existing.image = item.image;
+            }
+          }
+        }
+        return Array.from(map.values());
+      };
 
       // 「すべて」はランキングAPI（全ベビー商品の実売）、個別カテゴリーは検索APIでキーワードマッチ
       const useSearch = catName !== "すべて" && genre.keyword;
       const keyword = (subCat && subCat !== "すべて") ? `${genre.keyword} ${subCat}` : genre.keyword;
-      const primaryUrl = useSearch ? searchUrl(keyword) : rankingUrl(genre.id || '100533');
 
-      const rankingRes = await fetch(primaryUrl);
-      if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
-      const rankingData = await rankingRes.json();
-
-      let rawItems = rankingData.Items ? mapItems(rankingData.Items, catName) : [];
+      let rawItems;
+      if (useSearch) {
+        const [res1, res2] = await Promise.all([
+          fetch(searchUrl(keyword, 1)),
+          fetch(searchUrl(keyword, 2))
+        ]);
+        if (!res1.ok) throw new Error(`Search API Error: ${res1.status}`);
+        const data1 = await res1.json();
+        const data2 = res2.ok ? await res2.json() : { Items: [] };
+        const combined = [...(data1.Items || []), ...(data2.Items || [])];
+        rawItems = dedupeAndMergeShops(mapItems(combined, catName));
+      } else {
+        const rankingRes = await fetch(rankingUrl(genre.id || '100533'));
+        if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
+        const rankingData = await rankingRes.json();
+        rawItems = rankingData.Items ? mapItems(rankingData.Items, catName) : [];
+      }
 
       // 検索が0件のとき、ベビー全体ランキングでフォールバック
       if (rawItems.length === 0 && catName !== "すべて") {
@@ -689,6 +725,11 @@ ${productContext}
         <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{product.name}</h3>
         
         <div className="mt-auto">
+          {(product.shops?.length || 0) >= 2 && (
+            <p className="text-[9px] text-[#7B8E76] font-black mb-1 uppercase tracking-wider">
+              {product.shops.length}店舗で比較
+            </p>
+          )}
           {product.unitCount && (
              <p className="text-[10px] text-[#A5A19E] font-bold mb-1">
                1{product.unitName}あたり <span className="text-[#F2ABAC]">¥{Math.ceil(getLowestPrice(product.shops) / product.unitCount)}</span>
