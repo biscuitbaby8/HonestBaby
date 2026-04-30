@@ -9,8 +9,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Missing Yahoo Client ID (YAHOO_CLIENT_ID)' });
   }
 
-  // Yahoo Shopping API V3 (ItemSearch) - 15件取得、価格昇順
-  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${clientId}&query=${encodeURIComponent(query || '')}&results=15&sort=%2Bprice`;
+  // Yahoo Shopping API V3 (ItemSearch) - 30件取得、価格昇順
+  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${clientId}&query=${encodeURIComponent(query || '')}&results=30&sort=%2Bprice`;
 
   try {
     const response = await fetch(url);
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       price: item.price,
       image: item.image?.medium || item.image?.small || '',
       url: item.url,
-      brand: item.brand?.name || '',
+      brand: item.seller?.name || item.brand?.name || 'Yahoo!ショッピング',
       rating: item.review?.rate || 4.5,
       source: 'yahoo',
       shops: [{
