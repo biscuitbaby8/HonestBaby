@@ -759,33 +759,35 @@ ${productContext}
               <button
                 key={cat.name}
                 onClick={() => handleCategoryChange(cat.name)}
-                className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 ${
+                className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 ${
                   selectedCategory === cat.name
                     ? 'bg-[#7B8E76] text-white shadow-md'
-                    : 'bg-white text-[#A5A19E] border border-[#F4EFEB] shadow-sm'
+                    : 'bg-[#F0EBE6] text-[#7B8E76]'
                 }`}
               >
                 {cat.name}
               </button>
             ))}
           </div>
-          <div className="pointer-events-none absolute right-0 top-0 bottom-5 w-10 bg-gradient-to-l from-[#FFFDFB] to-transparent" />
+          <div className="pointer-events-none absolute right-0 top-0 bottom-5 w-16 bg-gradient-to-l from-[#FFFDFB] to-transparent flex items-center justify-end pr-2">
+            <ChevronRight className="w-4 h-4 text-[#7B8E76] opacity-60" />
+          </div>
         </div>
 
         {selectedCategory !== "すべて" && (() => {
           const currentSubs = CATEGORY_TREE.find(c => c.name === selectedCategory)?.subs || [];
           if (currentSubs.length === 0) return null;
           return (
-            <div className="mb-6">
+            <div className="mb-5 relative">
               <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
                 {["すべて", ...currentSubs].map(sub => (
                   <button
                     key={sub}
                     onClick={() => handleSubCategoryChange(sub)}
-                    className={`flex-shrink-0 px-4 py-2 rounded-full text-[11px] font-bold whitespace-nowrap transition-all duration-150 ${
+                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 ${
                       selectedSubCategory === sub
                         ? 'bg-[#5A4C4C] text-white shadow-sm'
-                        : 'bg-[#F5F0EC] text-[#7B8E76] border border-[#EDE8E3]'
+                        : 'bg-[#F0EBE6] text-[#7B8E76]'
                     }`}
                   >
                     {sub}
