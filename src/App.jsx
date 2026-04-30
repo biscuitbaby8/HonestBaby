@@ -18,7 +18,7 @@ const apiKey = "";
 // 市場網羅のための詳細カテゴリツリー
 const CATEGORY_TREE = [
   { name: "すべて",      id: "100533", keyword: "",                   icon: "🏠", subs: [] },
-  { name: "おむつ",      id: "101070", keyword: "おむつ",             icon: "🩲", subs: ["テープタイプ", "パンツタイプ", "夜用おむつ", "おしりふき"] },
+  { name: "おむつ",      id: "101070", keyword: "ベビー おむつ 赤ちゃん",    icon: "🩲", subs: ["テープタイプ", "パンツタイプ", "夜用おむつ", "おしりふき"] },
   { name: "ベビーカー",  id: "501062", keyword: "ベビーカー",         icon: "🚼", subs: ["A型", "B型", "AB型", "バギー"] },
   { name: "抱っこ紐",    id: "209214", keyword: "抱っこ紐",           icon: "🤱", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート"] },
   { name: "ウェア",      id: "110464", keyword: "ベビー服",           icon: "👕", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
@@ -28,7 +28,7 @@ const CATEGORY_TREE = [
   { name: "おもちゃ",    id: "101074", keyword: "ベビー おもちゃ",   icon: "🧸", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
   { name: "安全グッズ",  id: "101076", keyword: "ベビーゲート",       icon: "🔒", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止"] },
   { name: "お風呂用品",  id: "101075", keyword: "ベビーバス",         icon: "🛁", subs: ["ベビーバス", "沐浴剤", "体温計", "保湿クリーム"] },
-  { name: "トイレ用品",  id: "101072", keyword: "おしりふき",         icon: "🚿", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
+  { name: "トイレ用品",  id: "101072", keyword: "ベビー おしりふき",   icon: "🚿", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
   { name: "車用品",      id: "501063", keyword: "チャイルドシート",   icon: "🚗", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ"] },
   { name: "マタニティ",  id: "101080", keyword: "マタニティ",         icon: "🤰", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ"] },
   { name: "ギフトセット",id: "101079", keyword: "出産祝い ギフトセット", icon: "🎁", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
@@ -730,20 +730,23 @@ ${productContext}
           <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
         </div>
 
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4">
-          {CATEGORY_TREE.map(cat => (
-            <button
-              key={cat.name}
-              onClick={() => handleCategoryChange(cat.name)}
-              className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 ${
-                selectedCategory === cat.name
-                  ? 'bg-[#7B8E76] text-white shadow-md'
-                  : 'bg-white text-[#A5A19E] border border-[#F4EFEB] shadow-sm'
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
+        <div className="relative">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4">
+            {CATEGORY_TREE.map(cat => (
+              <button
+                key={cat.name}
+                onClick={() => handleCategoryChange(cat.name)}
+                className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 ${
+                  selectedCategory === cat.name
+                    ? 'bg-[#7B8E76] text-white shadow-md'
+                    : 'bg-white text-[#A5A19E] border border-[#F4EFEB] shadow-sm'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute right-0 top-0 bottom-5 w-10 bg-gradient-to-l from-[#FFFDFB] to-transparent" />
         </div>
 
         {selectedCategory !== "すべて" && (() => {
