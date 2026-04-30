@@ -17,21 +17,21 @@ const apiKey = "";
 
 // 市場網羅のための詳細カテゴリツリー
 const CATEGORY_TREE = [
-  { name: "すべて", id: "100533", keyword: "" },
-  { name: "おむつ", id: "101070", keyword: "おむつ" },
-  { name: "ベビーカー", id: "501062", keyword: "ベビーカー" },
-  { name: "抱っこ紐", id: "209214", keyword: "抱っこ紐" },
-  { name: "ウェア", id: "110464", keyword: "ベビー服" },
-  { name: "ミルク・授乳", id: "101077", keyword: "哺乳瓶" },
-  { name: "離乳食・食器", id: "101078", keyword: "離乳食" },
-  { name: "寝具・ベッド", id: "101071", keyword: "ベビーベッド" },
-  { name: "おもちゃ", id: "101074", keyword: "ベビー おもちゃ" },
-  { name: "安全グッズ", id: "101076", keyword: "ベビーゲート" },
-  { name: "お風呂用品", id: "101075", keyword: "ベビーバス" },
-  { name: "トイレ用品", id: "101072", keyword: "おしりふき" },
-  { name: "車用品", id: "501063", keyword: "チャイルドシート" },
-  { name: "マタニティ", id: "101080", keyword: "マタニティ" },
-  { name: "ギフトセット", id: "101079", keyword: "出産祝い ギフトセット" }
+  { name: "すべて",      id: "100533", keyword: "",                   icon: "🏠", subs: [] },
+  { name: "おむつ",      id: "101070", keyword: "おむつ",             icon: "🩲", subs: ["テープタイプ", "パンツタイプ", "夜用おむつ", "おしりふき"] },
+  { name: "ベビーカー",  id: "501062", keyword: "ベビーカー",         icon: "🚼", subs: ["A型", "B型", "AB型", "バギー"] },
+  { name: "抱っこ紐",    id: "209214", keyword: "抱っこ紐",           icon: "🤱", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート"] },
+  { name: "ウェア",      id: "110464", keyword: "ベビー服",           icon: "👕", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
+  { name: "ミルク・授乳",id: "101077", keyword: "哺乳瓶",             icon: "🍼", subs: ["哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
+  { name: "離乳食・食器",id: "101078", keyword: "離乳食",             icon: "🥣", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
+  { name: "寝具・ベッド",id: "101071", keyword: "ベビーベッド",       icon: "🛏️", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
+  { name: "おもちゃ",    id: "101074", keyword: "ベビー おもちゃ",   icon: "🧸", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
+  { name: "安全グッズ",  id: "101076", keyword: "ベビーゲート",       icon: "🔒", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止"] },
+  { name: "お風呂用品",  id: "101075", keyword: "ベビーバス",         icon: "🛁", subs: ["ベビーバス", "沐浴剤", "体温計", "保湿クリーム"] },
+  { name: "トイレ用品",  id: "101072", keyword: "おしりふき",         icon: "🚿", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
+  { name: "車用品",      id: "501063", keyword: "チャイルドシート",   icon: "🚗", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ"] },
+  { name: "マタニティ",  id: "101080", keyword: "マタニティ",         icon: "🤰", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ"] },
+  { name: "ギフトセット",id: "101079", keyword: "出産祝い ギフトセット", icon: "🎁", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
 ];
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
@@ -225,7 +225,7 @@ const App = () => {
   }, [selectedProduct]);
 
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
-  const fetchRankingsWithAI = async (catName) => {
+  const fetchRankingsWithAI = async (catName, subCat = "すべて") => {
     const genre = CATEGORY_TREE.find(c => c.name === catName) || CATEGORY_TREE[0];
     setIsRemoteLoading(true);
     setRemoteError(null);
@@ -254,7 +254,8 @@ const App = () => {
 
       // 「すべて」はランキングAPI（全ベビー商品の実売）、個別カテゴリーは検索APIでキーワードマッチ
       const useSearch = catName !== "すべて" && genre.keyword;
-      const primaryUrl = useSearch ? searchUrl(genre.keyword) : rankingUrl(genre.id || '100533');
+      const keyword = (subCat && subCat !== "すべて") ? `${genre.keyword} ${subCat}` : genre.keyword;
+      const primaryUrl = useSearch ? searchUrl(keyword) : rankingUrl(genre.id || '100533');
 
       const rankingRes = await fetch(primaryUrl);
       if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
@@ -455,7 +456,12 @@ const App = () => {
     setSelectedCategory(cat);
     setSelectedSubCategory("すべて");
     setSortOrder("standard");
-    fetchRankingsWithAI(cat);
+    fetchRankingsWithAI(cat, "すべて");
+  };
+
+  const handleSubCategoryChange = (sub) => {
+    setSelectedSubCategory(sub);
+    fetchRankingsWithAI(selectedCategory, sub);
   };
 
   const toggleFavorite = (e, product) => {
@@ -724,26 +730,46 @@ ${productContext}
           <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
         </div>
 
-        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-6 -mx-2 px-2">
-          {CATEGORIES.map(cat => (
-            <button key={cat} onClick={() => handleCategoryChange(cat)} className={`whitespace-nowrap px-6 py-3 rounded-full text-xs font-bold transition-all ${selectedCategory === cat ? 'bg-[#7B8E76] text-white shadow-md' : 'bg-white text-[#A5A19E] border border-[#F4EFEB] shadow-sm'}`}>
-              {cat}
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4">
+          {CATEGORY_TREE.map(cat => (
+            <button
+              key={cat.name}
+              onClick={() => handleCategoryChange(cat.name)}
+              className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl transition-all duration-200 ${
+                selectedCategory === cat.name
+                  ? 'bg-[#7B8E76] text-white shadow-lg scale-105'
+                  : 'bg-white text-[#7B8E76] border border-[#EDE8E3] shadow-sm active:scale-95'
+              }`}
+            >
+              <span className="text-xl leading-none">{cat.icon}</span>
+              <span className="text-[10px] font-bold whitespace-nowrap leading-none">{cat.name}</span>
             </button>
           ))}
         </div>
 
-        {selectedCategory !== "すべて" && (
-          <div className="space-y-4 mb-8">
-            <div className="flex items-center gap-2 p-2 bg-white border border-[#F4EFEB] rounded-full shadow-sm">
-              <div className="p-2 bg-[#F9F6F3] rounded-full ml-1 text-[#A5A19E]"><Layers className="w-4 h-4" /></div>
-              {["すべて", "本体", "周辺グッズ"].map(sub => (
-                <button key={sub} onClick={() => setSelectedSubCategory(sub)} className={`px-5 py-2.5 rounded-full text-[11px] font-bold transition-all ${selectedSubCategory === sub ? 'bg-[#5A4C4C] text-white shadow-sm' : 'bg-transparent text-[#A5A19E]'}`}>
-                  {sub}
-                </button>
-              ))}
+        {selectedCategory !== "すべて" && (() => {
+          const currentSubs = CATEGORY_TREE.find(c => c.name === selectedCategory)?.subs || [];
+          if (currentSubs.length === 0) return null;
+          return (
+            <div className="mb-6">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+                {["すべて", ...currentSubs].map(sub => (
+                  <button
+                    key={sub}
+                    onClick={() => handleSubCategoryChange(sub)}
+                    className={`flex-shrink-0 px-4 py-2 rounded-full text-[11px] font-bold whitespace-nowrap transition-all duration-150 ${
+                      selectedSubCategory === sub
+                        ? 'bg-[#5A4C4C] text-white shadow-sm'
+                        : 'bg-[#F5F0EC] text-[#7B8E76] border border-[#EDE8E3]'
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="flex items-center justify-between mb-5 px-1 mt-4">
           <h3 className="font-black text-[#5A4C4C] text-xl">
