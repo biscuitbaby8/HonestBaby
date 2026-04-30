@@ -730,19 +730,18 @@ ${productContext}
           <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
         </div>
 
-        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4">
           {CATEGORY_TREE.map(cat => (
             <button
               key={cat.name}
               onClick={() => handleCategoryChange(cat.name)}
-              className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl transition-all duration-200 ${
+              className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 ${
                 selectedCategory === cat.name
-                  ? 'bg-[#7B8E76] text-white shadow-lg scale-105'
-                  : 'bg-white text-[#7B8E76] border border-[#EDE8E3] shadow-sm active:scale-95'
+                  ? 'bg-[#7B8E76] text-white shadow-md'
+                  : 'bg-white text-[#A5A19E] border border-[#F4EFEB] shadow-sm'
               }`}
             >
-              <span className="text-xl leading-none">{cat.icon}</span>
-              <span className="text-[10px] font-bold whitespace-nowrap leading-none">{cat.name}</span>
+              {cat.name}
             </button>
           ))}
         </div>
