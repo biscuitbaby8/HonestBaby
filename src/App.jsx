@@ -247,24 +247,33 @@ const App = () => {
       return m ? parseInt(m[1]) : null;
     };
 
-    const mapItems = (items, cat) => items.map(item => {
-      const name = item.Item.itemName;
-      const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || "";
-      const unitCount = cat === "おむつ" ? parseDiaperCount(name) : null;
-      return {
-        id: `ranking-${item.Item.itemCode}`,
-        name,
-        price: item.Item.itemPrice,
-        image: rawImg.replace(/_ex=\d+x\d+/, '_ex=400x400'),
-        url: item.Item.affiliateUrl || item.Item.itemUrl,
-        brand: "",
-        category: cat,
-        rating: parseFloat(item.Item.reviewAverage) || 4.5,
-        unitCount,
-        unitName: unitCount ? "枚" : null,
-        shops: [{ name: "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
-      };
-    });
+    const NG_KEYWORDS = ['ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍'];
+    const cleanName = (name) => name
+      .replace(/【[^】]{0,40}】/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 45);
+
+    const mapItems = (items, cat) => items
+      .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+      .map(item => {
+        const name = cleanName(item.Item.itemName);
+        const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || "";
+        const unitCount = cat === "おむつ" ? parseDiaperCount(name) : null;
+        return {
+          id: `ranking-${item.Item.itemCode}`,
+          name,
+          price: item.Item.itemPrice,
+          image: rawImg.replace(/_ex=\d+x\d+/, '_ex=400x400'),
+          url: item.Item.affiliateUrl || item.Item.itemUrl,
+          brand: "",
+          category: cat,
+          rating: parseFloat(item.Item.reviewAverage) || 4.5,
+          unitCount,
+          unitName: unitCount ? "枚" : null,
+          shops: [{ name: "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
+        };
+      });
 
     try {
       const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
@@ -301,7 +310,7 @@ const App = () => {
       }
 
       // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
-      const immediateProducts = rawItems.slice(0, 10).map(i => ({ ...i, isMarketWide: true }));
+      const immediateProducts = rawItems.slice(0, 30).map(i => ({ ...i, isMarketWide: true }));
       setRemoteProducts(immediateProducts);
       setIsRemoteLoading(false);
 
@@ -831,13 +840,8 @@ ${productContext}
             <ProductCard key={p.id} product={p} />
           ))}
 
-          {/* DBに保存された商品（キャッシュ/過去のおすすめ）を下部に表示 */}
-          {!isRemoteLoading && filtered.map((p, idx) => (
-            <ProductCard key={p.id} product={p} localRank={sortOrder === "popular" ? idx + 1 : null} />
-          ))}
-
           {/* Empty State */}
-          {!isRemoteLoading && filtered.length === 0 && remoteProducts.length === 0 && (
+          {!isRemoteLoading && remoteProducts.length === 0 && (
              <div className="col-span-2 py-20 text-center text-[#A5A19E] text-xs font-bold uppercase tracking-widest leading-loose">該当する商品は見つかりませんでした</div>
           )}
         </div>
