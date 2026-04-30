@@ -17,21 +17,21 @@ const apiKey = "";
 
 // 市場網羅のための詳細カテゴリツリー
 const CATEGORY_TREE = [
-  { name: "すべて", id: "100533" },
-  { name: "おむつ", id: "101070" },
-  { name: "ベビーカー", id: "501062" },
-  { name: "抱っこ紐", id: "209214" },
-  { name: "ウェア", id: "110464" },
-  { name: "ミルク・授乳", id: "101077" },
-  { name: "離乳食・食器", id: "101078" },
-  { name: "寝具・ベッド", id: "101071" },
-  { name: "おもちゃ", id: "101074" },
-  { name: "安全グッズ", id: "101076" },
-  { name: "お風呂用品", id: "101075" },
-  { name: "トイレ用品", id: "101072" },
-  { name: "車用品", id: "501063" },
-  { name: "マタニティ", id: "101080" },
-  { name: "ギフトセット", id: "101079" }
+  { name: "すべて", id: "100533", keyword: "" },
+  { name: "おむつ", id: "101070", keyword: "おむつ" },
+  { name: "ベビーカー", id: "501062", keyword: "ベビーカー" },
+  { name: "抱っこ紐", id: "209214", keyword: "抱っこ紐" },
+  { name: "ウェア", id: "110464", keyword: "ベビー服" },
+  { name: "ミルク・授乳", id: "101077", keyword: "哺乳瓶" },
+  { name: "離乳食・食器", id: "101078", keyword: "離乳食" },
+  { name: "寝具・ベッド", id: "101071", keyword: "ベビーベッド" },
+  { name: "おもちゃ", id: "101074", keyword: "ベビー おもちゃ" },
+  { name: "安全グッズ", id: "101076", keyword: "ベビーゲート" },
+  { name: "お風呂用品", id: "101075", keyword: "ベビーバス" },
+  { name: "トイレ用品", id: "101072", keyword: "おしりふき" },
+  { name: "車用品", id: "501063", keyword: "チャイルドシート" },
+  { name: "マタニティ", id: "101080", keyword: "マタニティ" },
+  { name: "ギフトセット", id: "101079", keyword: "出産祝い ギフトセット" }
 ];
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
@@ -249,17 +249,22 @@ const App = () => {
       const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
       if (!appId) throw new Error("VITE_RAKUTEN_APP_ID not set");
 
-      const buildUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
+      const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
+      const searchUrl = (keyword) => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=standard&hits=30&availability=1&affiliateId=${affiliateId}`;
 
-      const rankingRes = await fetch(buildUrl(genre.id || '100533'));
+      // 「すべて」はランキングAPI（全ベビー商品の実売）、個別カテゴリーは検索APIでキーワードマッチ
+      const useSearch = catName !== "すべて" && genre.keyword;
+      const primaryUrl = useSearch ? searchUrl(genre.keyword) : rankingUrl(genre.id || '100533');
+
+      const rankingRes = await fetch(primaryUrl);
       if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
       const rankingData = await rankingRes.json();
 
       let rawItems = rankingData.Items ? mapItems(rankingData.Items, catName) : [];
 
-      // 結果が0件のとき親カテゴリ（ベビー全体）でフォールバック
-      if (rawItems.length === 0 && genre.id !== '100533') {
-        const fallbackRes = await fetch(buildUrl('100533'));
+      // 検索が0件のとき、ベビー全体ランキングでフォールバック
+      if (rawItems.length === 0 && catName !== "すべて") {
+        const fallbackRes = await fetch(rankingUrl('100533'));
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json();
           rawItems = fallbackData.Items ? mapItems(fallbackData.Items, catName) : [];
