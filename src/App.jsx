@@ -67,15 +67,27 @@ const App = () => {
   const [isCrossLoading, setIsCrossLoading] = useState(false);
 
   // Navigation States
-  const [activeTab, setActiveTab] = useState('home'); 
+  const [activeTab, setActiveTab] = useState('home');
   const [selectedProduct, setSelectedProduct] = useState(null);
-  
+
   // Category & Filter States
   const [selectedCategory, setSelectedCategory] = useState("すべて");
   const [selectedSubCategory, setSelectedSubCategory] = useState("すべて");
   const [sortOrder, setSortOrder] = useState("standard");
   const [searchTerm, setSearchTerm] = useState("");
   const [giftFilter, setGiftFilter] = useState("すべて");
+
+  // 管理モード: URLに ?admin=1 を付けると ON（localStorage で保持）
+  const [isAdminMode, setIsAdminMode] = useState(() => {
+    if (new URLSearchParams(window.location.search).get('admin') === '1') {
+      localStorage.setItem('honestBabyAdmin', '1');
+      return true;
+    }
+    return localStorage.getItem('honestBabyAdmin') === '1';
+  });
+
+  // ブロックリスト（非表示商品）
+  const [blocklist, setBlocklist] = useState(new Set());
   
   // User Data States
   const [favorites, setFavorites] = useState(() => {
@@ -180,6 +192,21 @@ const App = () => {
 
     fetchProducts();
   }, []);
+
+  // ブロックリストを起動時に読み込む
+  useEffect(() => {
+    supabase.from('product_blocklist').select('item_code').then(({ data }) => {
+      if (data) setBlocklist(new Set(data.map(r => r.item_code)));
+    });
+  }, []);
+
+  // 商品を非表示にする（管理者モード専用）
+  const blockProduct = async (product) => {
+    const code = product.id.replace(/^(ranking|product)-/, '');
+    await supabase.from('product_blocklist').upsert({ item_code: code });
+    setBlocklist(prev => new Set([...prev, code]));
+    setRemoteProducts(prev => prev.filter(p => p.id !== product.id));
+  };
 
   // 初回ロード安定化: DBデータを表示しつつ、裏側で市場最新データをAPIで取得（Discovery Engine）
   useEffect(() => {
@@ -345,16 +372,39 @@ const App = () => {
         const combined = [...(data1.Items || []), ...(data2.Items || [])];
         rawItems = dedupeAndMergeShops(mapItems(combined, catName));
       } else {
-        // メインカテゴリー（「すべて」サブタブ）: Ranking API でジャンル保証済みの人気商品
-        const rankingRes = await fetch(rankingUrl(genreId));
-        if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
-        const rankingData = await rankingRes.json();
-        rawItems = rankingData.Items ? mapItems(rankingData.Items, catName) : [];
+        // メインカテゴリー: 商品価格ナビAPIを優先（カタログ品質）、失敗時はRanking APIにフォールバック
+        try {
+          const productParams = new URLSearchParams({ genreId, hits: 30 });
+          if (genre.keyword) productParams.set('query', genre.keyword);
+          const productRes = await fetch(`/api/rakuten-product?${productParams}`);
+          if (productRes.ok) {
+            const productData = await productRes.json();
+            if ((productData.products || []).length > 0) {
+              rawItems = productData.products.map(p => ({
+                ...p,
+                category: catName,
+                unitCount: catName === "おむつ" ? parseDiaperCount(p.name) : null,
+                unitName: catName === "おむつ" ? "枚" : null,
+              })).filter(p => {
+                const code = p.id.replace('product-', '');
+                return !blocklist.has(code);
+              });
+            }
+          }
+        } catch (_) { /* フォールバックへ */ }
+
+        // 商品価格ナビで取得できなければ Ranking API（既存・ジャンル保証）
+        if (rawItems.length === 0) {
+          const rankingRes = await fetch(rankingUrl(genreId));
+          if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
+          const rankingData = await rankingRes.json();
+          rawItems = rankingData.Items ? mapItems(rankingData.Items, catName) : [];
+        }
       }
 
-      // 0件のとき: サブカテゴリーはRanking APIにフォールバック、それでも0ならベビー全体
+      // 0件のとき: Ranking API（genreId） → ベビー全体の順にフォールバック
       if (rawItems.length === 0) {
-        const fallbackId = useSearch ? genreId : '100533';
+        const fallbackId = genreId !== '100533' ? genreId : '100533';
         const fallbackRes = await fetch(rankingUrl(fallbackId));
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json();
@@ -701,12 +751,19 @@ ${productContext}
           className="w-full h-full object-cover rounded-[1.5rem]" 
           alt={product.name} 
         />
-        <button 
+        <button
           onClick={(e) => toggleFavorite(e, product)}
           className="absolute top-6 right-6 bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-sm z-10 hover:bg-rose-50 transition-colors"
         >
           <Heart className={`w-4 h-4 ${isFavorite(product.id) ? 'text-rose-400 fill-current' : 'text-[#D4CDC7]'}`} />
         </button>
+        {isAdminMode && (
+          <button
+            onClick={(e) => { e.stopPropagation(); blockProduct(product); }}
+            title="この商品を非表示にする"
+            className="absolute top-6 left-6 bg-red-500 text-white w-7 h-7 rounded-full text-sm font-black shadow-md z-30 flex items-center justify-center hover:bg-red-600"
+          >×</button>
+        )}
         {localRank && (
           <div className="absolute top-6 left-6 bg-[#F9DC5C] text-[#5A4C4C] w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-md border-2 border-white">
             {localRank}
