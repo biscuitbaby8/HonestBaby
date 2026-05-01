@@ -19,19 +19,24 @@ const apiKey = "";
 // ジャンルID は ranking.rakuten.co.jp/daily/<id>/ の URL から確認した実際のID
 const CATEGORY_TREE = [
   { name: "すべて",      id: "100533", keyword: "",                         icon: "🏠", subs: [] },
-  { name: "おむつ",      id: "205197", keyword: "おむつ",                   icon: "🩲", subs: ["テープタイプ", "パンツタイプ", "夜用おむつ", "おしりふき"] },
-  { name: "ベビーカー",  id: "200833", keyword: "ベビーカー",               icon: "🚼", subs: ["A型", "B型", "AB型", "バギー"] },
-  { name: "抱っこ紐",    id: "412209", keyword: "抱っこ紐",                 icon: "🤱", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート"] },
+  { name: "おむつ",      id: "205197", keyword: "おむつ",                   icon: "🩲", subs: [
+    { name: "テープタイプ", subsubs: ["新生児", "S", "M", "L", "BIG", "BIGより大きい"] },
+    { name: "パンツタイプ", subsubs: ["S", "M", "L", "BIG", "BIGより大きい"] },
+    { name: "夜用おむつ",   subsubs: ["M", "L", "BIG", "BIGより大きい"] },
+    { name: "おしりふき" },
+  ]},
+  { name: "ベビーカー",  id: "200833", keyword: "ベビーカー",               icon: "🚼", subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
+  { name: "抱っこ紐",    id: "412209", keyword: "抱っこ紐",                 icon: "🤱", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
   { name: "ウェア",      id: "111102", keyword: "ベビー服",                 icon: "👕", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
-  { name: "ミルク・授乳",id: "205208", keyword: "哺乳瓶",                   icon: "🍼", subs: ["哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
+  { name: "ミルク・授乳",id: "205208", keyword: "ミルク 授乳",              icon: "🍼", subs: ["ミルク", "哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
   { name: "離乳食・食器",id: "213980", keyword: "離乳食",                   icon: "🥣", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
   { name: "寝具・ベッド",id: "200822", keyword: "ベビーベッド",             icon: "🛏️", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
   { name: "おもちゃ",    id: "201591", keyword: "おもちゃ",                 icon: "🧸", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
-  { name: "安全グッズ",  id: "200841", keyword: "ベビーゲート",             icon: "🔒", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止"] },
-  { name: "お風呂用品",  id: "200815", keyword: "沐浴",                     icon: "🛁", subs: ["ベビーバス", "沐浴剤", "体温計", "保湿クリーム"] },
+  { name: "安全グッズ",  id: "200841", keyword: "ベビーゲート",             icon: "🔒", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止", "ベビーモニター"] },
+  { name: "お風呂用品",  id: "200815", keyword: "ベビー お風呂",            icon: "🛁", subs: ["ベビーバス", "ベビー用ソープ", "保湿クリーム"] },
   { name: "トイレ用品",  id: "200819", keyword: "おまる",                   icon: "🚿", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
-  { name: "車用品",      id: "566088", keyword: "チャイルドシート",          icon: "🚗", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ"] },
-  { name: "マタニティ",  id: "100533", keyword: "マタニティ",               icon: "🤰", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ"] },
+  { name: "車用品",      id: "566088", keyword: "チャイルドシート",          icon: "🚗", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ", "周辺グッズ"] },
+  { name: "マタニティ",  id: "100533", keyword: "マタニティ",               icon: "🤰", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
   { name: "ギフトセット",id: "205222", keyword: "出産祝い ギフト",           icon: "🎁", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
 ];
 
@@ -73,6 +78,7 @@ const App = () => {
   // Category & Filter States
   const [selectedCategory, setSelectedCategory] = useState("すべて");
   const [selectedSubCategory, setSelectedSubCategory] = useState("すべて");
+  const [selectedSubSubCategory, setSelectedSubSubCategory] = useState("すべて");
   const [sortOrder, setSortOrder] = useState("standard");
   const [searchTerm, setSearchTerm] = useState("");
   const [giftFilter, setGiftFilter] = useState("すべて");
@@ -280,7 +286,7 @@ const App = () => {
   }, [selectedProduct]);
 
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
-  const fetchRankingsWithAI = async (catName, subCat = "すべて") => {
+  const fetchRankingsWithAI = async (catName, subCat = "すべて", subSubCat = "すべて") => {
     const genre = CATEGORY_TREE.find(c => c.name === catName) || CATEGORY_TREE[0];
     setIsRemoteLoading(true);
     setRemoteError(null);
@@ -362,33 +368,43 @@ const App = () => {
 
       let rawItems;
       if (useSearch) {
-        // サブカテゴリー: genreId で親ジャンルを固定 + サブキーワードで絞り込み（2ページ並列）
-        const subKeyword = `${genre.keyword} ${subCat}`.trim();
+        // サブカテゴリー: genreId で親ジャンルを固定 + サブ/3段階キーワードで絞り込み（3ページ並列）
+        const subKeyword = [genre.keyword, subCat !== "すべて" ? subCat : "", subSubCat !== "すべて" ? subSubCat : ""].filter(Boolean).join(" ").trim();
         const mkUrl = (page) => `${searchUrl(subKeyword, page)}&genreId=${genreId}`;
-        const [res1, res2] = await Promise.all([fetch(mkUrl(1)), fetch(mkUrl(2))]);
+        const [res1, res2, res3] = await Promise.all([fetch(mkUrl(1)), fetch(mkUrl(2)), fetch(mkUrl(3))]);
         if (!res1.ok) throw new Error(`Search API Error: ${res1.status}`);
         const data1 = await res1.json();
         const data2 = res2.ok ? await res2.json() : { Items: [] };
-        const combined = [...(data1.Items || []), ...(data2.Items || [])];
+        const data3 = res3.ok ? await res3.json() : { Items: [] };
+        const combined = [...(data1.Items || []), ...(data2.Items || []), ...(data3.Items || [])];
         rawItems = dedupeAndMergeShops(mapItems(combined, catName));
       } else {
-        // メインカテゴリー: 商品価格ナビAPIを優先（カタログ品質）、失敗時はRanking APIにフォールバック
+        // メインカテゴリー: 商品価格ナビAPIを優先（3ページ並列）、失敗時はRanking APIにフォールバック
         try {
-          const productParams = new URLSearchParams({ genreId, hits: 30 });
-          if (genre.keyword) productParams.set('query', genre.keyword);
-          const productRes = await fetch(`/api/rakuten-product?${productParams}`);
-          if (productRes.ok) {
-            const productData = await productRes.json();
-            if ((productData.products || []).length > 0) {
-              rawItems = productData.products.map(p => ({
-                ...p,
-                category: catName,
-                unitCount: catName === "おむつ" ? parseDiaperCount(p.name) : null,
-                unitName: catName === "おむつ" ? "枚" : null,
-              })).filter(p => {
-                const code = p.id.replace('product-', '');
-                return !blocklist.has(code);
-              });
+          const mkProductUrl = (page) => {
+            const p = new URLSearchParams({ genreId, hits: 30, page });
+            if (genre.keyword) p.set('query', genre.keyword);
+            return `/api/rakuten-product?${p}`;
+          };
+          const [pRes1, pRes2, pRes3] = await Promise.all([fetch(mkProductUrl(1)), fetch(mkProductUrl(2)), fetch(mkProductUrl(3))]);
+          if (pRes1.ok) {
+            const pData1 = await pRes1.json();
+            const pData2 = pRes2.ok ? await pRes2.json() : { products: [] };
+            const pData3 = pRes3.ok ? await pRes3.json() : { products: [] };
+            const allProducts = [...(pData1.products || []), ...(pData2.products || []), ...(pData3.products || [])];
+            if (allProducts.length > 0) {
+              const seen = new Set();
+              rawItems = allProducts
+                .filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; })
+                .map(p => ({
+                  ...p,
+                  category: catName,
+                  unitCount: catName === "おむつ" ? parseDiaperCount(p.name) : null,
+                  unitName: catName === "おむつ" ? "枚" : null,
+                })).filter(p => {
+                  const code = p.id.replace('product-', '');
+                  return !blocklist.has(code);
+                });
             }
           }
         } catch (_) { /* フォールバックへ */ }
@@ -418,7 +434,7 @@ const App = () => {
       }
 
       // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
-      const immediateProducts = rawItems.slice(0, 30).map(i => ({ ...i, isMarketWide: true }));
+      const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
       setRemoteProducts(immediateProducts);
       setIsRemoteLoading(false);
 
@@ -427,7 +443,7 @@ const App = () => {
       if (!gApiKey) return;
 
       try {
-        const simplified = rawItems.slice(0, 15).map(i => ({ name: i.name, price: i.price }));
+        const simplified = rawItems.slice(0, 30).map(i => ({ name: i.name, price: i.price }));
         const prompt = `あなたはベビー用品の専門バイヤーです。
       以下の商品リストから、「ギフトや自宅用として本当に自信を持っておすすめできるもの」を厳選し、
       以下のJSON形式のみで返してください。
@@ -595,13 +611,20 @@ const App = () => {
   const handleCategoryChange = (cat) => {
     setSelectedCategory(cat);
     setSelectedSubCategory("すべて");
+    setSelectedSubSubCategory("すべて");
     setSortOrder("standard");
     fetchRankingsWithAI(cat, "すべて");
   };
 
   const handleSubCategoryChange = (sub) => {
     setSelectedSubCategory(sub);
+    setSelectedSubSubCategory("すべて");
     fetchRankingsWithAI(selectedCategory, sub);
+  };
+
+  const handleSubSubCategoryChange = (subsub) => {
+    setSelectedSubSubCategory(subsub);
+    fetchRankingsWithAI(selectedCategory, selectedSubCategory, subsub);
   };
 
   const toggleFavorite = (e, product) => {
@@ -858,7 +881,8 @@ ${productContext}
     let filtered = dbProducts.filter(p => {
       const matchCat = selectedCategory === "すべて" || p.category === selectedCategory;
       const matchSub = selectedSubCategory === "すべて" || p.subCategory === selectedSubCategory;
-      return matchCat && matchSub;
+      const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
+      return matchCat && matchSub && matchSubSub;
     });
     
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
@@ -906,24 +930,51 @@ ${productContext}
         {selectedCategory !== "すべて" && (() => {
           const currentSubs = CATEGORY_TREE.find(c => c.name === selectedCategory)?.subs || [];
           if (currentSubs.length === 0) return null;
+          const getSubName = (sub) => typeof sub === 'string' ? sub : sub.name;
+          const currentSubObj = currentSubs.find(s => getSubName(s) === selectedSubCategory);
+          const currentSubsubs = currentSubObj?.subsubs || [];
           return (
-            <div className="mb-5 relative">
-              <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
-                {["すべて", ...currentSubs].map(sub => (
-                  <button
-                    key={sub}
-                    onClick={() => handleSubCategoryChange(sub)}
-                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 ${
-                      selectedSubCategory === sub
-                        ? 'bg-[#5A4C4C] text-white shadow-sm'
-                        : 'bg-[#F0EBE6] text-[#7B8E76]'
-                    }`}
-                  >
-                    {sub}
-                  </button>
-                ))}
+            <>
+              <div className="mb-3 relative">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+                  {["すべて", ...currentSubs].map(sub => {
+                    const subName = getSubName(sub);
+                    return (
+                      <button
+                        key={subName}
+                        onClick={() => handleSubCategoryChange(subName)}
+                        className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 ${
+                          selectedSubCategory === subName
+                            ? 'bg-[#5A4C4C] text-white shadow-sm'
+                            : 'bg-[#F0EBE6] text-[#7B8E76]'
+                        }`}
+                      >
+                        {subName}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+              {currentSubsubs.length > 0 && (
+                <div className="mb-5 relative">
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+                    {["すべて", ...currentSubsubs].map(subsub => (
+                      <button
+                        key={subsub}
+                        onClick={() => handleSubSubCategoryChange(subsub)}
+                        className={`flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 ${
+                          selectedSubSubCategory === subsub
+                            ? 'bg-[#7B8E76] text-white shadow-sm'
+                            : 'bg-[#EBF0EA] text-[#5A4C4C]'
+                        }`}
+                      >
+                        {subsub}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           );
         })()}
 
