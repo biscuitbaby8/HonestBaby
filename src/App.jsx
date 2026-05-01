@@ -16,22 +16,23 @@ const apiKey = "";
 // ＝＝＝＝＝ 商品データはSupabaseから取得します ＝＝＝＝＝
 
 // 市場網羅のための詳細カテゴリツリー
+// ジャンルID は ranking.rakuten.co.jp/daily/<id>/ の URL から確認した実際のID
 const CATEGORY_TREE = [
-  { name: "すべて",      id: "100533", keyword: "",                            icon: "🏠", subs: [] },
-  { name: "おむつ",      id: "101070", keyword: "紙おむつ 赤ちゃん",           icon: "🩲", subs: ["テープタイプ", "パンツタイプ", "夜用おむつ", "おしりふき"] },
-  { name: "ベビーカー",  id: "501062", keyword: "ベビーカー",                  icon: "🚼", subs: ["A型", "B型", "AB型", "バギー"] },
-  { name: "抱っこ紐",    id: "209214", keyword: "抱っこ紐 新生児",             icon: "🤱", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート"] },
-  { name: "ウェア",      id: "110464", keyword: "ベビー服 赤ちゃん",           icon: "👕", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
-  { name: "ミルク・授乳",id: "101077", keyword: "ベビー 哺乳瓶",              icon: "🍼", subs: ["哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
-  { name: "離乳食・食器",id: "101078", keyword: "離乳食 ベビーフード",         icon: "🥣", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
-  { name: "寝具・ベッド",id: "101071", keyword: "ベビーベッド 赤ちゃん布団",  icon: "🛏️", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
-  { name: "おもちゃ",    id: "101074", keyword: "赤ちゃん おもちゃ 知育",     icon: "🧸", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
-  { name: "安全グッズ",  id: "101076", keyword: "ベビー 安全グッズ ゲート",   icon: "🔒", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止"] },
-  { name: "お風呂用品",  id: "101075", keyword: "ベビー お風呂 沐浴",         icon: "🛁", subs: ["ベビーバス", "沐浴剤", "体温計", "保湿クリーム"] },
-  { name: "トイレ用品",  id: "101072", keyword: "ベビー おしりふき 赤ちゃん", icon: "🚿", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
-  { name: "車用品",      id: "501063", keyword: "チャイルドシート 新生児",     icon: "🚗", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ"] },
-  { name: "マタニティ",  id: "101080", keyword: "マタニティ 妊娠",             icon: "🤰", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ"] },
-  { name: "ギフトセット",id: "101079", keyword: "出産祝い ギフトセット 赤ちゃん", icon: "🎁", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
+  { name: "すべて",      id: "100533", keyword: "",                         icon: "🏠", subs: [] },
+  { name: "おむつ",      id: "205197", keyword: "おむつ",                   icon: "🩲", subs: ["テープタイプ", "パンツタイプ", "夜用おむつ", "おしりふき"] },
+  { name: "ベビーカー",  id: "200833", keyword: "ベビーカー",               icon: "🚼", subs: ["A型", "B型", "AB型", "バギー"] },
+  { name: "抱っこ紐",    id: "412209", keyword: "抱っこ紐",                 icon: "🤱", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート"] },
+  { name: "ウェア",      id: "111102", keyword: "ベビー服",                 icon: "👕", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
+  { name: "ミルク・授乳",id: "205208", keyword: "哺乳瓶",                   icon: "🍼", subs: ["哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
+  { name: "離乳食・食器",id: "213980", keyword: "離乳食",                   icon: "🥣", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
+  { name: "寝具・ベッド",id: "200822", keyword: "ベビーベッド",             icon: "🛏️", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
+  { name: "おもちゃ",    id: "201591", keyword: "おもちゃ",                 icon: "🧸", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
+  { name: "安全グッズ",  id: "200841", keyword: "ベビーゲート",             icon: "🔒", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止"] },
+  { name: "お風呂用品",  id: "200815", keyword: "沐浴",                     icon: "🛁", subs: ["ベビーバス", "沐浴剤", "体温計", "保湿クリーム"] },
+  { name: "トイレ用品",  id: "200819", keyword: "おまる",                   icon: "🚿", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
+  { name: "車用品",      id: "566088", keyword: "チャイルドシート",          icon: "🚗", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ"] },
+  { name: "マタニティ",  id: "100533", keyword: "マタニティ",               icon: "🤰", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ"] },
+  { name: "ギフトセット",id: "205222", keyword: "出産祝い ギフト",           icon: "🎁", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
 ];
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
@@ -327,31 +328,34 @@ const App = () => {
         return Array.from(map.values());
       };
 
-      // 「すべて」はランキングAPI（全ベビー商品の実売）、個別カテゴリーは検索APIでキーワードマッチ
-      const useSearch = catName !== "すべて" && genre.keyword;
-      const keyword = (subCat && subCat !== "すべて") ? `${genre.keyword} ${subCat}` : genre.keyword;
+      // メインカテゴリー表示はRanking API（genreId指定 → ジャンル外商品が構造的に混入しない）
+      // サブカテゴリー選択時のみ Search API（genreId + サブキーワードで絞り込み）
+      const useSearch = !!(subCat && subCat !== "すべて");
+      const genreId = genre.id || '100533';
 
       let rawItems;
       if (useSearch) {
-        const [res1, res2] = await Promise.all([
-          fetch(searchUrl(keyword, 1)),
-          fetch(searchUrl(keyword, 2))
-        ]);
+        // サブカテゴリー: genreId で親ジャンルを固定 + サブキーワードで絞り込み（2ページ並列）
+        const subKeyword = `${genre.keyword} ${subCat}`.trim();
+        const mkUrl = (page) => `${searchUrl(subKeyword, page)}&genreId=${genreId}`;
+        const [res1, res2] = await Promise.all([fetch(mkUrl(1)), fetch(mkUrl(2))]);
         if (!res1.ok) throw new Error(`Search API Error: ${res1.status}`);
         const data1 = await res1.json();
         const data2 = res2.ok ? await res2.json() : { Items: [] };
         const combined = [...(data1.Items || []), ...(data2.Items || [])];
         rawItems = dedupeAndMergeShops(mapItems(combined, catName));
       } else {
-        const rankingRes = await fetch(rankingUrl(genre.id || '100533'));
+        // メインカテゴリー（「すべて」サブタブ）: Ranking API でジャンル保証済みの人気商品
+        const rankingRes = await fetch(rankingUrl(genreId));
         if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
         const rankingData = await rankingRes.json();
         rawItems = rankingData.Items ? mapItems(rankingData.Items, catName) : [];
       }
 
-      // 検索が0件のとき、ベビー全体ランキングでフォールバック
-      if (rawItems.length === 0 && catName !== "すべて") {
-        const fallbackRes = await fetch(rankingUrl('100533'));
+      // 0件のとき: サブカテゴリーはRanking APIにフォールバック、それでも0ならベビー全体
+      if (rawItems.length === 0) {
+        const fallbackId = useSearch ? genreId : '100533';
+        const fallbackRes = await fetch(rankingUrl(fallbackId));
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json();
           rawItems = fallbackData.Items ? mapItems(fallbackData.Items, catName) : [];
