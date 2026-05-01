@@ -1196,7 +1196,107 @@ ${productContext}
   return (
     <div className="min-h-screen bg-[#FFFDFB] pb-32 font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white">
       <Helmet>
-        <title>{selectedProduct ? `${selectedProduct.name} | Honest Baby` : activeTab === 'home' ? 'Honest Baby | 忖度なしのベビー用品比較' : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} | Honest Baby`}</title>
+        {/* タイトル */}
+        {selectedProduct
+          ? <title>{selectedProduct.name} の最安値・価格比較 | HonestBaby</title>
+          : selectedCategory !== "すべて"
+            ? <title>{selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby</title>
+            : <title>HonestBaby | 忖度なしのベビー用品比較・最安値検索</title>
+        }
+
+        {/* meta description */}
+        {selectedProduct
+          ? <meta name="description" content={`${selectedProduct.name}の最安値・価格比較。評価${selectedProduct.rating}★。楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`} />
+          : selectedCategory !== "すべて"
+            ? <meta name="description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。楽天・Yahoo対応。HonestBabyは忖度なしの比較サイトです。`} />
+            : <meta name="description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。忖度なしのリアルレビューも掲載。" />
+        }
+
+        {/* canonical */}
+        {selectedProduct
+          ? <link rel="canonical" href={`https://honestbaby-care.com/?product=${encodeURIComponent(selectedProduct.id)}`} />
+          : selectedCategory !== "すべて"
+            ? <link rel="canonical" href={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
+            : <link rel="canonical" href="https://honestbaby-care.com/" />
+        }
+
+        {/* OGP */}
+        {selectedProduct
+          ? <meta property="og:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
+          : selectedCategory !== "すべて"
+            ? <meta property="og:title" content={`${selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby`} />
+            : <meta property="og:title" content="HonestBaby | 忖度なしのベビー用品比較・最安値検索" />
+        }
+        {selectedProduct
+          ? <meta property="og:description" content={`${selectedProduct.name}の最安値・価格比較。評価${selectedProduct.rating}★。楽天・Yahoo最安値をまとめてチェック。`} />
+          : selectedCategory !== "すべて"
+            ? <meta property="og:description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。`} />
+            : <meta property="og:description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。" />
+        }
+        <meta property="og:image" content={selectedProduct?.image || "https://honestbaby-care.com/logo.png"} />
+        {selectedProduct
+          ? <meta property="og:url" content={`https://honestbaby-care.com/?product=${encodeURIComponent(selectedProduct.id)}`} />
+          : selectedCategory !== "すべて"
+            ? <meta property="og:url" content={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
+            : <meta property="og:url" content="https://honestbaby-care.com/" />
+        }
+        <meta property="og:locale" content="ja_JP" />
+
+        {/* Twitter Card */}
+        {selectedProduct
+          ? <meta name="twitter:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
+          : <meta name="twitter:title" content="HonestBaby | 忖度なしのベビー用品比較" />
+        }
+        <meta name="twitter:image" content={selectedProduct?.image || "https://honestbaby-care.com/logo.png"} />
+
+        {/* JSON-LD: WebSite + Organization */}
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "WebSite",
+              "@id": "https://honestbaby-care.com/#website",
+              "url": "https://honestbaby-care.com/",
+              "name": "HonestBaby",
+              "description": "ベビー用品・育児グッズの忖度なし価格比較サイト",
+              "inLanguage": "ja"
+            },
+            {
+              "@type": "Organization",
+              "@id": "https://honestbaby-care.com/#organization",
+              "name": "HonestBaby",
+              "url": "https://honestbaby-care.com/",
+              "logo": "https://honestbaby-care.com/logo.png"
+            }
+          ]
+        })}</script>
+
+        {/* JSON-LD: Product（商品詳細ページのみ） */}
+        {selectedProduct && (
+          <script type="application/ld+json">{JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": selectedProduct.name,
+            "image": selectedProduct.image,
+            "brand": { "@type": "Brand", "name": selectedProduct.brand || "ベビー用品" },
+            "offers": {
+              "@type": "AggregateOffer",
+              "priceCurrency": "JPY",
+              "lowPrice": selectedProduct.price,
+              "offerCount": (selectedProduct.shops || []).length || 1,
+              "availability": "https://schema.org/InStock"
+            },
+            ...(selectedProduct.rating && {
+              "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": selectedProduct.rating,
+                "reviewCount": selectedProduct.reviewCount || selectedProduct.reviewsCount || 1,
+                "bestRating": 5,
+                "worstRating": 1
+              }
+            })
+          })}</script>
+        )}
       </Helmet>
       {/* 上部ヘッダー */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
