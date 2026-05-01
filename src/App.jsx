@@ -394,7 +394,7 @@ const App = () => {
         } catch (_) { /* フォールバックへ */ }
 
         // 商品価格ナビで取得できなければ Ranking API（既存・ジャンル保証）
-        if (rawItems.length === 0) {
+        if (!rawItems || rawItems.length === 0) {
           const rankingRes = await fetch(rankingUrl(genreId));
           if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
           const rankingData = await rankingRes.json();
@@ -403,7 +403,7 @@ const App = () => {
       }
 
       // 0件のとき: Ranking API（genreId） → ベビー全体の順にフォールバック
-      if (rawItems.length === 0) {
+      if (!rawItems || rawItems.length === 0) {
         const fallbackId = genreId !== '100533' ? genreId : '100533';
         const fallbackRes = await fetch(rankingUrl(fallbackId));
         if (fallbackRes.ok) {
