@@ -6,11 +6,10 @@ import {
   Settings, History, Bookmark, Sparkles, Send, Bot, 
   Package, Layers, ChevronDown, ChevronUp, Calculator, 
   Store, Gift, ChevronLeft, ShieldCheck, Baby, BellRing, Edit3,
-  FileText, Shield, Info, Edit2, Camera, Archive, RotateCcw, Trash2, PlusCircle
+  FileText, Shield, Info, Edit2, Camera
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { supabase } from './lib/supabaseClient';
-import { storage } from './utils/storage';
 
 const apiKey = "";
 
@@ -119,19 +118,15 @@ const App = () => {
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // AI Chat States
-  const [chatMessages, setChatMessages] = useState(() => storage.getChatMessages());
+  const [chatMessages, setChatMessages] = useState([
+    { role: 'assistant', text: 'こんにちは！Honest BabyのAIコンサルタントです🧸 ご自宅用からギフトまで、何でも相談してね！' }
+  ]);
   const [userInput, setUserInput] = useState("");
   const [isAiTyping, setIsAiTyping] = useState(false);
-  const [showArchivePanel, setShowArchivePanel] = useState(false);
-  const [archivedChats, setArchivedChats] = useState(() => storage.getArchivedChats());
   const chatEndRef = useRef(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
-
-  useEffect(() => {
-    storage.saveChatMessages(chatMessages);
   }, [chatMessages]);
 
   useEffect(() => {
@@ -1244,27 +1239,11 @@ ${productContext}
         )}
         {activeTab === 'ai' && (
           <div className="flex flex-col h-[75vh] bg-white rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom duration-300 border border-[#F4EFEB]">
-             <div className="p-4 border-b border-[#F4EFEB] flex items-center gap-3 bg-[#FFF5F5]">
-                <div className="w-10 h-10 rounded-full bg-[#F2ABAC] flex items-center justify-center text-white shadow-md flex-shrink-0"><Bot className="w-5 h-5" /></div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-black text-[#5A4C4C] text-base">Honest AI</h3>
+             <div className="p-6 border-b border-[#F4EFEB] flex items-center gap-4 bg-[#FFF5F5]">
+                <div className="w-12 h-12 rounded-full bg-[#F2ABAC] flex items-center justify-center text-white shadow-md"><Bot className="w-6 h-6" /></div>
+                <div>
+                  <h3 className="font-black text-[#5A4C4C] text-lg">Honest AI</h3>
                   <p className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest mt-0.5">Baby Concierge</p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => { setShowArchivePanel(true); setArchivedChats(storage.getArchivedChats()); }}
-                    className="p-2 rounded-full text-[#A5A19E] hover:bg-[#F4EFEB] active:scale-95 transition-all"
-                    title="過去の会話を見る"
-                  ><Archive className="w-5 h-5" /></button>
-                  <button
-                    onClick={() => {
-                      storage.archiveCurrentChat(chatMessages);
-                      setArchivedChats(storage.getArchivedChats());
-                      setChatMessages([storage.defaultWelcomeMessage()]);
-                    }}
-                    className="p-2 rounded-full text-[#A5A19E] hover:bg-[#F4EFEB] active:scale-95 transition-all"
-                    title="会話をアーカイブして新しく始める"
-                  ><PlusCircle className="w-5 h-5" /></button>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FFFDFB]">
@@ -1287,53 +1266,6 @@ ${productContext}
           </div>
         )}
       </main>
-
-      {/* ＝＝＝＝＝ アーカイブ済み会話パネル ＝＝＝＝＝ */}
-      {showArchivePanel && (
-        <div className="fixed inset-0 z-[70] bg-black/30 flex items-end" onClick={() => setShowArchivePanel(false)}>
-          <div className="w-full bg-[#FFFDFB] rounded-t-[2.5rem] max-h-[80vh] flex flex-col animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-[#F4EFEB] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Archive className="w-5 h-5 text-[#F2ABAC]" />
-                <h3 className="font-black text-[#5A4C4C] text-lg">過去の会話</h3>
-              </div>
-              <button onClick={() => setShowArchivePanel(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-3">
-              {archivedChats.length === 0 ? (
-                <p className="text-center text-[#A5A19E] mt-10 font-bold text-xs uppercase tracking-widest leading-loose">アーカイブされた会話はありません</p>
-              ) : archivedChats.map(chat => (
-                <div key={chat.id} className="bg-white border border-[#F4EFEB] rounded-[1.5rem] p-4 flex items-center gap-3 shadow-sm">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[#5A4C4C] truncate">{chat.preview}…</p>
-                    <p className="text-[10px] text-[#A5A19E] mt-0.5">{new Date(chat.archivedAt).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {chat.messages.filter(m => m.role === 'user').length}件のメッセージ</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      const restored = storage.restoreArchivedChat(chat.id);
-                      if (restored) {
-                        setChatMessages(restored);
-                        setArchivedChats(storage.getArchivedChats());
-                        setShowArchivePanel(false);
-                      }
-                    }}
-                    className="p-2 rounded-full bg-[#7B8E76]/10 text-[#7B8E76] active:scale-95 transition-all flex-shrink-0"
-                    title="この会話を復元"
-                  ><RotateCcw className="w-4 h-4" /></button>
-                  <button
-                    onClick={() => {
-                      storage.deleteArchivedChat(chat.id);
-                      setArchivedChats(storage.getArchivedChats());
-                    }}
-                    className="p-2 rounded-full bg-[#FFF5F5] text-[#F2ABAC] active:scale-95 transition-all flex-shrink-0"
-                    title="削除"
-                  ><Trash2 className="w-4 h-4" /></button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ＝＝＝＝＝ 商品詳細モーダル ＝＝＝＝＝ */}
       {selectedProduct && (
