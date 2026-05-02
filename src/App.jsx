@@ -112,7 +112,33 @@ const App = () => {
       console.error("Failed to save favorites", e);
     }
   }, [favorites]);
-  
+
+  // --- マイページ States（localStorage連動）---
+  const [babyInfo, setBabyInfo] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null'); } catch { return null; }
+  });
+  const [recentlyViewed, setRecentlyViewed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('honestBabyRecentlyViewed') || '[]'); } catch { return []; }
+  });
+  const [priceAlerts, setPriceAlerts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('honestBabyPriceAlerts') || '[]'); } catch { return []; }
+  });
+  const [savedSearches, setSavedSearches] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('honestBabySavedSearches') || '[]'); } catch { return []; }
+  });
+  useEffect(() => { try { localStorage.setItem('honestBabyBabyInfo', JSON.stringify(babyInfo)); } catch {} }, [babyInfo]);
+  useEffect(() => { try { localStorage.setItem('honestBabyRecentlyViewed', JSON.stringify(recentlyViewed)); } catch {} }, [recentlyViewed]);
+  useEffect(() => { try { localStorage.setItem('honestBabyPriceAlerts', JSON.stringify(priceAlerts)); } catch {} }, [priceAlerts]);
+  useEffect(() => { try { localStorage.setItem('honestBabySavedSearches', JSON.stringify(savedSearches)); } catch {} }, [savedSearches]);
+
+  // モーダル制御
+  const [showBabyModal, setShowBabyModal] = useState(false);
+  const [showPriceAlertModal, setShowPriceAlertModal] = useState(false);
+  const [showSaveSearchModal, setShowSaveSearchModal] = useState(false);
+  const [babyForm, setBabyForm] = useState({ name: '', birthYear: new Date().getFullYear(), birthMonth: 1, gender: '' });
+  const [alertTargetPrice, setAlertTargetPrice] = useState('');
+  const [saveSearchLabel, setSaveSearchLabel] = useState('');
+
   // Modal & Expand States
   const [expandedMall, setExpandedMall] = useState(null);
   const [activeLegalPage, setActiveLegalPage] = useState(null);
@@ -762,10 +788,18 @@ ${productContext}
 
   // --- 共通コンポーネント ---
 
+  const openProduct = (product) => {
+    setSelectedProduct(product);
+    setRecentlyViewed(prev => {
+      const filtered = prev.filter(p => p.id !== product.id);
+      return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
+    });
+  };
+
   const ProductCard = ({ product, localRank = null }) => (
-    <div 
+    <div
       className="bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full relative active:scale-95 transition-all cursor-pointer border border-[#F4EFEB]"
-      onClick={() => setSelectedProduct(product)}
+      onClick={() => openProduct(product)}
     >
       <div className="relative aspect-square bg-[#F9F6F3] p-4">
         <img 
@@ -982,6 +1016,14 @@ ${productContext}
           <h3 className="font-black text-[#5A4C4C] text-xl">
             {selectedCategory === "すべて" ? "おすすめピックアップ" : `${selectedCategory}の検索結果`}
           </h3>
+          {selectedCategory !== "すべて" && (
+            <button
+              onClick={() => { setSaveSearchLabel(selectedCategory); setShowSaveSearchModal(true); }}
+              className="text-[10px] text-[#7B8E76] font-bold bg-[#EBF0EA] px-3 py-1.5 rounded-full active:scale-95 transition-transform flex items-center gap-1"
+            >
+              <Bookmark className="w-3 h-3" /> 保存
+            </button>
+          )}
         </div>
 
         {isRemoteLoading && (
@@ -1043,7 +1085,7 @@ ${productContext}
           </div>
           <div className="space-y-5">
             {sorted.map((p, idx) => (
-              <div key={p.id} className="bg-white rounded-[2.5rem] p-4 flex gap-5 border border-[#F4EFEB] shadow-[0_4px_20px_rgb(0,0,0,0.02)] relative active:scale-95 transition-all cursor-pointer" onClick={() => setSelectedProduct(p)}>
+              <div key={p.id} className="bg-white rounded-[2.5rem] p-4 flex gap-5 border border-[#F4EFEB] shadow-[0_4px_20px_rgb(0,0,0,0.02)] relative active:scale-95 transition-all cursor-pointer" onClick={() => openProduct(p)}>
                 <div className={`absolute -top-2 -left-2 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg border-2 border-white ${idx === 0 ? 'bg-[#F9DC5C] text-[#5A4C4C]' : idx === 1 ? 'bg-[#D4CDC7] text-white' : idx === 2 ? 'bg-[#D4AF37] text-white' : 'bg-[#7B8E76] text-white'}`}>{idx + 1}</div>
                 <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 bg-[#F9F6F3] p-2"><img src={p.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full h-full object-cover rounded-xl" alt={p.name} /></div>
                 <div className="flex-1 flex flex-col justify-center">
@@ -1099,99 +1141,180 @@ ${productContext}
     );
   };
 
-  const renderUser = () => (
-    <div className="animate-in slide-in-from-right duration-300 pb-20">
-      <div className="bg-gradient-to-b from-[#FFF9F0] to-transparent -mx-6 px-6 pt-2 pb-8 mb-4">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="font-serif font-black text-[#5A4C4C] text-2xl">マイページ</h2>
-          <button className="p-2 bg-white rounded-full shadow-sm text-[#A5A19E] hover:text-[#5A4C4C]">
-            <Settings className="w-5 h-5" />
-          </button>
-        </div>
+  const renderUser = () => {
+    const now = new Date();
+    const babyAgeMonths = babyInfo
+      ? (now.getFullYear() - babyInfo.birthYear) * 12 + (now.getMonth() + 1 - babyInfo.birthMonth)
+      : null;
+    const babyAgeLabel = babyAgeMonths != null
+      ? babyAgeMonths < 12 ? `${babyAgeMonths}ヶ月` : `${Math.floor(babyAgeMonths / 12)}歳${babyAgeMonths % 12 ? `${babyAgeMonths % 12}ヶ月` : ''}`
+      : null;
 
-        <div className="bg-white p-6 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#F4EFEB] flex items-center gap-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5"><User className="w-32 h-32 text-[#7B8E76]" /></div>
-          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#F2ABAC] to-[#F9DC5C] flex items-center justify-center text-white shadow-md relative z-10">
-            <User className="w-8 h-8" />
+    return (
+      <div className="animate-in slide-in-from-right duration-300 pb-20">
+        {/* プロフィールカード */}
+        <div className="bg-gradient-to-b from-[#FFF9F0] to-transparent -mx-6 px-6 pt-2 pb-8 mb-4">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="font-serif font-black text-[#5A4C4C] text-2xl">マイページ</h2>
           </div>
-          <div className="relative z-10">
-            <h3 className="text-xl font-black text-[#5A4C4C] leading-tight">ゲスト様</h3>
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[10px] text-white bg-[#7B8E76] px-2 py-0.5 rounded-md font-bold uppercase tracking-widest">無料会員</span>
-              <button className="text-[10px] text-[#A5A19E] flex items-center gap-0.5 font-bold hover:text-[#5A4C4C] transition-colors">
-                プロフィール編集 <Edit3 className="w-3 h-3" />
-              </button>
+          <div className="bg-white p-6 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#F4EFEB] flex items-center gap-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5"><Baby className="w-32 h-32 text-[#7B8E76]" /></div>
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#F2ABAC] to-[#F9DC5C] flex items-center justify-center text-white shadow-md relative z-10">
+              {babyInfo ? <Baby className="w-8 h-8" /> : <User className="w-8 h-8" />}
+            </div>
+            <div className="relative z-10">
+              <h3 className="text-xl font-black text-[#5A4C4C] leading-tight">
+                {babyInfo?.name ? `${babyInfo.name}のママ・パパ` : 'ゲスト様'}
+              </h3>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                {babyAgeLabel && (
+                  <span className="text-[10px] text-white bg-[#F2ABAC] px-2 py-0.5 rounded-md font-bold">{babyAgeLabel}</span>
+                )}
+                {babyInfo?.gender && (
+                  <span className="text-[10px] text-white bg-[#7B8E76] px-2 py-0.5 rounded-md font-bold">{babyInfo.gender}</span>
+                )}
+                <button onClick={() => {
+                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+                  setShowBabyModal(true);
+                }} className="text-[10px] text-[#A5A19E] flex items-center gap-0.5 font-bold hover:text-[#5A4C4C] transition-colors">
+                  {babyInfo ? '編集' : 'プロフィール登録'} <Edit3 className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4 px-1">
-          <h3 className="font-black text-[#5A4C4C] flex items-center gap-2">
-            <Baby className="w-5 h-5 text-[#F2ABAC]" />
-            Myベビー情報
+        {/* Myベビー情報 */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4 px-1">
+            <h3 className="font-black text-[#5A4C4C] flex items-center gap-2">
+              <Baby className="w-5 h-5 text-[#F2ABAC]" /> Myベビー情報
+            </h3>
+            <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest bg-[#F9F6F3] px-2 py-1 rounded-md">おすすめの最適化</span>
+          </div>
+          <div onClick={() => {
+            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+            setShowBabyModal(true);
+          }} className="bg-[#FFF5F5] border border-[#FFEBEB] p-5 rounded-[2rem] shadow-sm flex items-center justify-between active:scale-95 transition-transform cursor-pointer relative overflow-hidden group">
+            <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#F2ABAC] rounded-l-[2rem]"></div>
+            <div className="pl-2">
+              {babyInfo ? (
+                <>
+                  <p className="text-[10px] font-bold text-[#8E8282] mb-1">登録済み</p>
+                  <p className="text-sm font-black text-[#5A4C4C]">
+                    {babyInfo.name || 'お子さん'} · {babyAgeLabel} · {babyInfo.gender || '性別未設定'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[10px] font-bold text-[#8E8282] mb-1">年齢・月齢を登録すると</p>
+                  <p className="text-sm font-black text-[#5A4C4C]">ぴったりのアイテムをAIが提案✨</p>
+                </>
+              )}
+            </div>
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#F2ABAC] shadow-sm group-hover:bg-[#F2ABAC] group-hover:text-white transition-colors">
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* 最近見た商品 */}
+        <div className="mb-8">
+          <h3 className="font-black text-[#5A4C4C] mb-4 px-1 flex items-center gap-2">
+            <History className="w-5 h-5 text-[#7B8E76]" /> 最近見た商品
           </h3>
-          <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest bg-[#F9F6F3] px-2 py-1 rounded-md">おすすめの最適化</span>
-        </div>
-        <div className="bg-[#FFF5F5] border border-[#FFEBEB] p-5 rounded-[2rem] shadow-sm flex items-center justify-between active:scale-95 transition-transform cursor-pointer relative overflow-hidden group">
-          <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#F2ABAC] rounded-l-[2rem]"></div>
-          <div className="pl-2">
-            <p className="text-[10px] font-bold text-[#8E8282] mb-1">年齢・月齢を登録すると</p>
-            <p className="text-sm font-black text-[#5A4C4C]">ぴったりのアイテムをAIが提案✨</p>
-          </div>
-          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#F2ABAC] shadow-sm group-hover:bg-[#F2ABAC] group-hover:text-white transition-colors">
-            <ChevronRight className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => setActiveTab('heart')}>
-          <div className="w-12 h-12 bg-[#FFF5F5] rounded-[1.25rem] flex items-center justify-center text-[#F2ABAC] mb-3"><Heart className="w-6 h-6 fill-current" /></div>
-          <p className="text-sm font-black text-[#5A4C4C]">保存リスト</p>
-          <p className="text-[10px] text-[#A5A19E] font-bold mt-1">{favorites.length} items</p>
-        </div>
-        <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer">
-          <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] mb-3"><BellRing className="w-6 h-6" /></div>
-          <p className="text-sm font-black text-[#5A4C4C]">価格アラート</p>
-          <p className="text-[10px] text-[#A5A19E] font-bold mt-1">値下がり通知を設定</p>
-        </div>
-      </div>
-
-      <h3 className="font-black text-[#5A4C4C] mb-4 px-1">メニュー</h3>
-      <div className="space-y-2 bg-white border border-[#F4EFEB] rounded-[2.5rem] p-3 shadow-sm mb-10">
-        {[
-          { icon: History, label: "最近見た商品", desc: "閲覧履歴を確認" },
-          { icon: Search, label: "保存した検索条件", desc: "お気に入りの絞り込み" },
-          { icon: ShieldCheck, label: "アカウント設定", desc: "セキュリティと連携" },
-          { icon: MessageCircle, label: "ヘルプ・お問い合わせ", desc: "よくある質問など" }
-        ].map((item, i) => (
-          <div key={i} className="flex items-center justify-between p-4 rounded-[1.5rem] active:bg-[#F9F6F3] transition-colors cursor-pointer">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-2xl bg-[#F9F6F3] text-[#A5A19E]"><item.icon className="w-5 h-5" /></div>
-              <div><p className="text-sm font-black text-[#5A4C4C]">{item.label}</p><p className="text-[10px] text-[#A5A19E] font-bold mt-0.5">{item.desc}</p></div>
+          {recentlyViewed.length === 0 ? (
+            <p className="text-xs text-[#A5A19E] font-bold text-center py-6 bg-[#F9F6F3] rounded-[2rem]">まだ見ていません</p>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+              {recentlyViewed.map(p => (
+                <div key={p.id} onClick={() => { const full = [...remoteProducts, ...dbProducts].find(r => r.id === p.id) || p; openProduct(full); }}
+                  className="flex-shrink-0 w-28 cursor-pointer active:scale-95 transition-transform">
+                  <div className="w-28 h-28 rounded-[1.5rem] overflow-hidden bg-[#F9F6F3] mb-2">
+                    {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#A5A19E]"><Package className="w-8 h-8" /></div>}
+                  </div>
+                  <p className="text-[10px] font-bold text-[#5A4C4C] leading-tight line-clamp-2">{p.name}</p>
+                  {p.price && <p className="text-[10px] text-[#F2ABAC] font-black mt-0.5">¥{p.price.toLocaleString()}</p>}
+                </div>
+              ))}
             </div>
-            <ChevronRight className="w-4 h-4 text-[#A5A19E]" />
-          </div>
-        ))}
-      </div>
+          )}
+        </div>
 
-      <div className="px-2 border-t border-[#F4EFEB] pt-8">
-        <div className="flex flex-col gap-4">
-          <button onClick={() => setActiveLegalPage('terms')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 利用規約</button>
-          <button onClick={() => setActiveLegalPage('privacy')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Shield className="w-4 h-4 mr-2" /> プライバシーポリシー</button>
-          <button onClick={() => setActiveLegalPage('disclaimer')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors text-left leading-relaxed"><Info className="w-4 h-4 mr-2 flex-shrink-0" /> 運営者情報・免責事項<br/>(アフィリエイトについて)</button>
+        {/* クイックアクション */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => setActiveTab('heart')}>
+            <div className="w-12 h-12 bg-[#FFF5F5] rounded-[1.25rem] flex items-center justify-center text-[#F2ABAC] mb-3"><Heart className="w-6 h-6 fill-current" /></div>
+            <p className="text-sm font-black text-[#5A4C4C]">保存リスト</p>
+            <p className="text-[10px] text-[#A5A19E] font-bold mt-1">{favorites.length} items</p>
+          </div>
+          <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => setAlertTargetPrice('') || setShowPriceAlertModal(false)}>
+            <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] mb-3"><BellRing className="w-6 h-6" /></div>
+            <p className="text-sm font-black text-[#5A4C4C]">価格アラート</p>
+            <p className="text-[10px] text-[#A5A19E] font-bold mt-1">{priceAlerts.length > 0 ? `${priceAlerts.length}件設定中` : '値下がり通知を設定'}</p>
+          </div>
+        </div>
+
+        {/* 価格アラート一覧 */}
+        {priceAlerts.length > 0 && (
+          <div className="mb-8">
+            <h3 className="font-black text-[#5A4C4C] mb-4 px-1 flex items-center gap-2">
+              <BellRing className="w-5 h-5 text-[#D4AF37]" /> 設定中のアラート
+            </h3>
+            <div className="space-y-3">
+              {priceAlerts.map(alert => (
+                <div key={alert.id} className="bg-white border border-[#F4EFEB] p-4 rounded-[1.5rem] shadow-sm flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-[1rem] overflow-hidden bg-[#F9F6F3] flex-shrink-0">
+                    {alert.image ? <img src={alert.image} alt={alert.name} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-[#A5A19E] m-auto mt-4" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black text-[#5A4C4C] leading-tight line-clamp-1">{alert.name}</p>
+                    <p className="text-[10px] text-[#A5A19E] font-bold mt-0.5">登録価格 ¥{Number(alert.price).toLocaleString()}</p>
+                    <p className="text-[10px] text-[#D4AF37] font-black">目標 ¥{Number(alert.targetPrice).toLocaleString()} 以下</p>
+                  </div>
+                  <div className="flex flex-col gap-1 flex-shrink-0">
+                    <a href={alert.url} target="_blank" rel="noopener noreferrer" className="text-[9px] bg-[#F2ABAC] text-white px-2 py-1 rounded-full font-black text-center">確認</a>
+                    <button onClick={() => setPriceAlerts(prev => prev.filter(a => a.id !== alert.id))} className="text-[9px] bg-[#F9F6F3] text-[#A5A19E] px-2 py-1 rounded-full font-black">削除</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 保存した検索条件 */}
+        <div className="mb-8">
+          <h3 className="font-black text-[#5A4C4C] mb-4 px-1 flex items-center gap-2">
+            <Bookmark className="w-5 h-5 text-[#7B8E76]" /> 保存した検索条件
+          </h3>
+          {savedSearches.length === 0 ? (
+            <p className="text-xs text-[#A5A19E] font-bold text-center py-6 bg-[#F9F6F3] rounded-[2rem]">商品一覧の「保存」ボタンから追加できます</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {savedSearches.map(s => (
+                <div key={s.id} className="flex items-center gap-1 bg-[#EBF0EA] rounded-full pl-3 pr-1 py-1">
+                  <button onClick={() => { handleCategoryChange(s.category); if (s.subCategory && s.subCategory !== 'すべて') handleSubCategoryChange(s.subCategory); setActiveTab('home'); }}
+                    className="text-[11px] font-black text-[#5A4C4C]">{s.label}</button>
+                  <button onClick={() => setSavedSearches(prev => prev.filter(x => x.id !== s.id))} className="w-5 h-5 bg-white rounded-full flex items-center justify-center text-[#A5A19E]">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 法的リンク */}
+        <div className="px-2 border-t border-[#F4EFEB] pt-8">
+          <div className="flex flex-col gap-4">
+            <button onClick={() => setActiveLegalPage('terms')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 利用規約</button>
+            <button onClick={() => setActiveLegalPage('privacy')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Shield className="w-4 h-4 mr-2" /> プライバシーポリシー</button>
+            <button onClick={() => setActiveLegalPage('disclaimer')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors text-left leading-relaxed"><Info className="w-4 h-4 mr-2 flex-shrink-0" /> 運営者情報・免責事項<br/>(アフィリエイトについて)</button>
+          </div>
         </div>
       </div>
-      
-      <div className="mt-12 text-center">
-        <button className="text-xs font-bold text-[#A5A19E] px-6 py-3 rounded-full border border-transparent hover:border-[#F4EFEB] hover:text-[#F2ABAC] transition-all">
-          ログアウト
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#FFFDFB] pb-32 font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white">
@@ -1454,6 +1577,9 @@ ${productContext}
               <div className="flex items-center gap-2 mb-4 relative z-10"><Sparkles className="w-5 h-5 text-[#F2ABAC]" /><h3 className="font-black text-[#5A4C4C] text-lg">AIによる分析</h3></div>
               <p className="text-sm text-[#8E8282] leading-relaxed font-medium mb-8 relative z-10">{selectedProduct.aiAnalysis}</p>
               <button onClick={() => { setActiveTab('ai'); setUserInput(`${selectedProduct.name}についてもっと詳しく教えて`); setSelectedProduct(null); }} className="w-full py-4 bg-white border border-[#F2ABAC] text-[#F2ABAC] rounded-full text-xs font-black shadow-sm active:scale-95 transition-transform relative z-10">AIコンサルタントにさらに聞く</button>
+              <button onClick={() => { setAlertTargetPrice(''); setShowPriceAlertModal(true); }} className="w-full mt-3 py-4 bg-[#FFF9E6] border border-[#F9DC5C]/40 text-[#B8860B] rounded-full text-xs font-black shadow-sm active:scale-95 transition-transform relative z-10 flex items-center justify-center gap-2">
+                <BellRing className="w-4 h-4" /> 価格アラートを設定する
+              </button>
               <Bot className="absolute right-[-10%] bottom-[-10%] w-32 h-32 text-[#F2ABAC] opacity-10 rotate-12" />
             </section>
 
@@ -1787,6 +1913,127 @@ ${productContext}
           <User className={`w-6 h-6 ${activeTab === 'user' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">マイ</span>
         </button>
       </nav>
+
+      {/* ===== モーダル: 赤ちゃん情報 ===== */}
+      {showBabyModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowBabyModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><Baby className="w-5 h-5 text-[#F2ABAC]" /> Myベビー情報</h3>
+              <button onClick={() => setShowBabyModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-5">
+              <div>
+                <label className="text-xs font-black text-[#5A4C4C] mb-2 block">赤ちゃんのお名前（任意）</label>
+                <input value={babyForm.name} onChange={e => setBabyForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="例：はな" className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#F2ABAC]" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-black text-[#5A4C4C] mb-2 block">生まれた年</label>
+                  <select value={babyForm.birthYear} onChange={e => setBabyForm(p => ({ ...p, birthYear: Number(e.target.value) }))}
+                    className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#F2ABAC] bg-white">
+                    {Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i).map(y => <option key={y} value={y}>{y}年</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-[#5A4C4C] mb-2 block">生まれた月</label>
+                  <select value={babyForm.birthMonth} onChange={e => setBabyForm(p => ({ ...p, birthMonth: Number(e.target.value) }))}
+                    className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#F2ABAC] bg-white">
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-black text-[#5A4C4C] mb-2 block">性別</label>
+                <div className="flex gap-3">
+                  {['男の子', '女の子', 'どちらでも'].map(g => (
+                    <button key={g} onClick={() => setBabyForm(p => ({ ...p, gender: g }))}
+                      className={`flex-1 py-3 rounded-[1rem] text-xs font-black transition-all ${babyForm.gender === g ? 'bg-[#F2ABAC] text-white' : 'bg-[#F9F6F3] text-[#A5A19E]'}`}>{g}</button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={() => { setBabyInfo({ ...babyForm }); setShowBabyModal(false); }}
+                className="w-full py-4 bg-[#5A4C4C] text-white rounded-full font-black text-sm active:scale-95 transition-transform mt-2">
+                保存する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== モーダル: 価格アラート設定 ===== */}
+      {showPriceAlertModal && selectedProduct && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowPriceAlertModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><BellRing className="w-5 h-5 text-[#D4AF37]" /> 価格アラート</h3>
+              <button onClick={() => setShowPriceAlertModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="flex items-center gap-3 mb-6 p-4 bg-[#F9F6F3] rounded-[1.5rem]">
+              {selectedProduct.image && <img src={selectedProduct.image} alt="" className="w-14 h-14 rounded-[1rem] object-cover" />}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-[#5A4C4C] leading-tight line-clamp-2">{selectedProduct.name}</p>
+                <p className="text-xs text-[#A5A19E] font-bold mt-1">現在 ¥{selectedProduct.price?.toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="mb-6">
+              <label className="text-xs font-black text-[#5A4C4C] mb-2 block">この価格以下になったら教えてほしい</label>
+              <div className="flex items-center border border-[#F4EFEB] rounded-[1rem] px-4 py-3 focus-within:border-[#D4AF37]">
+                <span className="text-sm font-black text-[#5A4C4C] mr-2">¥</span>
+                <input type="number" value={alertTargetPrice} onChange={e => setAlertTargetPrice(e.target.value)}
+                  placeholder={String(Math.floor((selectedProduct.price || 0) * 0.9))}
+                  className="flex-1 text-sm font-bold text-[#5A4C4C] focus:outline-none" />
+              </div>
+              <p className="text-[10px] text-[#A5A19E] font-bold mt-2">※ マイページで確認・削除できます</p>
+            </div>
+            <button onClick={() => {
+              const target = Number(alertTargetPrice) || Math.floor((selectedProduct.price || 0) * 0.9);
+              const shop = selectedProduct.shops?.[0];
+              setPriceAlerts(prev => [...prev.filter(a => a.id !== selectedProduct.id), {
+                id: selectedProduct.id, name: selectedProduct.name, image: selectedProduct.image,
+                price: selectedProduct.price, url: shop?.url || selectedProduct.url || '#',
+                targetPrice: target, addedAt: new Date().toISOString()
+              }]);
+              setShowPriceAlertModal(false);
+            }} className="w-full py-4 bg-[#D4AF37] text-white rounded-full font-black text-sm active:scale-95 transition-transform">
+              アラートを設定する
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== モーダル: 検索条件を保存 ===== */}
+      {showSaveSearchModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowSaveSearchModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><Bookmark className="w-5 h-5 text-[#7B8E76]" /> 検索条件を保存</h3>
+              <button onClick={() => setShowSaveSearchModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="mb-4 p-4 bg-[#EBF0EA] rounded-[1.5rem] text-xs font-bold text-[#5A4C4C]">
+              <p>{selectedCategory}{selectedSubCategory !== 'すべて' ? ` / ${selectedSubCategory}` : ''}{selectedSubSubCategory !== 'すべて' ? ` / ${selectedSubSubCategory}` : ''}</p>
+            </div>
+            <div className="mb-6">
+              <label className="text-xs font-black text-[#5A4C4C] mb-2 block">ラベル名（任意）</label>
+              <input value={saveSearchLabel} onChange={e => setSaveSearchLabel(e.target.value)}
+                placeholder={selectedCategory}
+                className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#7B8E76]" />
+            </div>
+            <button onClick={() => {
+              const label = saveSearchLabel.trim() || selectedCategory;
+              setSavedSearches(prev => [...prev, {
+                id: Date.now(), label, category: selectedCategory,
+                subCategory: selectedSubCategory, subSubCategory: selectedSubSubCategory,
+                savedAt: new Date().toISOString()
+              }]);
+              setShowSaveSearchModal(false);
+            }} className="w-full py-4 bg-[#7B8E76] text-white rounded-full font-black text-sm active:scale-95 transition-transform">
+              保存する
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
