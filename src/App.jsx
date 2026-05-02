@@ -1596,21 +1596,6 @@ ${productContext}
               </>
             )}
 
-            {/* DB内の一致商品（searchTermあるときのみ） */}
-            {searchTerm && !isSearchLoading && (() => {
-              const matched = dbProducts.filter(p =>
-                p.name?.includes(searchTerm) || p.category?.includes(searchTerm) || p.brand?.includes(searchTerm)
-              );
-              if (matched.length === 0) return null;
-              return (
-                <div className="mb-10">
-                  <p className="text-xs font-black text-[#A5A19E] uppercase tracking-widest mb-4 px-1">おすすめピックアップより</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    {matched.map(p => <ProductCard key={p.id} product={p} />)}
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         )}
         {activeTab === 'heart' && (
