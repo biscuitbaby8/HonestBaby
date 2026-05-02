@@ -113,6 +113,20 @@ const App = () => {
     }
   }, [favorites]);
 
+  // --- 検索専用 States（ホームのremoteProductsと分離）---
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+
+  // --- ピン留め商品（検索→一覧に追加）---
+  const [pinnedProducts, setPinnedProducts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('honestBabyPinned') || '[]'); } catch { return []; }
+  });
+  useEffect(() => { try { localStorage.setItem('honestBabyPinned', JSON.stringify(pinnedProducts)); } catch {} }, [pinnedProducts]);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinTargetProduct, setPinTargetProduct] = useState(null);
+  const [pinCategory, setPinCategory] = useState('');
+
   // --- マイページ States（localStorage連動）---
   const [babyInfo, setBabyInfo] = useState(() => {
     try { return JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null'); } catch { return null; }
@@ -460,7 +474,10 @@ const App = () => {
       }
 
       // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
-      const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
+      const pinned = pinnedProducts
+        .filter(p => p.category === catName)
+        .map(p => ({ ...p, isPinned: true }));
+      const immediateProducts = [...pinned, ...rawItems.map(i => ({ ...i, isMarketWide: true }))];
       setRemoteProducts(immediateProducts);
       setIsRemoteLoading(false);
 
@@ -532,13 +549,11 @@ const App = () => {
 
   // --- 既存機能の拡張: AI搭載・楽天＋Yahoo並列検索ロジック ---
   const fetchRemoteProductsWithAI = async (keyword) => {
-    if (!keyword || keyword === "すべて") {
-      setRemoteProducts([]);
-      return;
-    }
+    if (!keyword.trim()) return;
 
-    setIsRemoteLoading(true);
-    setRemoteError(null);
+    setIsSearchLoading(true);
+    setSearchError(null);
+    setSearchResults([]);
 
     try {
       // 1. 楽天・Yahoo両方から並列取得
@@ -570,8 +585,8 @@ const App = () => {
       const allItems = [...rakutenItems, ...yahooItems];
 
       if (allItems.length === 0) {
-        setRemoteProducts([]);
-        setIsRemoteLoading(false);
+        setSearchResults([]);
+        setIsSearchLoading(false);
         return;
       }
 
@@ -625,12 +640,12 @@ const App = () => {
         };
       });
 
-      setRemoteProducts(formatted);
+      setSearchResults(formatted);
     } catch (err) {
       console.error("Remote Search Error:", err);
-      setRemoteError(err.message);
+      setSearchError(err.message);
     } finally {
-      setIsRemoteLoading(false);
+      setIsSearchLoading(false);
     }
   };
 
@@ -1449,53 +1464,115 @@ ${productContext}
         
         {activeTab === 'search' && (
           <div className="animate-in slide-in-from-right duration-300">
-            <div className="relative mb-8">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#A5A19E]" />
-                <input 
-                  type="text" 
-                  placeholder="ブランドや悩みで検索..." 
-                  className="w-full bg-white border border-[#F4EFEB] rounded-full py-4 pl-14 pr-5 text-sm shadow-[0_4px_20px_rgb(0,0,0,0.03)] focus:outline-none focus:border-[#7B8E76]" 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                  onKeyPress={(e) => e.key === 'Enter' && fetchRemoteProductsWithAI(searchTerm)}
-                  autoFocus 
-                />
+            {/* 検索ボックス */}
+            <div className="relative mb-6">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#A5A19E]" />
+              <input
+                type="text"
+                placeholder="ブランドや商品名で検索..."
+                className="w-full bg-white border border-[#F4EFEB] rounded-full py-4 pl-14 pr-14 text-sm shadow-[0_4px_20px_rgb(0,0,0,0.03)] focus:outline-none focus:border-[#7B8E76]"
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); if (!e.target.value) setSearchResults([]); }}
+                onKeyPress={(e) => e.key === 'Enter' && fetchRemoteProductsWithAI(searchTerm)}
+                autoFocus
+              />
+              {searchTerm && (
+                <button onClick={() => { setSearchTerm(''); setSearchResults([]); }}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-[#A5A19E]">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* 検索ボタン（入力済みで未検索のとき表示） */}
+            {searchTerm && !isSearchLoading && searchResults.length === 0 && (
+              <div className="text-center mb-8">
+                <button onClick={() => fetchRemoteProductsWithAI(searchTerm)}
+                  className="bg-[#5A4C4C] text-white px-8 py-3.5 rounded-full text-sm font-black shadow-lg active:scale-95 transition-all flex items-center gap-2 mx-auto">
+                  <Search className="w-4 h-4" /> 楽天・Yahooから検索する
+                </button>
               </div>
+            )}
 
-              {isRemoteLoading && (
-                <div className="bg-white rounded-[2.5rem] p-12 text-center border-2 border-dashed border-[#F2ABAC]/30 mb-8 animate-pulse">
-                  <div className="w-12 h-12 bg-[#FFF5F5] rounded-full flex items-center justify-center mx-auto mb-4 text-[#F2ABAC]"><Sparkles className="w-6 h-6 animate-spin-slow" /></div>
-                  <p className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-[0.2em] mb-2">AI Generating Best Selection...</p>
-                  <p className="text-sm font-bold text-[#5A4C4C]">「{searchTerm}」をWebから厳選中...</p>
-                </div>
-              )}
-
-              {remoteError && (
-                <div className="bg-rose-50 border border-rose-100 p-6 rounded-[2rem] text-center mb-8">
-                  <p className="text-xs text-rose-400 font-bold mb-2">検索に失敗しました</p>
-                  <p className="text-[10px] text-rose-300 font-mono break-all">{remoteError}</p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 mb-10">
-                {/* 1. DB (Featured) Results */}
-                {dbProducts.filter(p => 
-                  p.name.includes(searchTerm) || 
-                  p.category.includes(searchTerm) || 
-                  p.brand.includes(searchTerm)
-                ).map(p => <ProductCard key={p.id} product={p} />)}
-                
-                {/* 2. Remote Results */}
-                {remoteProducts.length > 0 && remoteProducts.map(p => <ProductCard key={p.id} product={p} />)}
+            {/* ローディング */}
+            {isSearchLoading && (
+              <div className="bg-white rounded-[2.5rem] p-12 text-center border-2 border-dashed border-[#F2ABAC]/30 mb-8 animate-pulse">
+                <div className="w-12 h-12 bg-[#FFF5F5] rounded-full flex items-center justify-center mx-auto mb-4 text-[#F2ABAC]"><Sparkles className="w-6 h-6 animate-spin-slow" /></div>
+                <p className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-[0.2em] mb-2">AI Generating Best Selection...</p>
+                <p className="text-sm font-bold text-[#5A4C4C]">「{searchTerm}」を検索中...</p>
               </div>
+            )}
 
-              {searchTerm && !isRemoteLoading && remoteProducts.length === 0 && (
-                <div className="text-center py-10">
-                   <button onClick={() => fetchRemoteProductsWithAI(searchTerm)} className="bg-[#5A4C4C] text-white px-8 py-3 rounded-full text-xs font-bold shadow-lg active:scale-95 transition-all">
-                      ウェブから自動で探す 🔍
-                   </button>
+            {/* エラー */}
+            {searchError && (
+              <div className="bg-rose-50 border border-rose-100 p-6 rounded-[2rem] text-center mb-8">
+                <p className="text-xs text-rose-400 font-bold mb-2">検索に失敗しました</p>
+                <button onClick={() => fetchRemoteProductsWithAI(searchTerm)} className="text-xs text-rose-400 underline font-bold">再試行する</button>
+              </div>
+            )}
+
+            {/* 未入力時: 最近見た商品を表示 */}
+            {!searchTerm && recentlyViewed.length > 0 && (
+              <div className="mb-8">
+                <p className="text-xs font-black text-[#A5A19E] mb-3 px-1 uppercase tracking-widest">最近見た商品</p>
+                <div className="flex gap-2 flex-wrap">
+                  {recentlyViewed.slice(0, 5).map(p => (
+                    <button key={p.id} onClick={() => { setSearchTerm(p.name.slice(0, 15)); }}
+                      className="text-xs font-bold bg-[#F9F6F3] text-[#5A4C4C] px-3 py-1.5 rounded-full active:scale-95 transition-transform">
+                      {p.name.slice(0, 15)}
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* 検索結果 */}
+            {searchResults.length > 0 && (
+              <>
+                <div className="flex items-center justify-between mb-4 px-1">
+                  <p className="text-xs font-black text-[#A5A19E] uppercase tracking-widest">「{searchTerm}」の検索結果</p>
+                  <p className="text-xs text-[#A5A19E] font-bold">{searchResults.length}件</p>
+                </div>
+                <div className="space-y-3 mb-10">
+                  {searchResults.map(p => (
+                    <div key={p.id} className="bg-white rounded-[2rem] border border-[#F4EFEB] shadow-sm overflow-hidden flex gap-4 p-4 active:scale-[0.98] transition-transform cursor-pointer"
+                      onClick={() => openProduct(p)}>
+                      <div className="w-20 h-20 rounded-[1.25rem] overflow-hidden bg-[#F9F6F3] flex-shrink-0">
+                        {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-[#A5A19E] m-auto mt-6" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-black text-[#5A4C4C] leading-tight line-clamp-2 mb-1">{p.name}</p>
+                        {p.shops?.[0]?.lowest_price && (
+                          <p className="text-base font-black text-[#F2ABAC]">¥{Number(p.shops[0].lowest_price).toLocaleString()}<span className="text-xs font-bold text-[#A5A19E]"> ~</span></p>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setPinTargetProduct(p); setPinCategory(CATEGORY_TREE[1].name); setShowPinModal(true); }}
+                          className="mt-2 text-[10px] font-black text-[#7B8E76] bg-[#EBF0EA] px-3 py-1 rounded-full flex items-center gap-1 w-fit active:scale-95 transition-transform"
+                        >
+                          <Bookmark className="w-3 h-3" /> 一覧に追加
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* DB内の一致商品（searchTermあるときのみ） */}
+            {searchTerm && !isSearchLoading && (() => {
+              const matched = dbProducts.filter(p =>
+                p.name?.includes(searchTerm) || p.category?.includes(searchTerm) || p.brand?.includes(searchTerm)
+              );
+              if (matched.length === 0) return null;
+              return (
+                <div className="mb-10">
+                  <p className="text-xs font-black text-[#A5A19E] uppercase tracking-widest mb-4 px-1">おすすめピックアップより</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {matched.map(p => <ProductCard key={p.id} product={p} />)}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
         {activeTab === 'heart' && (
@@ -1913,6 +1990,40 @@ ${productContext}
           <User className={`w-6 h-6 ${activeTab === 'user' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">マイ</span>
         </button>
       </nav>
+
+      {/* ===== モーダル: 一覧に追加 ===== */}
+      {showPinModal && pinTargetProduct && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowPinModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><Bookmark className="w-5 h-5 text-[#7B8E76]" /> 一覧に追加</h3>
+              <button onClick={() => setShowPinModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="flex items-center gap-3 mb-6 p-4 bg-[#F9F6F3] rounded-[1.5rem]">
+              {pinTargetProduct.image && <img src={pinTargetProduct.image} alt="" className="w-14 h-14 rounded-[1rem] object-cover flex-shrink-0" />}
+              <p className="text-xs font-black text-[#5A4C4C] leading-tight line-clamp-2">{pinTargetProduct.name}</p>
+            </div>
+            <div className="mb-6">
+              <label className="text-xs font-black text-[#5A4C4C] mb-2 block">追加するカテゴリを選んでください</label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORY_TREE.filter(c => c.name !== 'すべて').map(c => (
+                  <button key={c.name} onClick={() => setPinCategory(c.name)}
+                    className={`text-xs font-black px-3 py-1.5 rounded-full transition-all ${pinCategory === c.name ? 'bg-[#7B8E76] text-white' : 'bg-[#F9F6F3] text-[#5A4C4C]'}`}>
+                    {c.icon} {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button onClick={() => {
+              const product = { ...pinTargetProduct, category: pinCategory, id: `pinned-${Date.now()}` };
+              setPinnedProducts(prev => [...prev.filter(p => p.name !== pinTargetProduct.name || p.category !== pinCategory), product]);
+              setShowPinModal(false);
+            }} className="w-full py-4 bg-[#7B8E76] text-white rounded-full font-black text-sm active:scale-95 transition-transform">
+              「{pinCategory}」に追加する
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ===== モーダル: 赤ちゃん情報 ===== */}
       {showBabyModal && (
