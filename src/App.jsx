@@ -118,6 +118,12 @@ const App = () => {
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
+  // --- ランキング・ギフト States ---
+  const [rankingProducts, setRankingProducts] = useState([]);
+  const [isRankingLoading, setIsRankingLoading] = useState(false);
+  const [giftProducts, setGiftProducts] = useState([]);
+  const [isGiftLoading, setIsGiftLoading] = useState(false);
+
 
   // --- マイページ States（localStorage連動）---
   const [babyInfo, setBabyInfo] = useState(() => {
@@ -316,6 +322,49 @@ const App = () => {
     };
     fetchCross();
   }, [selectedProduct]);
+
+  // ランキングタブ: 楽天Ranking APIから上位カテゴリを並列取得
+  const fetchRankingProducts = async () => {
+    setIsRankingLoading(true);
+    const topGenres = ['205197', '200833', '412209', '205208']; // おむつ・ベビーカー・抱っこ紐・ミルク授乳
+    const results = await Promise.allSettled(
+      topGenres.map(g => fetch(`/api/ranking?genreId=${g}`).then(r => r.json()))
+    );
+    const merged = results
+      .filter(r => r.status === 'fulfilled')
+      .flatMap(r => r.value.products || []);
+    const seen = new Set();
+    const deduped = merged.filter(p => {
+      if (seen.has(p.name)) return false;
+      seen.add(p.name);
+      return true;
+    });
+    setRankingProducts(deduped.slice(0, 20));
+    setIsRankingLoading(false);
+  };
+
+  // ギフトタブ: 楽天検索APIからギフト商品を取得
+  const fetchGiftProducts = async (filter = 'すべて') => {
+    setIsGiftLoading(true);
+    const keyword = ['出産祝い', 'ギフト', filter !== 'すべて' && !filter.includes('円') ? filter : ''].filter(Boolean).join(' ');
+    try {
+      const result = await fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`).then(r => r.json());
+      let products = result.products || [];
+      if (filter === '3000円〜') products = products.filter(p => p.price >= 3000 && p.price < 5000);
+      else if (filter === '5000円〜') products = products.filter(p => p.price >= 5000 && p.price < 10000);
+      else if (filter === '10000円〜') products = products.filter(p => p.price >= 10000);
+      setGiftProducts(products);
+    } catch {}
+    setIsGiftLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'ranking') fetchRankingProducts();
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'gift') fetchGiftProducts(giftFilter);
+  }, [activeTab, giftFilter]);
 
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
   const fetchRankingsWithAI = async (catName, subCat = "すべて", subSubCat = "すべて") => {
@@ -1132,38 +1181,40 @@ ${productContext}
   };
 
   const renderRanking = () => {
-    const sorted = [...dbProducts].sort((a,b) => b.rating - a.rating);
     return (
       <div className="animate-in slide-in-from-bottom duration-300">
-         <div className="flex items-center gap-3 mb-8 px-1 mt-2">
-            <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] shadow-sm"><Award className="w-7 h-7" /></div>
-            <div>
-              <h3 className="font-serif font-black text-[#5A4C4C] text-2xl">総合ランキング</h3>
-              <p className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest leading-none mt-1">Real-time Top Picks</p>
-            </div>
+        <div className="flex items-center gap-3 mb-8 px-1 mt-2">
+          <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] shadow-sm"><Award className="w-7 h-7" /></div>
+          <div>
+            <h3 className="font-serif font-black text-[#5A4C4C] text-2xl">総合ランキング</h3>
+            <p className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest leading-none mt-1">Real-time Top Picks</p>
           </div>
+        </div>
+        {isRankingLoading ? (
+          <div className="text-center py-20 text-[#A5A19E] text-xs font-bold animate-pulse">ランキングを読み込み中...</div>
+        ) : (
           <div className="space-y-5">
-            {sorted.map((p, idx) => (
-              <div key={p.id} className="bg-white rounded-[2.5rem] p-4 flex gap-5 border border-[#F4EFEB] shadow-[0_4px_20px_rgb(0,0,0,0.02)] relative active:scale-95 transition-all cursor-pointer" onClick={() => openProduct(p)}>
+            {rankingProducts.map((p, idx) => (
+              <div key={p.id || idx} className="bg-white rounded-[2.5rem] p-4 flex gap-5 border border-[#F4EFEB] shadow-[0_4px_20px_rgb(0,0,0,0.02)] relative active:scale-95 transition-all cursor-pointer" onClick={() => openProduct(p)}>
                 <div className={`absolute -top-2 -left-2 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg border-2 border-white ${idx === 0 ? 'bg-[#F9DC5C] text-[#5A4C4C]' : idx === 1 ? 'bg-[#D4CDC7] text-white' : idx === 2 ? 'bg-[#D4AF37] text-white' : 'bg-[#7B8E76] text-white'}`}>{idx + 1}</div>
                 <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 bg-[#F9F6F3] p-2"><img src={p.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full h-full object-cover rounded-xl" alt={p.name} /></div>
                 <div className="flex-1 flex flex-col justify-center">
                   <span className="text-[9px] font-black text-[#A5A19E] uppercase tracking-widest">{p.category}</span>
                   <h4 className="text-sm font-bold text-[#5A4C4C] leading-tight mb-2 line-clamp-2">{p.name}</h4>
                   <div className="flex items-end justify-between">
-                    <p className="text-lg font-black text-[#7B8E76]">¥{getLowestPrice(p.shops).toLocaleString()}</p>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-[#A5A19E] bg-[#FFF9E6] px-2 py-0.5 rounded-full"><Star className="w-3 h-3 text-[#D4AF37] fill-current" /> {p.rating}</div>
+                    <p className="text-lg font-black text-[#7B8E76]">¥{(p.price || getLowestPrice(p.shops)).toLocaleString()}</p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-[#A5A19E] bg-[#FFF9E6] px-2 py-0.5 rounded-full"><Star className="w-3 h-3 text-[#D4AF37] fill-current" /> {Number(p.rating || 0).toFixed(1)}</div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+        )}
       </div>
     );
   };
 
   const renderGift = () => {
-    const giftProducts = dbProducts.filter(p => p.giftTags && (giftFilter === "すべて" || p.giftTags.includes(giftFilter)));
     return (
       <div className="animate-in slide-in-from-right duration-300">
         <div className="bg-[#FFF9F0] -mx-6 px-6 pt-4 pb-10 rounded-b-[3rem] mb-8 relative overflow-hidden">
@@ -1194,7 +1245,11 @@ ${productContext}
 
         <div className="flex items-center justify-between mb-5 px-1"><h3 className="font-black text-[#5A4C4C] text-xl">おすすめのギフト</h3></div>
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {giftProducts.length > 0 ? giftProducts.map(p => <ProductCard key={p.id} product={p} />) : <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold">条件に合うギフトが見つかりません</div>}
+          {isGiftLoading
+            ? <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold animate-pulse">ギフト商品を検索中...</div>
+            : giftProducts.length > 0
+              ? giftProducts.map((p, i) => <ProductCard key={p.id || i} product={p} />)
+              : <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold">条件に合うギフトが見つかりません</div>}
         </div>
       </div>
     );
