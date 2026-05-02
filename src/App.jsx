@@ -118,14 +118,6 @@ const App = () => {
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
-  // --- ピン留め商品（検索→一覧に追加）---
-  const [pinnedProducts, setPinnedProducts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('honestBabyPinned') || '[]'); } catch { return []; }
-  });
-  useEffect(() => { try { localStorage.setItem('honestBabyPinned', JSON.stringify(pinnedProducts)); } catch {} }, [pinnedProducts]);
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pinTargetProduct, setPinTargetProduct] = useState(null);
-  const [pinCategory, setPinCategory] = useState('');
 
   // --- マイページ States（localStorage連動）---
   const [babyInfo, setBabyInfo] = useState(() => {
@@ -474,10 +466,7 @@ const App = () => {
       }
 
       // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
-      const pinned = pinnedProducts
-        .filter(p => p.category === catName)
-        .map(p => ({ ...p, isPinned: true }));
-      const immediateProducts = [...pinned, ...rawItems.map(i => ({ ...i, isMarketWide: true }))];
+      const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
       setRemoteProducts(immediateProducts);
       setIsRemoteLoading(false);
 
@@ -548,6 +537,41 @@ const App = () => {
   };
 
   // --- 既存機能の拡張: AI搭載・楽天＋Yahoo並列検索ロジック ---
+  const autoSaveSearchResultsToDb = async (products, keyword) => {
+    const matchedCat = CATEGORY_TREE.find(cat =>
+      cat.name !== "すべて" && (
+        keyword.includes(cat.name) ||
+        (cat.keyword && keyword.includes(cat.keyword)) ||
+        cat.subs?.some(s => {
+          const sName = typeof s === 'string' ? s : s.name;
+          return keyword.includes(sName);
+        })
+      )
+    );
+    const category = matchedCat?.name || "その他";
+
+    const toSave = products
+      .filter(p => p.name && p.image)
+      .slice(0, 10)
+      .map(p => ({
+        name: p.name.slice(0, 200),
+        category,
+        sub_category: '本体',
+        image_url: p.image || null,
+        rating: Math.round((p.rating || 4.0) * 10) / 10,
+        reviews_count: p.reviews_count || 0,
+        ai_analysis: p.ai_analysis || null,
+      }));
+
+    if (toSave.length === 0) return;
+
+    try {
+      await supabase
+        .from('products')
+        .upsert(toSave, { ignoreDuplicates: true });
+    } catch {}
+  };
+
   const fetchRemoteProductsWithAI = async (keyword) => {
     if (!keyword.trim()) return;
 
@@ -590,11 +614,12 @@ const App = () => {
         return;
       }
 
-      // 2. Gemini AI にデータを渡して「整理・厳選」させる
+      // 2. Gemini AI にデータを渡して「整理・厳選」させる（なければ生データをそのまま使う）
       const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!gApiKey) throw new Error("VITE_GEMINI_API_KEY is missing");
+      let formatted;
 
-      const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
+      if (gApiKey) {
+        const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
       ルール：
       1. 重複（同じ商品の別店舗）は1つにまとめる。ただしurlとsourceは必ず保持する。
       2. 「車輪だけ」「カバーだけ」などの付属品は除外し、「本体」のみを残す。
@@ -606,41 +631,60 @@ const App = () => {
 
       検索結果データ: ${JSON.stringify(allItems.slice(0, 20))}`;
 
-      const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: aiPrompt }] }]
-        })
-      });
+        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: aiPrompt }] }]
+          })
+        });
 
-      const aiData = await aiRes.json();
-      const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-      const jsonMatch = aiText.match(/\[[\s\S]*\]/);
-      const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+        const aiData = await aiRes.json();
+        const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+        const jsonMatch = aiText.match(/\[[\s\S]*\]/);
+        const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 
-      // アプリ内の形式に変換（URLからショップ名を自動判定）
-      const formatted = cleanedProducts.map((p, i) => {
-        const shopName = getShopNameFromUrl(p.url);
-        return {
+        formatted = cleanedProducts.map((p, i) => {
+          const shopName = getShopNameFromUrl(p.url);
+          return {
+            id: `remote-${i}-${Date.now()}`,
+            name: p.name,
+            brand: p.brand || "メーカー不明",
+            category: keyword,
+            image: p.image,
+            rating: 4.0 + (Math.random() * 1.0),
+            reviews_count: Math.floor(Math.random() * 500) + 50,
+            ai_analysis: p.aiAnalysis,
+            shops: [{
+              shop_name: shopName,
+              shop_type: 'mall',
+              lowest_price: p.price,
+              url: p.url
+            }]
+          };
+        });
+      } else {
+        // Gemini なし: 生データをそのまま整形
+        formatted = allItems.slice(0, 20).map((p, i) => ({
           id: `remote-${i}-${Date.now()}`,
           name: p.name,
-          brand: p.brand || "メーカー不明",
+          brand: "メーカー不明",
           category: keyword,
           image: p.image,
-          rating: 4.0 + (Math.random() * 1.0),
-          reviews_count: Math.floor(Math.random() * 500) + 50,
-          ai_analysis: p.aiAnalysis,
+          rating: 4.0,
+          reviews_count: 0,
+          ai_analysis: null,
           shops: [{
-            shop_name: shopName,
+            shop_name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング',
             shop_type: 'mall',
             lowest_price: p.price,
             url: p.url
           }]
-        };
-      });
+        }));
+      }
 
       setSearchResults(formatted);
+      autoSaveSearchResultsToDb(formatted, keyword);
     } catch (err) {
       console.error("Remote Search Error:", err);
       setSearchError(err.message);
@@ -1545,12 +1589,6 @@ ${productContext}
                         {p.shops?.[0]?.lowest_price && (
                           <p className="text-base font-black text-[#F2ABAC]">¥{Number(p.shops[0].lowest_price).toLocaleString()}<span className="text-xs font-bold text-[#A5A19E]"> ~</span></p>
                         )}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setPinTargetProduct(p); setPinCategory(CATEGORY_TREE[1].name); setShowPinModal(true); }}
-                          className="mt-2 text-[10px] font-black text-[#7B8E76] bg-[#EBF0EA] px-3 py-1 rounded-full flex items-center gap-1 w-fit active:scale-95 transition-transform"
-                        >
-                          <Bookmark className="w-3 h-3" /> 一覧に追加
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -1990,40 +2028,6 @@ ${productContext}
           <User className={`w-6 h-6 ${activeTab === 'user' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">マイ</span>
         </button>
       </nav>
-
-      {/* ===== モーダル: 一覧に追加 ===== */}
-      {showPinModal && pinTargetProduct && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowPinModal(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><Bookmark className="w-5 h-5 text-[#7B8E76]" /> 一覧に追加</h3>
-              <button onClick={() => setShowPinModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="flex items-center gap-3 mb-6 p-4 bg-[#F9F6F3] rounded-[1.5rem]">
-              {pinTargetProduct.image && <img src={pinTargetProduct.image} alt="" className="w-14 h-14 rounded-[1rem] object-cover flex-shrink-0" />}
-              <p className="text-xs font-black text-[#5A4C4C] leading-tight line-clamp-2">{pinTargetProduct.name}</p>
-            </div>
-            <div className="mb-6">
-              <label className="text-xs font-black text-[#5A4C4C] mb-2 block">追加するカテゴリを選んでください</label>
-              <div className="flex flex-wrap gap-2">
-                {CATEGORY_TREE.filter(c => c.name !== 'すべて').map(c => (
-                  <button key={c.name} onClick={() => setPinCategory(c.name)}
-                    className={`text-xs font-black px-3 py-1.5 rounded-full transition-all ${pinCategory === c.name ? 'bg-[#7B8E76] text-white' : 'bg-[#F9F6F3] text-[#5A4C4C]'}`}>
-                    {c.icon} {c.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button onClick={() => {
-              const product = { ...pinTargetProduct, category: pinCategory, id: `pinned-${Date.now()}` };
-              setPinnedProducts(prev => [...prev.filter(p => p.name !== pinTargetProduct.name || p.category !== pinCategory), product]);
-              setShowPinModal(false);
-            }} className="w-full py-4 bg-[#7B8E76] text-white rounded-full font-black text-sm active:scale-95 transition-transform">
-              「{pinCategory}」に追加する
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ===== モーダル: 赤ちゃん情報 ===== */}
       {showBabyModal && (
