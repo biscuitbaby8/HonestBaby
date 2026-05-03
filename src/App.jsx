@@ -655,7 +655,13 @@ const App = () => {
           }))
         : [];
 
-      const allItems = [...rakutenItems, ...yahooItems];
+      // 部品・周辺グッズ・交換用パーツを除外
+      const excludeWords = ['タイヤ', '部品', 'パーツ', '交換用', 'シート生地', 'レインカバー単品', 'ドリンクホルダー', '延長ベルト', 'ハンドルカバー', 'フットマフ', 'バンパーバー', 'サンキャノピー'];
+      const filterAccessories = (items) => items.filter(item =>
+        !excludeWords.some(w => item.name?.includes(w))
+      );
+
+      const allItems = filterAccessories([...rakutenItems, ...yahooItems]);
 
       if (allItems.length === 0) {
         setSearchError("検索結果が見つかりませんでした。別のキーワードをお試しください。");
