@@ -636,11 +636,11 @@ const App = () => {
       ]);
 
       const rakutenItems = rakutenResult.status === 'fulfilled'
-        ? (rakutenResult.value.Items || []).map(item => ({
-            name: item.Item.itemName,
-            price: item.Item.itemPrice,
-            url: item.Item.affiliateUrl || item.Item.itemUrl,
-            image: item.Item.mediumImageUrls[0]?.imageUrl || '',
+        ? (rakutenResult.value.products || []).map(item => ({
+            name: item.name,
+            price: item.price,
+            url: item.url,
+            image: item.image || '',
             source: 'rakuten'
           }))
         : [];
