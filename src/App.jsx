@@ -520,9 +520,6 @@ const App = () => {
       setIsRemoteLoading(false);
 
       // Step 2: Gemini でバックグラウンド強化（失敗しても生データを維持）
-      const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!gApiKey) return;
-
       try {
         const simplified = rawItems.slice(0, 30).map(i => ({ name: i.name, price: i.price }));
         const prompt = `あなたはベビー用品の専門バイヤーです。
@@ -533,14 +530,14 @@ const App = () => {
 
       リスト: ${JSON.stringify(simplified)}`;
 
-        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
+        const aiRes = await fetch('/api/gemini', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          body: JSON.stringify({ prompt })
         });
 
         const aiData = await aiRes.json();
-        const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+        const aiText = aiData.text || "[]";
         const jsonMatch = aiText.match(/\[[\s\S]*\]/);
         const curatedList = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 
@@ -684,9 +681,8 @@ const App = () => {
       const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
       let formatted;
 
-      if (gApiKey) {
-        try {
-          const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
+      try {
+        const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
 ルール：
 1. 重複（同じ商品の別店舗）は1つにまとめる。
 2. 「車輪だけ」「カバーだけ」などの付属品は除外し「本体」のみ残す。
@@ -698,14 +694,14 @@ const App = () => {
 
 検索結果データ: ${JSON.stringify(allItems.slice(0, 20))}`;
 
-          const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ parts: [{ text: aiPrompt }] }] })
+          const aiRes = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: aiPrompt })
           });
 
           const aiData = await aiRes.json();
-          const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const aiText = aiData.text || "";
           const jsonMatch = aiText.match(/\[[\s\S]*\]/);
           const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 
@@ -734,9 +730,6 @@ const App = () => {
           // Gemini 失敗でも生データにフォールバック
           formatted = formatRawItems(allItems);
         }
-      } else {
-        formatted = formatRawItems(allItems);
-      }
 
       setSearchResults(formatted);
       autoSaveSearchResultsToDb(formatted, keyword);
@@ -814,42 +807,24 @@ const App = () => {
     setIsAiTyping(true);
 
     try {
-      const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!gApiKey) {
-        setChatMessages([...newMessages, { role: 'assistant', text: "エラー: .env に VITE_GEMINI_API_KEY が設定されていません。" }]);
-        setIsAiTyping(false);
-        return;
-      }
-
-      // 簡易コンテキストとして商品知識をAIに教える
-      const productContext = dbProducts.map(p => `${p.name} (最安目安: ¥${getLowestPrice(p.shops)})`).join(', ');
-      
-      const payload = {
-        contents: [{
-          role: "user",
-          parts: [{ text: `あなたは Honest Baby という次世代ベビー用品比較アプリの専属AIコンサルタントです。
-現在手元にある比較可能な商品は以下の通りです：
-${productContext}
-
+      const prompt = `あなたは Honest Baby という次世代ベビー用品比較アプリの専属AIコンサルタントです。
 ユーザーの質問に、絵文字を使いつつ、優しく友人のように（簡潔に3〜4文程度で）答えてください。
-ユーザーの質問: ${userText}` }]
-        }]
-      };
+ユーザーの質問: ${userText}`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
       });
 
       if (!response.ok) throw new Error(`API Error: ${response.status}`);
       const data = await response.json();
-      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "すみません、一時的に考え込んでしまいました💦";
-      
+      const aiText = data.text || "すみません、一時的に考え込んでしまいました💦";
+
       setChatMessages([...newMessages, { role: 'assistant', text: aiText }]);
     } catch (e) {
       console.error("Gemini API Error:", e);
-      setChatMessages([...newMessages, { role: 'assistant', text: "ネットワークエラーが発生しました。設定をご確認ください。" }]);
+      setChatMessages([...newMessages, { role: 'assistant', text: "少し混み合っています💦 もう一度試してみてください！" }]);
     } finally {
       setIsAiTyping(false);
     }
@@ -1673,31 +1648,31 @@ ${productContext}
           </div>
         )}
         {activeTab === 'ai' && (
-          <div className="flex flex-col h-[75vh] bg-white rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom duration-300 border border-[#F4EFEB]">
-             <div className="p-6 border-b border-[#F4EFEB] flex items-center gap-4 bg-[#FFF5F5]">
-                <div className="w-12 h-12 rounded-full bg-[#F2ABAC] flex items-center justify-center text-white shadow-md"><Bot className="w-6 h-6" /></div>
-                <div>
-                  <h3 className="font-black text-[#5A4C4C] text-lg">Honest AI</h3>
-                  <p className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest mt-0.5">Baby Concierge</p>
-                </div>
+          <div className="flex flex-col bg-white rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom duration-300 border border-[#F4EFEB]" style={{height: 'calc(100svh - 13rem)'}}>
+            <div className="p-6 border-b border-[#F4EFEB] flex items-center gap-4 bg-[#FFF5F5] flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-[#F2ABAC] flex items-center justify-center text-white shadow-md"><Bot className="w-6 h-6" /></div>
+              <div>
+                <h3 className="font-black text-[#5A4C4C] text-lg">Honest AI</h3>
+                <p className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest mt-0.5">Baby Concierge</p>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FFFDFB]">
-                {chatMessages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] p-4 text-sm font-medium leading-relaxed ${
-                      msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'
-                    }`}>
-                      {msg.text}
-                    </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FFFDFB] min-h-0">
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] p-4 text-sm font-medium leading-relaxed ${
+                    msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'
+                  }`}>
+                    {msg.text}
                   </div>
-                ))}
-                {isAiTyping && <div className="flex gap-1.5 p-2"><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-75"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-150"></div></div>}
-                <div ref={chatEndRef} />
-              </div>
-              <div className="p-4 bg-white border-t border-[#F4EFEB] flex gap-2">
-                <input type="text" placeholder="AIにメッセージ..." className="flex-1 bg-[#F9F6F3] border-none rounded-full px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#7B8E76]/20" value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()} />
-                <button onClick={handleSendMessage} className="bg-[#7B8E76] text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"><Send className="w-5 h-5 ml-1" /></button>
-              </div>
+                </div>
+              ))}
+              {isAiTyping && <div className="flex gap-1.5 p-2"><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-75"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-150"></div></div>}
+              <div ref={chatEndRef} />
+            </div>
+            <div className="p-4 bg-white border-t border-[#F4EFEB] flex gap-2 flex-shrink-0">
+              <input type="text" placeholder="AIにメッセージ..." className="flex-1 bg-[#F9F6F3] border-none rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#7B8E76]/20" value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()} />
+              <button onClick={handleSendMessage} className="bg-[#7B8E76] text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"><Send className="w-4 h-4 ml-0.5" /></button>
+            </div>
           </div>
         )}
       </main>
