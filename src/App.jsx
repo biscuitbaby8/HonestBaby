@@ -626,10 +626,13 @@ const App = () => {
     setSearchResults([]);
 
     try {
-      // 1. 楽天・Yahoo両方から並列取得
+      // 1. 楽天・Yahoo両方から並列取得（ベビー関連語がなければ補完）
+      const babyWords = ['ベビー', '赤ちゃん', 'おむつ', '抱っこ', '哺乳', 'おもちゃ', 'ミルク', 'マタニティ'];
+      const needsBaby = !babyWords.some(w => keyword.includes(w));
+      const searchKeyword = needsBaby ? `ベビー ${keyword}` : keyword;
       const [rakutenResult, yahooResult] = await Promise.allSettled([
-        fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`).then(r => r.json()),
-        fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}`).then(r => r.json())
+        fetch(`/api/rakuten?query=${encodeURIComponent(searchKeyword)}`).then(r => r.json()),
+        fetch(`/api/yahoo?query=${encodeURIComponent(searchKeyword)}`).then(r => r.json())
       ]);
 
       const rakutenItems = rakutenResult.status === 'fulfilled'
@@ -817,14 +820,16 @@ const App = () => {
         body: JSON.stringify({ prompt })
       });
 
-      if (!response.ok) throw new Error(`API Error: ${response.status}`);
       const data = await response.json();
+      if (data.error) {
+        setChatMessages([...newMessages, { role: 'assistant', text: `⚠️ エラー: ${data.error}` }]);
+        return;
+      }
       const aiText = data.text || "すみません、一時的に考え込んでしまいました💦";
-
       setChatMessages([...newMessages, { role: 'assistant', text: aiText }]);
     } catch (e) {
       console.error("Gemini API Error:", e);
-      setChatMessages([...newMessages, { role: 'assistant', text: "少し混み合っています💦 もう一度試してみてください！" }]);
+      setChatMessages([...newMessages, { role: 'assistant', text: `⚠️ ${e.message}` }]);
     } finally {
       setIsAiTyping(false);
     }
