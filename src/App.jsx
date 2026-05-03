@@ -658,78 +658,84 @@ const App = () => {
       const allItems = [...rakutenItems, ...yahooItems];
 
       if (allItems.length === 0) {
-        setSearchResults([]);
-        setIsSearchLoading(false);
+        setSearchError("検索結果が見つかりませんでした。別のキーワードをお試しください。");
         return;
       }
 
-      // 2. Gemini AI にデータを渡して「整理・厳選」させる（なければ生データをそのまま使う）
+      // 生データから整形する共通関数
+      const formatRawItems = (items) => items.slice(0, 20).map((p, i) => ({
+        id: `remote-${i}-${Date.now()}`,
+        name: p.name,
+        brand: "メーカー不明",
+        category: keyword,
+        image: p.image,
+        rating: 4.0,
+        reviews_count: 0,
+        ai_analysis: null,
+        shops: [{
+          shop_name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング',
+          shop_type: 'mall',
+          lowest_price: p.price,
+          url: p.url
+        }]
+      }));
+
+      // 2. Gemini AI で厳選（キーがなければ生データをそのまま使う）
       const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
       let formatted;
 
       if (gApiKey) {
-        const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
-      ルール：
-      1. 重複（同じ商品の別店舗）は1つにまとめる。ただしurlとsourceは必ず保持する。
-      2. 「車輪だけ」「カバーだけ」などの付属品は除外し、「本体」のみを残す。
-      3. 商品名を分かりやすく（例：〇〇 ベビーカー A型）に整える。
-      4. AI分析として「どんな人におすすめか」を1文で作成。
+        try {
+          const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
+ルール：
+1. 重複（同じ商品の別店舗）は1つにまとめる。
+2. 「車輪だけ」「カバーだけ」などの付属品は除外し「本体」のみ残す。
+3. 商品名を分かりやすく整える。
+4. AI分析として「どんな人におすすめか」を1文で作成。
 
-      出力形式 (JSONのみ):
-      [{"name": "...", "price": 0, "url": "...", "image": "...", "source": "rakuten or yahoo", "aiAnalysis": "...", "brand": "..."}]
+出力形式 (JSONのみ、他の文字を含めない):
+[{"name": "...", "price": 0, "url": "...", "image": "...", "source": "rakuten", "aiAnalysis": "...", "brand": "..."}]
 
-      検索結果データ: ${JSON.stringify(allItems.slice(0, 20))}`;
+検索結果データ: ${JSON.stringify(allItems.slice(0, 20))}`;
 
-        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: aiPrompt }] }]
-          })
-        });
+          const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ parts: [{ text: aiPrompt }] }] })
+          });
 
-        const aiData = await aiRes.json();
-        const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-        const jsonMatch = aiText.match(/\[[\s\S]*\]/);
-        const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+          const aiData = await aiRes.json();
+          const aiText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const jsonMatch = aiText.match(/\[[\s\S]*\]/);
+          const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 
-        formatted = cleanedProducts.map((p, i) => {
-          const shopName = getShopNameFromUrl(p.url);
-          return {
-            id: `remote-${i}-${Date.now()}`,
-            name: p.name,
-            brand: p.brand || "メーカー不明",
-            category: keyword,
-            image: p.image,
-            rating: 4.0 + (Math.random() * 1.0),
-            reviews_count: Math.floor(Math.random() * 500) + 50,
-            ai_analysis: p.aiAnalysis,
-            shops: [{
-              shop_name: shopName,
-              shop_type: 'mall',
-              lowest_price: p.price,
-              url: p.url
-            }]
-          };
-        });
+          if (cleanedProducts.length > 0) {
+            formatted = cleanedProducts.map((p, i) => ({
+              id: `remote-${i}-${Date.now()}`,
+              name: p.name,
+              brand: p.brand || "メーカー不明",
+              category: keyword,
+              image: p.image,
+              rating: 4.0 + (Math.random() * 1.0),
+              reviews_count: Math.floor(Math.random() * 500) + 50,
+              ai_analysis: p.aiAnalysis,
+              shops: [{
+                shop_name: getShopNameFromUrl(p.url),
+                shop_type: 'mall',
+                lowest_price: p.price,
+                url: p.url
+              }]
+            }));
+          } else {
+            // Gemini が空を返したら生データにフォールバック
+            formatted = formatRawItems(allItems);
+          }
+        } catch {
+          // Gemini 失敗でも生データにフォールバック
+          formatted = formatRawItems(allItems);
+        }
       } else {
-        // Gemini なし: 生データをそのまま整形
-        formatted = allItems.slice(0, 20).map((p, i) => ({
-          id: `remote-${i}-${Date.now()}`,
-          name: p.name,
-          brand: "メーカー不明",
-          category: keyword,
-          image: p.image,
-          rating: 4.0,
-          reviews_count: 0,
-          ai_analysis: null,
-          shops: [{
-            shop_name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング',
-            shop_type: 'mall',
-            lowest_price: p.price,
-            url: p.url
-          }]
-        }));
+        formatted = formatRawItems(allItems);
       }
 
       setSearchResults(formatted);
@@ -1605,8 +1611,8 @@ ${productContext}
             {/* エラー */}
             {searchError && (
               <div className="bg-rose-50 border border-rose-100 p-6 rounded-[2rem] text-center mb-8">
-                <p className="text-xs text-rose-400 font-bold mb-2">検索に失敗しました</p>
-                <button onClick={() => fetchRemoteProductsWithAI(searchTerm)} className="text-xs text-rose-400 underline font-bold">再試行する</button>
+                <p className="text-xs text-rose-400 font-bold mb-2">{searchError}</p>
+                <button onClick={() => { setSearchError(null); fetchRemoteProductsWithAI(searchTerm); }} className="text-xs text-rose-400 underline font-bold">再試行する</button>
               </div>
             )}
 
