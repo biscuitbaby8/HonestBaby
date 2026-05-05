@@ -845,7 +845,7 @@ const App = () => {
             { keywords: ['授乳クッション', '抱き枕'], search: '授乳クッション' },
           ];
           const matched = categorySearchMap.find(m => m.keywords.some(k => userText.includes(k)));
-          const searchKeyword = matched ? matched.search : `ベビー ${userText.slice(0, 15)}`;
+          const searchKeyword = matched ? matched.search : 'ベビー用品 人気';
           const res = await fetch(`/api/rakuten?query=${encodeURIComponent(searchKeyword)}`);
           const resData = await res.json();
           if (resData.error) throw new Error(resData.error);
@@ -901,8 +901,7 @@ ${userText}
 【絶対ルール】今回は商品データが取得できていません。以下を厳守してください：
 - Aprica、Combi、Ergobaby、コンビ、西松屋など、いかなるブランド名・商品名も絶対に出さないこと
 - 「〜がおすすめです」「〜を選ぶといいです」など具体的な推薦は禁止
-- 「どんな点を重視するか？」「何ヶ月のお子さんですか？」など逆質問してOK
-- 一般的な選び方のポイントのみを3文以内で、絵文字を使い友人のように答えること
+- 選び方の一般的なポイントを2〜3文で、絵文字を使い友人のように答えること
 ユーザーの質問: ${userText}`;
       }
 
