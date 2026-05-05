@@ -369,7 +369,8 @@ const App = () => {
   useEffect(() => {
     if (!window.visualViewport) return;
     const handleResize = () => {
-      document.documentElement.style.setProperty('--app-height', `${window.visualViewport.height}px`);
+      const kbHeight = Math.max(0, window.innerHeight - window.visualViewport.height);
+      document.documentElement.style.setProperty('--keyboard-height', `${kbHeight}px`);
     };
     window.visualViewport.addEventListener('resize', handleResize);
     handleResize();
@@ -903,8 +904,11 @@ ${userText}
 上記フォーマットで答えてください。リスト外の商品名は絶対に使わないでください。`;
       } else {
         prompt = `あなたはベビー用品アドバイザーです。
-今回は商品リストが取得できていないため、具体的な商品名・ブランド名は一切挙げないでください。
-代わりに、選び方のポイントや注意点を3〜4文で、絵文字を使いながら友人のように答えてください。
+【絶対ルール】今回は商品データが取得できていません。以下を厳守してください：
+- Aprica、Combi、Ergobaby、コンビ、西松屋など、いかなるブランド名・商品名も絶対に出さないこと
+- 「〜がおすすめです」「〜を選ぶといいです」など具体的な推薦は禁止
+- 「どんな点を重視するか？」「何ヶ月のお子さんですか？」など逆質問してOK
+- 一般的な選び方のポイントのみを3文以内で、絵文字を使い友人のように答えること
 ユーザーの質問: ${userText}`;
       }
 
@@ -1511,7 +1515,7 @@ ${userText}
   };
 
   return (
-    <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`} style={activeTab === 'ai' ? {height: 'var(--app-height, 100dvh)'} : {}}>
+    <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`}>
       <Helmet>
         {/* タイトル */}
         {selectedProduct
@@ -1770,7 +1774,7 @@ ${userText}
                           <img src={p.image} onError={e => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/80x80.png?text=Baby"; }} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" alt={p.name} />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-black text-[#5A4C4C] line-clamp-2 leading-snug">{p.name}</p>
-                            <p className="text-xs text-[#7B8E76] font-bold mt-1">¥{p.price?.toLocaleString()}</p>
+                            <p className="text-xs text-[#7B8E76] font-bold mt-1">¥{(p.shops?.[0]?.lowest_price ?? p.price)?.toLocaleString()}</p>
                           </div>
                           <ChevronRight className="w-4 h-4 text-[#A5A19E] flex-shrink-0" />
                         </button>
@@ -1782,7 +1786,7 @@ ${userText}
               {isAiTyping && <div className="flex gap-1.5 p-2"><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-75"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-150"></div></div>}
               <div ref={chatEndRef} />
             </div>
-            <div className="p-4 bg-white border-t border-[#F4EFEB] flex gap-2 flex-shrink-0">
+            <div className="p-4 bg-white border-t border-[#F4EFEB] flex gap-2 flex-shrink-0" style={{paddingBottom: 'calc(1rem + var(--keyboard-height, 0px))'}}>
               <input type="text" placeholder="AIにメッセージ..." className="flex-1 bg-[#F9F6F3] border-none rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#7B8E76]/20" value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()} />
               <button onClick={handleSendMessage} className="bg-[#7B8E76] text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"><Send className="w-4 h-4 ml-0.5" /></button>
             </div>
