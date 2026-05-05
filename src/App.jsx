@@ -366,6 +366,16 @@ const App = () => {
     if (activeTab === 'gift') fetchGiftProducts(giftFilter);
   }, [activeTab, giftFilter]);
 
+  useEffect(() => {
+    if (!window.visualViewport) return;
+    const handleResize = () => {
+      document.documentElement.style.setProperty('--app-height', `${window.visualViewport.height}px`);
+    };
+    window.visualViewport.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.visualViewport.removeEventListener('resize', handleResize);
+  }, []);
+
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
   const fetchRankingsWithAI = async (catName, subCat = "すべて", subSubCat = "すべて") => {
     const genre = CATEGORY_TREE.find(c => c.name === catName) || CATEGORY_TREE[0];
@@ -852,15 +862,27 @@ const App = () => {
           const price = p.shops?.[0]?.lowest_price ?? p.price;
           return `${i + 1}. ${p.name}（${price ? price.toLocaleString() + '円' : '価格不明'}）`;
         }).join('\n');
-        prompt = `あなたは Honest Baby というベビー用品比較アプリの専属AIコンサルタントです。
-以下の【実際の商品リスト】の中から、ユーザーの質問に合う商品を2〜3個選んでおすすめしてください。
-リストにない商品名は絶対に作らないでください。必ずリストの番号と商品名をそのまま使ってください。
-各商品について「✅ 商品名：おすすめ理由（1〜2文）」の形式で、絵文字を使って友人のように温かく答えてください。
+        prompt = `あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
 
-【実際の商品リスト】
+【絶対ルール】
+- 必ず以下の【商品リスト】にある番号と商品名だけを使ってください
+- リストに存在しない商品名（例：マグネタック、マリオバティ等）は絶対に作ってはいけません
+- 2〜3個の商品を選び、各商品を「✅ X番：おすすめ理由（1〜2文）」の形式で答えてください
+- 絵文字を使って友人のように温かく答えてください
+
+【商品リスト】
 ${productList}
 
-【ユーザーの質問】${userText}`;
+【ユーザーの質問】
+${userText}
+
+【回答例】
+お探しですね😊 おすすめはこちらです！
+
+✅ 1番：〇〇という理由でとても人気です👶
+✅ 3番：コスパが良く〜な方にぴったりです💕
+
+上記フォーマットで答えてください。リスト外の商品名は絶対に使わないでください。`;
       } else {
         prompt = `あなたは Honest Baby というベビー用品比較アプリの専属AIコンサルタントです。
 ユーザーの質問に、絵文字を使いつつ、優しく友人のように（簡潔に3〜4文程度で）答えてください。
@@ -1470,7 +1492,7 @@ ${productList}
   };
 
   return (
-    <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`}>
+    <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`} style={activeTab === 'ai' ? {height: 'var(--app-height, 100dvh)'} : {}}>
       <Helmet>
         {/* タイトル */}
         {selectedProduct
