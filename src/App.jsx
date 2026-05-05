@@ -832,11 +832,23 @@ const App = () => {
 
       if (contextProducts.length === 0) {
         try {
-          const babyWords = ['ベビー', '赤ちゃん', 'おむつ', '抱っこ', '哺乳', 'おもちゃ', 'ミルク', 'マタニティ'];
-          const needsBaby = !babyWords.some(w => userText.includes(w));
-          const searchKeyword = needsBaby ? `ベビー ${userText}` : userText;
+          const categorySearchMap = [
+            { keywords: ['ベビーカー', 'バギー', 'ストローラー'], search: 'ベビーカー' },
+            { keywords: ['抱っこ紐', '抱っこひも', 'だっこ', 'スリング', 'ベビーキャリー'], search: '抱っこ紐' },
+            { keywords: ['おむつ', 'オムツ', 'パンツ型', 'テープ型'], search: 'ベビーおむつ' },
+            { keywords: ['ミルク', '粉ミルク', '授乳', '哺乳瓶', '搾乳'], search: '赤ちゃん ミルク' },
+            { keywords: ['ベッド', '寝具', 'ねんね', 'ベビーベッド'], search: 'ベビーベッド' },
+            { keywords: ['おもちゃ', 'ガラガラ', '知育', 'プレイマット'], search: 'ベビーおもちゃ' },
+            { keywords: ['チャイルドシート', 'カーシート', 'ジュニアシート'], search: 'チャイルドシート' },
+            { keywords: ['離乳食', '食器', 'スプーン', 'フォーク', 'マグ'], search: 'ベビー離乳食' },
+            { keywords: ['お風呂', 'バス', 'ベビーバス', '沐浴'], search: 'ベビーバス 沐浴' },
+            { keywords: ['授乳クッション', '抱き枕'], search: '授乳クッション' },
+          ];
+          const matched = categorySearchMap.find(m => m.keywords.some(k => userText.includes(k)));
+          const searchKeyword = matched ? matched.search : `ベビー ${userText.slice(0, 15)}`;
           const res = await fetch(`/api/rakuten?query=${encodeURIComponent(searchKeyword)}`);
           const resData = await res.json();
+          if (resData.error) throw new Error(resData.error);
           const excludeWords = ['タイヤ', '部品', 'パーツ', '交換用', 'シート生地', 'レインカバー単品'];
           contextProducts = (resData.products || [])
             .filter(p => !excludeWords.some(w => p.name?.includes(w)))
@@ -844,35 +856,17 @@ const App = () => {
             .map((item, i) => ({
               id: `chat-${i}-${Date.now()}`,
               name: item.name,
-              brand: 'メーカー不明',
-              category: userText,
+              brand: item.brand || '楽天市場',
+              category: matched?.search || userText,
               image: item.image || '',
-              rating: 4.0,
+              rating: item.rating || 4.0,
               reviews_count: 0,
               ai_analysis: null,
               shops: [{ shop_name: '楽天市場', shop_type: 'mall', lowest_price: item.price, url: item.url }]
             }));
         } catch (e) {
-          console.error('Rakuten fallback search failed:', e);
+          console.error('Rakuten chat search failed:', e);
         }
-      }
-
-      // DBの商品をキーワードで絞り込んで使う（Rakuten失敗時のフォールバック）
-      if (contextProducts.length === 0 && dbProducts.length > 0) {
-        const keywordCategoryMap = [
-          { keywords: ['ベビーカー'], category: 'ベビーカー' },
-          { keywords: ['抱っこ紐', '抱っこひも', 'だっこ'], category: '抱っこ紐' },
-          { keywords: ['おむつ', 'オムツ'], category: 'おむつ' },
-          { keywords: ['ミルク', '授乳', '哺乳瓶'], category: 'ミルク・授乳' },
-          { keywords: ['ベッド', '寝具', 'ねんね'], category: '寝具・ベッド' },
-          { keywords: ['おもちゃ'], category: 'おもちゃ' },
-        ];
-        const matchedCategory = keywordCategoryMap.find(m =>
-          m.keywords.some(k => userText.includes(k))
-        )?.category;
-        contextProducts = dbProducts
-          .filter(p => matchedCategory ? p.category === matchedCategory : true)
-          .slice(0, 6);
       }
 
       let prompt;
