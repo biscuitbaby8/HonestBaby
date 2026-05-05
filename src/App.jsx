@@ -816,17 +816,48 @@ const App = () => {
     setIsAiTyping(true);
 
     try {
-      const hasProducts = searchResults && searchResults.length > 0;
-      let prompt;
-      if (hasProducts) {
-        const productList = searchResults.slice(0, 6).map(p =>
-          `・${p.name}（${p.price ? p.price.toLocaleString() + '円' : '価格不明'}）`
-        ).join('\n');
-        prompt = `あなたは Honest Baby というベビー用品比較アプリの専属AIコンサルタントです。
-以下の商品リストの中から、ユーザーの質問に合うものを2〜3個おすすめしてください。
-各商品について「商品名：おすすめ理由（1〜2文）」の形式で、絵文字を使って友人のように温かく説明してください。
+      // 既存の検索結果があればそれを使う、なければユーザーの質問で検索する
+      let contextProducts = searchResults.length > 0 ? searchResults : [];
 
-【現在表示中の商品リスト】
+      if (contextProducts.length === 0) {
+        try {
+          const babyWords = ['ベビー', '赤ちゃん', 'おむつ', '抱っこ', '哺乳', 'おもちゃ', 'ミルク', 'マタニティ'];
+          const needsBaby = !babyWords.some(w => userText.includes(w));
+          const searchKeyword = needsBaby ? `ベビー ${userText}` : userText;
+          const res = await fetch(`/api/rakuten?query=${encodeURIComponent(searchKeyword)}`);
+          const resData = await res.json();
+          const excludeWords = ['タイヤ', '部品', 'パーツ', '交換用', 'シート生地', 'レインカバー単品'];
+          contextProducts = (resData.products || [])
+            .filter(p => !excludeWords.some(w => p.name?.includes(w)))
+            .slice(0, 6)
+            .map((item, i) => ({
+              id: `chat-${i}-${Date.now()}`,
+              name: item.name,
+              brand: 'メーカー不明',
+              category: userText,
+              image: item.image || '',
+              rating: 4.0,
+              reviews_count: 0,
+              ai_analysis: null,
+              shops: [{ shop_name: '楽天市場', shop_type: 'mall', lowest_price: item.price, url: item.url }]
+            }));
+        } catch {
+          // 検索失敗しても続行
+        }
+      }
+
+      let prompt;
+      if (contextProducts.length > 0) {
+        const productList = contextProducts.slice(0, 6).map((p, i) => {
+          const price = p.shops?.[0]?.lowest_price ?? p.price;
+          return `${i + 1}. ${p.name}（${price ? price.toLocaleString() + '円' : '価格不明'}）`;
+        }).join('\n');
+        prompt = `あなたは Honest Baby というベビー用品比較アプリの専属AIコンサルタントです。
+以下の【実際の商品リスト】の中から、ユーザーの質問に合う商品を2〜3個選んでおすすめしてください。
+リストにない商品名は絶対に作らないでください。必ずリストの番号と商品名をそのまま使ってください。
+各商品について「✅ 商品名：おすすめ理由（1〜2文）」の形式で、絵文字を使って友人のように温かく答えてください。
+
+【実際の商品リスト】
 ${productList}
 
 【ユーザーの質問】${userText}`;
@@ -848,8 +879,7 @@ ${productList}
         return;
       }
       const aiText = data.text || "すみません、一時的に考え込んでしまいました💦";
-      const attachedProducts = hasProducts ? searchResults.slice(0, 3) : [];
-      setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: attachedProducts }]);
+      setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: contextProducts.slice(0, 3) }]);
     } catch (e) {
       console.error("AI Chat Error:", e);
       setChatMessages([...newMessages, { role: 'assistant', text: `⚠️ ${e.message}` }]);
