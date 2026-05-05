@@ -606,7 +606,7 @@ const App = () => {
   };
 
   // --- 既存機能の拡張: AI搭載・楽天＋Yahoo並列検索ロジック ---
-  const cacheSearchResultsLocally = (products, keyword) => {
+  const autoSaveSearchResultsToDb = async (products, keyword) => {
     const matchedCat = CATEGORY_TREE.find(cat =>
       cat.name !== "すべて" && (
         keyword.includes(cat.name) ||
@@ -621,9 +621,27 @@ const App = () => {
     if (!category) return;
     const toSave = products.filter(p => p.name && p.image).slice(0, 10);
     if (toSave.length === 0) return;
+
+    // localStorage（即時・このユーザー）
     try {
       localStorage.setItem(`honestBabyCache_${category}`, JSON.stringify(toSave));
       setCachedProducts(prev => ({ ...prev, [category]: toSave }));
+    } catch {}
+
+    // Supabase（全ユーザー共有）
+    try {
+      await supabase.from('products').upsert(
+        toSave.map(p => ({
+          name: p.name.slice(0, 200),
+          category,
+          sub_category: '本体',
+          image_url: p.image || null,
+          rating: Math.round((p.rating || 4.0) * 10) / 10,
+          reviews_count: p.reviews_count || 0,
+          ai_analysis: p.ai_analysis || null,
+        })),
+        { onConflict: 'name', ignoreDuplicates: true }
+      );
     } catch {}
   };
 
@@ -750,7 +768,7 @@ const App = () => {
         }
 
       setSearchResults(formatted);
-      cacheSearchResultsLocally(formatted, keyword);
+      autoSaveSearchResultsToDb(formatted, keyword);
     } catch (err) {
       console.error("Remote Search Error:", err);
       setSearchError(err.message);
@@ -1241,15 +1259,18 @@ ${userText}
             <ProductCard key={p.id} product={p} />
           ))}
 
-          {/* 検索キャッシュ商品（そのカテゴリで検索した結果を表示） */}
-          {!isRemoteLoading && remoteProducts.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
-            cachedProducts[selectedCategory].map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))
+          {/* Supabase蓄積商品（ユーザー検索で積み上がった全体共有データ） */}
+          {!isRemoteLoading && remoteProducts.length === 0 && filtered.length > 0 && (
+            filtered.map((p) => <ProductCard key={p.id} product={p} />)
+          )}
+
+          {/* localStorageキャッシュ（Supabaseも空の場合の即時フォールバック） */}
+          {!isRemoteLoading && remoteProducts.length === 0 && filtered.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
+            cachedProducts[selectedCategory].map((p) => <ProductCard key={p.id} product={p} />)
           )}
 
           {/* Empty State */}
-          {!isRemoteLoading && remoteProducts.length === 0 && !cachedProducts[selectedCategory]?.length && (
+          {!isRemoteLoading && remoteProducts.length === 0 && filtered.length === 0 && !cachedProducts[selectedCategory]?.length && (
              <div className="col-span-2 py-20 text-center text-[#A5A19E] text-xs font-bold uppercase tracking-widest leading-loose">該当する商品は見つかりませんでした</div>
           )}
         </div>
