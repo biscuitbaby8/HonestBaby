@@ -851,9 +851,27 @@ const App = () => {
               ai_analysis: null,
               shops: [{ shop_name: '楽天市場', shop_type: 'mall', lowest_price: item.price, url: item.url }]
             }));
-        } catch {
-          // 検索失敗しても続行
+        } catch (e) {
+          console.error('Rakuten fallback search failed:', e);
         }
+      }
+
+      // DBの商品をキーワードで絞り込んで使う（Rakuten失敗時のフォールバック）
+      if (contextProducts.length === 0 && dbProducts.length > 0) {
+        const keywordCategoryMap = [
+          { keywords: ['ベビーカー'], category: 'ベビーカー' },
+          { keywords: ['抱っこ紐', '抱っこひも', 'だっこ'], category: '抱っこ紐' },
+          { keywords: ['おむつ', 'オムツ'], category: 'おむつ' },
+          { keywords: ['ミルク', '授乳', '哺乳瓶'], category: 'ミルク・授乳' },
+          { keywords: ['ベッド', '寝具', 'ねんね'], category: '寝具・ベッド' },
+          { keywords: ['おもちゃ'], category: 'おもちゃ' },
+        ];
+        const matchedCategory = keywordCategoryMap.find(m =>
+          m.keywords.some(k => userText.includes(k))
+        )?.category;
+        contextProducts = dbProducts
+          .filter(p => matchedCategory ? p.category === matchedCategory : true)
+          .slice(0, 6);
       }
 
       let prompt;
@@ -884,8 +902,9 @@ ${userText}
 
 上記フォーマットで答えてください。リスト外の商品名は絶対に使わないでください。`;
       } else {
-        prompt = `あなたは Honest Baby というベビー用品比較アプリの専属AIコンサルタントです。
-ユーザーの質問に、絵文字を使いつつ、優しく友人のように（簡潔に3〜4文程度で）答えてください。
+        prompt = `あなたはベビー用品アドバイザーです。
+今回は商品リストが取得できていないため、具体的な商品名・ブランド名は一切挙げないでください。
+代わりに、選び方のポイントや注意点を3〜4文で、絵文字を使いながら友人のように答えてください。
 ユーザーの質問: ${userText}`;
       }
 
