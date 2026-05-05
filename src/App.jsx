@@ -113,6 +113,18 @@ const App = () => {
     }
   }, [favorites]);
 
+  // --- 検索キャッシュ（localStorage → カテゴリ別）---
+  const [cachedProducts, setCachedProducts] = useState(() => {
+    const cache = {};
+    CATEGORIES.filter(c => c !== 'すべて').forEach(cat => {
+      try {
+        const stored = localStorage.getItem(`honestBabyCache_${cat}`);
+        if (stored) cache[cat] = JSON.parse(stored);
+      } catch {}
+    });
+    return cache;
+  });
+
   // --- 検索専用 States（ホームのremoteProductsと分離）---
   const [searchResults, setSearchResults] = useState([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
@@ -594,7 +606,7 @@ const App = () => {
   };
 
   // --- 既存機能の拡張: AI搭載・楽天＋Yahoo並列検索ロジック ---
-  const autoSaveSearchResultsToDb = async (products, keyword) => {
+  const cacheSearchResultsLocally = (products, keyword) => {
     const matchedCat = CATEGORY_TREE.find(cat =>
       cat.name !== "すべて" && (
         keyword.includes(cat.name) ||
@@ -605,27 +617,13 @@ const App = () => {
         })
       )
     );
-    const category = matchedCat?.name || "その他";
-
-    const toSave = products
-      .filter(p => p.name && p.image)
-      .slice(0, 10)
-      .map(p => ({
-        name: p.name.slice(0, 200),
-        category,
-        sub_category: '本体',
-        image_url: p.image || null,
-        rating: Math.round((p.rating || 4.0) * 10) / 10,
-        reviews_count: p.reviews_count || 0,
-        ai_analysis: p.ai_analysis || null,
-      }));
-
+    const category = matchedCat?.name;
+    if (!category) return;
+    const toSave = products.filter(p => p.name && p.image).slice(0, 10);
     if (toSave.length === 0) return;
-
     try {
-      await supabase
-        .from('products')
-        .upsert(toSave, { ignoreDuplicates: true });
+      localStorage.setItem(`honestBabyCache_${category}`, JSON.stringify(toSave));
+      setCachedProducts(prev => ({ ...prev, [category]: toSave }));
     } catch {}
   };
 
@@ -752,7 +750,7 @@ const App = () => {
         }
 
       setSearchResults(formatted);
-      autoSaveSearchResultsToDb(formatted, keyword);
+      cacheSearchResultsLocally(formatted, keyword);
     } catch (err) {
       console.error("Remote Search Error:", err);
       setSearchError(err.message);
@@ -1243,8 +1241,15 @@ ${userText}
             <ProductCard key={p.id} product={p} />
           ))}
 
+          {/* 検索キャッシュ商品（そのカテゴリで検索した結果を表示） */}
+          {!isRemoteLoading && remoteProducts.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
+            cachedProducts[selectedCategory].map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))
+          )}
+
           {/* Empty State */}
-          {!isRemoteLoading && remoteProducts.length === 0 && (
+          {!isRemoteLoading && remoteProducts.length === 0 && !cachedProducts[selectedCategory]?.length && (
              <div className="col-span-2 py-20 text-center text-[#A5A19E] text-xs font-bold uppercase tracking-widest leading-loose">該当する商品は見つかりませんでした</div>
           )}
         </div>
