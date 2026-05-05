@@ -846,23 +846,28 @@ const App = () => {
           ];
           const matched = categoryGenreMap.find(m => m.keywords.some(k => userText.includes(k)));
           const genreId = matched?.genreId ?? '100533';
-          const res = await fetch(`/api/ranking?genreId=${genreId}`);
+          const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
+          const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
+          const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
+          if (!appId) throw new Error('VITE_RAKUTEN_APP_ID not set');
+          const rankingUrl = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
+          const res = await fetch(rankingUrl, { headers: { Referer: 'https://honestbaby-care.com' } });
           const resData = await res.json();
-          if (resData.error) throw new Error(resData.error);
           const excludeWords = ['タイヤ', '部品', 'パーツ', '交換用', 'シート生地', 'レインカバー単品'];
-          contextProducts = (resData.products || [])
-            .filter(p => !excludeWords.some(w => p.name?.includes(w)))
+          contextProducts = (resData.Items || [])
+            .map(i => i.Item)
+            .filter(item => item && !excludeWords.some(w => item.itemName?.includes(w)))
             .slice(0, 6)
             .map((item, i) => ({
               id: `chat-${i}-${Date.now()}`,
-              name: item.name,
-              brand: item.brand || '楽天市場',
+              name: item.itemName,
+              brand: item.shopName || '楽天市場',
               category: matched ? userText : 'ベビー用品',
-              image: item.image || '',
-              rating: item.rating || 4.0,
+              image: (item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
+              rating: parseFloat(item.reviewAverage) || 4.0,
               reviews_count: 0,
               ai_analysis: null,
-              shops: [{ shop_name: '楽天市場', shop_type: 'mall', lowest_price: item.price, url: item.url }]
+              shops: [{ shop_name: '楽天市場', shop_type: 'mall', lowest_price: item.itemPrice, url: item.affiliateUrl || item.itemUrl }]
             }));
         } catch (e) {
           console.error('Ranking chat fetch failed:', e);
