@@ -832,21 +832,21 @@ const App = () => {
 
       if (contextProducts.length === 0) {
         try {
-          const categorySearchMap = [
-            { keywords: ['ベビーカー', 'バギー', 'ストローラー'], search: 'ベビーカー' },
-            { keywords: ['抱っこ紐', '抱っこひも', 'だっこ', 'スリング', 'ベビーキャリー'], search: '抱っこ紐' },
-            { keywords: ['おむつ', 'オムツ', 'パンツ型', 'テープ型'], search: 'ベビーおむつ' },
-            { keywords: ['ミルク', '粉ミルク', '授乳', '哺乳瓶', '搾乳'], search: '赤ちゃん ミルク' },
-            { keywords: ['ベッド', '寝具', 'ねんね', 'ベビーベッド'], search: 'ベビーベッド' },
-            { keywords: ['おもちゃ', 'ガラガラ', '知育', 'プレイマット'], search: 'ベビーおもちゃ' },
-            { keywords: ['チャイルドシート', 'カーシート', 'ジュニアシート'], search: 'チャイルドシート' },
-            { keywords: ['離乳食', '食器', 'スプーン', 'フォーク', 'マグ'], search: 'ベビー離乳食' },
-            { keywords: ['お風呂', 'バス', 'ベビーバス', '沐浴'], search: 'ベビーバス 沐浴' },
-            { keywords: ['授乳クッション', '抱き枕'], search: '授乳クッション' },
+          const categoryGenreMap = [
+            { keywords: ['ベビーカー', 'バギー', 'ストローラー'], genreId: '200833' },
+            { keywords: ['抱っこ紐', '抱っこひも', 'だっこ', 'スリング'], genreId: '412209' },
+            { keywords: ['おむつ', 'オムツ', 'パンツ型', 'テープ型', 'おしりふき'], genreId: '205197' },
+            { keywords: ['ミルク', '粉ミルク', '授乳', '哺乳瓶', '搾乳'], genreId: '205208' },
+            { keywords: ['ベッド', '寝具', 'ねんね', 'スリーパー'], genreId: '200822' },
+            { keywords: ['おもちゃ', 'ガラガラ', '知育', 'プレイマット', 'ぬいぐるみ'], genreId: '201591' },
+            { keywords: ['チャイルドシート', 'カーシート', 'ジュニアシート'], genreId: '566088' },
+            { keywords: ['離乳食', '食器', 'スプーン', 'マグ', 'ベビーフード'], genreId: '213980' },
+            { keywords: ['お風呂', 'バス', 'ベビーバス', '沐浴'], genreId: '200815' },
+            { keywords: ['ゲート', 'ガード', 'ベビーモニター', '安全'], genreId: '200841' },
           ];
-          const matched = categorySearchMap.find(m => m.keywords.some(k => userText.includes(k)));
-          const searchKeyword = matched ? matched.search : 'ベビー用品 人気';
-          const res = await fetch(`/api/rakuten?query=${encodeURIComponent(searchKeyword)}`);
+          const matched = categoryGenreMap.find(m => m.keywords.some(k => userText.includes(k)));
+          const genreId = matched?.genreId ?? '100533';
+          const res = await fetch(`/api/ranking?genreId=${genreId}`);
           const resData = await res.json();
           if (resData.error) throw new Error(resData.error);
           const excludeWords = ['タイヤ', '部品', 'パーツ', '交換用', 'シート生地', 'レインカバー単品'];
@@ -857,7 +857,7 @@ const App = () => {
               id: `chat-${i}-${Date.now()}`,
               name: item.name,
               brand: item.brand || '楽天市場',
-              category: matched?.search || userText,
+              category: matched ? userText : 'ベビー用品',
               image: item.image || '',
               rating: item.rating || 4.0,
               reviews_count: 0,
@@ -865,7 +865,7 @@ const App = () => {
               shops: [{ shop_name: '楽天市場', shop_type: 'mall', lowest_price: item.price, url: item.url }]
             }));
         } catch (e) {
-          console.error('Rakuten chat search failed:', e);
+          console.error('Ranking chat fetch failed:', e);
         }
       }
 
