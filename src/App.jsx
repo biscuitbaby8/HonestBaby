@@ -1440,7 +1440,7 @@ ${productList}
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFDFB] pb-32 font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white">
+    <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`}>
       <Helmet>
         {/* タイトル */}
         {selectedProduct
@@ -1564,7 +1564,7 @@ ${productList}
         </div>
       </header>
 
-      <main className="px-6 pt-4">
+      <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden' : 'px-6 pt-4'} style={activeTab === 'ai' ? {paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)'} : {}}>
         {activeTab === 'home' && renderHome()}
         {activeTab === 'ranking' && renderRanking()}
         {activeTab === 'gift' && renderGift()}
@@ -1676,7 +1676,7 @@ ${productList}
           </div>
         )}
         {activeTab === 'ai' && (
-          <div className="flex flex-col bg-white rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom duration-300 border border-[#F4EFEB]" style={{height: 'calc(100svh - 13rem)'}}>
+          <div className="flex flex-col bg-white rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom duration-300 border border-[#F4EFEB] flex-1 min-h-0">
             <div className="p-6 border-b border-[#F4EFEB] flex items-center gap-4 bg-[#FFF5F5] flex-shrink-0">
               <div className="w-12 h-12 rounded-full bg-[#F2ABAC] flex items-center justify-center text-white shadow-md"><Bot className="w-6 h-6" /></div>
               <div>
