@@ -816,9 +816,25 @@ const App = () => {
     setIsAiTyping(true);
 
     try {
-      const prompt = `あなたは Honest Baby という次世代ベビー用品比較アプリの専属AIコンサルタントです。
+      const hasProducts = searchResults && searchResults.length > 0;
+      let prompt;
+      if (hasProducts) {
+        const productList = searchResults.slice(0, 6).map(p =>
+          `・${p.name}（${p.price ? p.price.toLocaleString() + '円' : '価格不明'}）`
+        ).join('\n');
+        prompt = `あなたは Honest Baby というベビー用品比較アプリの専属AIコンサルタントです。
+以下の商品リストの中から、ユーザーの質問に合うものを2〜3個おすすめしてください。
+各商品について「商品名：おすすめ理由（1〜2文）」の形式で、絵文字を使って友人のように温かく説明してください。
+
+【現在表示中の商品リスト】
+${productList}
+
+【ユーザーの質問】${userText}`;
+      } else {
+        prompt = `あなたは Honest Baby というベビー用品比較アプリの専属AIコンサルタントです。
 ユーザーの質問に、絵文字を使いつつ、優しく友人のように（簡潔に3〜4文程度で）答えてください。
 ユーザーの質問: ${userText}`;
+      }
 
       const response = await fetch('/api/gemini', {
         method: 'POST',
@@ -832,9 +848,10 @@ const App = () => {
         return;
       }
       const aiText = data.text || "すみません、一時的に考え込んでしまいました💦";
-      setChatMessages([...newMessages, { role: 'assistant', text: aiText }]);
+      const attachedProducts = hasProducts ? searchResults.slice(0, 3) : [];
+      setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: attachedProducts }]);
     } catch (e) {
-      console.error("Gemini API Error:", e);
+      console.error("AI Chat Error:", e);
       setChatMessages([...newMessages, { role: 'assistant', text: `⚠️ ${e.message}` }]);
     } finally {
       setIsAiTyping(false);
@@ -1669,12 +1686,26 @@ const App = () => {
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FFFDFB] min-h-0">
               {chatMessages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] p-4 text-sm font-medium leading-relaxed ${
+                <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`max-w-[85%] p-4 text-sm font-medium leading-relaxed whitespace-pre-wrap ${
                     msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'
                   }`}>
                     {msg.text}
                   </div>
+                  {msg.products && msg.products.length > 0 && (
+                    <div className="mt-2 space-y-2 w-[85%]">
+                      {msg.products.map(p => (
+                        <button key={p.id} onClick={() => setSelectedProduct(p)} className="w-full flex items-center gap-3 bg-white rounded-2xl p-3 text-left border border-[#F4EFEB] shadow-sm active:scale-[0.98] transition-transform">
+                          <img src={p.image} onError={e => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/80x80.png?text=Baby"; }} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" alt={p.name} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-black text-[#5A4C4C] line-clamp-2 leading-snug">{p.name}</p>
+                            <p className="text-xs text-[#7B8E76] font-bold mt-1">¥{p.price?.toLocaleString()}</p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-[#A5A19E] flex-shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               {isAiTyping && <div className="flex gap-1.5 p-2"><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-75"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-150"></div></div>}
@@ -2041,7 +2072,7 @@ const App = () => {
       )}
 
       {/* 下部ナビゲーション */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-[#F4EFEB] px-8 py-5 flex justify-between items-center pb-10 rounded-t-[3rem] shadow-[0_-10px_40px_rgb(0,0,0,0.03)]">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-[#F4EFEB] px-8 pt-4 flex justify-between items-center rounded-t-[3rem] shadow-[0_-10px_40px_rgb(0,0,0,0.03)]" style={{paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)'}}>
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'home' ? 'text-[#7B8E76] scale-110' : 'text-[#D4CDC7] hover:text-[#A5A19E]'}`}>
           <Home className={`w-6 h-6 ${activeTab === 'home' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">ホーム</span>
         </button>
