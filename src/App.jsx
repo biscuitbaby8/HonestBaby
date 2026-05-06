@@ -557,53 +557,6 @@ const App = () => {
       const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
       setRemoteProducts(immediateProducts);
       setIsRemoteLoading(false);
-
-      // Step 2: Gemini でバックグラウンド強化（失敗しても生データを維持）
-      try {
-        const simplified = rawItems.slice(0, 30).map(i => ({ name: i.name, price: i.price }));
-        const prompt = `あなたはベビー用品の専門バイヤーです。
-      以下の商品リストから、「ギフトや自宅用として本当に自信を持っておすすめできるもの」を厳選し、
-      以下のJSON形式のみで返してください。
-
-      [{"name": "整理された商品名", "price": 価格, "reason": "おすすめ理由1文", "brand": "ブランド名"}]
-
-      リスト: ${JSON.stringify(simplified)}`;
-
-        const aiRes = await fetch('/api/gemini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt })
-        });
-
-        const aiData = await aiRes.json();
-        const aiText = aiData.text || "[]";
-        const jsonMatch = aiText.match(/\[[\s\S]*\]/);
-        const curatedList = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-
-        if (curatedList.length > 0) {
-          const finalProducts = curatedList.map((citem, idx) => {
-            const original = rawItems.find(r => r.name.includes(citem.name.substring(0, 8))) || rawItems[idx];
-            return {
-              id: `market-${original?.id || Math.random()}`,
-              name: citem.name,
-              category: catName,
-              subCategory: "本体",
-              brand: citem.brand || "人気ブランド",
-              image: original?.image || "",
-              rating: original?.rating || (4.5 + Math.random() * 0.5),
-              shops: original?.shops || [],
-              aiAnalysis: citem.reason,
-              isMarketWide: true,
-              isBestSeller: idx < 3,
-              isTopRated: (original?.rating || 4.5) >= 4.8
-            };
-          });
-          setRemoteProducts(finalProducts);
-        }
-      } catch (geminiErr) {
-        console.warn("Gemini enhancement skipped:", geminiErr);
-        // 生データをそのまま維持
-      }
     } catch (e) {
       console.error("Market-Wide Fetch error:", e);
       setRemoteError(`${e.message} (API Check Required)`);
