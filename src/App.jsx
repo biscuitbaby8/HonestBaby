@@ -85,13 +85,17 @@ const CATEGORY_FILTERS = {
   },
 };
 
-const filterCategoryProducts = (items, categoryHint, getNameFn = (p) => p.name || p.itemName || '') => {
+// excludeOnly=true: ランキングAPIなどgenreIdで絞り込み済みの場合はアクセサリー除外のみ
+// excludeOnly=false: キーワード検索結果には本体必須チェックも適用
+const filterCategoryProducts = (items, categoryHint, getNameFn = (p) => p.name || p.itemName || '', excludeOnly = false) => {
   const filter = CATEGORY_FILTERS[categoryHint]
     || Object.values(CATEGORY_FILTERS).find(f => f.mustAny.some(w => categoryHint?.includes(w)));
   if (!filter) return items;
   return items.filter(item => {
     const name = getNameFn(item);
-    return filter.mustAny.some(w => name.includes(w)) && !filter.excludeAny.some(w => name.includes(w));
+    if (filter.excludeAny.some(w => name.includes(w))) return false;
+    if (excludeOnly) return true;
+    return filter.mustAny.some(w => name.includes(w));
   });
 };
 
@@ -575,9 +579,9 @@ const App = () => {
         return;
       }
 
-      // カテゴリフィルター: アクセサリーを除外して本体商品のみ表示
+      // ランキングAPIはgenreId済みなのでアクセサリー除外のみ（mustAny不要）
       if (CATEGORY_FILTERS[catName]) {
-        const categoryFiltered = filterCategoryProducts(rawItems, catName);
+        const categoryFiltered = filterCategoryProducts(rawItems, catName, undefined, true);
         if (categoryFiltered.length > 0) rawItems = categoryFiltered;
       }
 
@@ -728,7 +732,7 @@ const App = () => {
 
       // カテゴリフィルター: 本体商品のみを通す（アクセサリー除外）
       const raw = [...rakutenItems, ...yahooItems];
-      const filtered = filterCategoryProducts(raw, keyword);
+      const filtered = filterCategoryProducts(raw, keyword, undefined, true);
       const allItems = filtered.length > 0 ? filtered : raw;
 
       if (allItems.length === 0) {
@@ -912,7 +916,7 @@ const App = () => {
           const resData = await res.json();
           const allItems = (resData.Items || []).map(i => i.Item).filter(Boolean);
           const categoryName = matched?.keywords?.[0] || '';
-          const filtered = filterCategoryProducts(allItems, categoryName, item => item.itemName || '');
+          const filtered = filterCategoryProducts(allItems, categoryName, item => item.itemName || '', true);
           contextProducts = (filtered.length > 0 ? filtered : allItems)
             .slice(0, 6)
             .map((item, i) => ({
