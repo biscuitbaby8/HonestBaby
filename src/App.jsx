@@ -403,11 +403,12 @@ const App = () => {
       });
       const accessoryFiltered = filterAccessories(merged);
       const seen = new Set();
-      setRankingProducts((accessoryFiltered.length > 0 ? accessoryFiltered : merged).filter(p => {
+      const deduped = (accessoryFiltered.length > 0 ? accessoryFiltered : merged).filter(p => {
         if (seen.has(p.name)) return false;
         seen.add(p.name);
         return true;
-      }));
+      });
+      setRankingProducts(deduped.sort((a, b) => (b.rating || 0) - (a.rating || 0)));
     } catch (e) {
       console.error('Ranking fetch error:', e);
     }
