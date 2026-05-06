@@ -57,6 +57,44 @@ const LEGAL_PAGES = {
   }
 };
 
+// カテゴリ別フィルター: 本体のみを通しアクセサリーを除外する
+const CATEGORY_FILTERS = {
+  'ベビーカー': {
+    genreId: '200833',
+    mustAny: ['ベビーカー', 'バギー', 'ストローラー'],
+    excludeAny: ['ベビーカード', 'ホルダー', 'レインカバー', '日よけ', '虫よけ', 'ファン',
+      '扇風機', 'ドリンク', 'マグ', 'カップ', 'スマホ', 'テーブル', 'フック', '収納バッグ',
+      'ハンドルカバー', 'アームバー', 'フットマフ', 'シート生地', 'タイヤ', '部品',
+      'パーツ', '交換', 'クッション', 'ブランケット', '保冷', '保温', 'ネット', 'バンパーバー',
+      '延長ベルト', 'サンキャノピー', 'オーガナイザー', 'バッグ', 'ポケット']
+  },
+  '抱っこ紐': {
+    genreId: '412209',
+    mustAny: ['抱っこ紐', '抱っこひも', 'スリング', 'ヒップシート', 'キャリア', 'おんぶ紐', 'ベビーキャリア'],
+    excludeAny: ['収納袋', 'よだれパッド', 'クリップ', 'ケープ', '専用バッグ']
+  },
+  'おむつ': {
+    genreId: '205197',
+    mustAny: ['おむつ', 'オムツ', 'パンパース', 'メリーズ', 'ムーニー', 'グーン', 'テープタイプ', 'パンツタイプ', 'ゲンキ'],
+    excludeAny: ['ゴミ箱', 'ゴミ袋', 'おむつカバー', 'おむつポーチ', 'おしりふき']
+  },
+  'チャイルドシート': {
+    genreId: '566088',
+    mustAny: ['チャイルドシート', 'カーシート', 'ジュニアシート', 'ベビーシート'],
+    excludeAny: ['シートベルト', 'ミラー', 'サンシェード', 'カバー', 'シートプロテクター']
+  },
+};
+
+const filterCategoryProducts = (items, categoryHint, getNameFn = (p) => p.name || p.itemName || '') => {
+  const filter = CATEGORY_FILTERS[categoryHint]
+    || Object.values(CATEGORY_FILTERS).find(f => f.mustAny.some(w => categoryHint?.includes(w)));
+  if (!filter) return items;
+  return items.filter(item => {
+    const name = getNameFn(item);
+    return filter.mustAny.some(w => name.includes(w)) && !filter.excludeAny.some(w => name.includes(w));
+  });
+};
+
 const App = () => {
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
@@ -537,6 +575,12 @@ const App = () => {
         return;
       }
 
+      // カテゴリフィルター: アクセサリーを除外して本体商品のみ表示
+      if (CATEGORY_FILTERS[catName]) {
+        const categoryFiltered = filterCategoryProducts(rawItems, catName);
+        if (categoryFiltered.length > 0) rawItems = categoryFiltered;
+      }
+
       // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
       const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
       setRemoteProducts(immediateProducts);
@@ -682,13 +726,10 @@ const App = () => {
           }))
         : [];
 
-      // 部品・周辺グッズ・交換用パーツを除外
-      const excludeWords = ['タイヤ', '部品', 'パーツ', '交換用', 'シート生地', 'レインカバー単品', 'ドリンクホルダー', '延長ベルト', 'ハンドルカバー', 'フットマフ', 'バンパーバー', 'サンキャノピー'];
-      const filterAccessories = (items) => items.filter(item =>
-        !excludeWords.some(w => item.name?.includes(w))
-      );
-
-      const allItems = filterAccessories([...rakutenItems, ...yahooItems]);
+      // カテゴリフィルター: 本体商品のみを通す（アクセサリー除外）
+      const raw = [...rakutenItems, ...yahooItems];
+      const filtered = filterCategoryProducts(raw, keyword);
+      const allItems = filtered.length > 0 ? filtered : raw;
 
       if (allItems.length === 0) {
         setSearchError("検索結果が見つかりませんでした。別のキーワードをお試しください。");
@@ -869,10 +910,10 @@ const App = () => {
           const rankingUrl = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
           const res = await fetch(rankingUrl, { headers: { Referer: 'https://honestbaby-care.com' } });
           const resData = await res.json();
-          const excludeWords = ['タイヤ', '部品', 'パーツ', '交換用', 'シート生地', 'レインカバー単品'];
-          contextProducts = (resData.Items || [])
-            .map(i => i.Item)
-            .filter(item => item && !excludeWords.some(w => item.itemName?.includes(w)))
+          const allItems = (resData.Items || []).map(i => i.Item).filter(Boolean);
+          const categoryName = matched?.keywords?.[0] || '';
+          const filtered = filterCategoryProducts(allItems, categoryName, item => item.itemName || '');
+          contextProducts = (filtered.length > 0 ? filtered : allItems)
             .slice(0, 6)
             .map((item, i) => ({
               id: `chat-${i}-${Date.now()}`,
