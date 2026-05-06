@@ -1363,30 +1363,46 @@ ${userText}
   };
 
   const renderRanking = () => {
+    const categoryOrder = ['ベビーカー', '抱っこ紐', 'おむつ', 'ミルク・授乳', 'おもちゃ', '寝具・ベッド', '車用品', 'お風呂用品'];
+    const grouped = categoryOrder.map(cat => ({
+      name: cat,
+      items: rankingProducts.filter(p => p.category === cat).sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    })).filter(g => g.items.length > 0);
+
     return (
       <div className="animate-in slide-in-from-bottom duration-300">
         <div className="flex items-center gap-3 mb-8 px-1 mt-2">
           <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] shadow-sm"><Award className="w-7 h-7" /></div>
           <div>
-            <h3 className="font-serif font-black text-[#5A4C4C] text-2xl">総合ランキング</h3>
-            <p className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest leading-none mt-1">Real-time Top Picks</p>
+            <h3 className="font-serif font-black text-[#5A4C4C] text-2xl">カテゴリ別ランキング</h3>
+            <p className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest leading-none mt-1">Top Rated by Category</p>
           </div>
         </div>
         {isRankingLoading ? (
           <div className="text-center py-20 text-[#A5A19E] text-xs font-bold animate-pulse">ランキングを読み込み中...</div>
         ) : (
-          <div className="space-y-5">
-            {rankingProducts.map((p, idx) => (
-              <div key={p.id || idx} className="bg-white rounded-[2.5rem] p-4 flex gap-5 border border-[#F4EFEB] shadow-[0_4px_20px_rgb(0,0,0,0.02)] relative active:scale-95 transition-all cursor-pointer" onClick={() => openProduct(p)}>
-                <div className={`absolute -top-2 -left-2 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg border-2 border-white ${idx === 0 ? 'bg-[#F9DC5C] text-[#5A4C4C]' : idx === 1 ? 'bg-[#D4CDC7] text-white' : idx === 2 ? 'bg-[#D4AF37] text-white' : 'bg-[#7B8E76] text-white'}`}>{idx + 1}</div>
-                <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 bg-[#F9F6F3] p-2"><img src={p.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full h-full object-cover rounded-xl" alt={p.name} /></div>
-                <div className="flex-1 flex flex-col justify-center">
-                  <span className="text-[9px] font-black text-[#A5A19E] uppercase tracking-widest">{p.category}</span>
-                  <h4 className="text-sm font-bold text-[#5A4C4C] leading-tight mb-2 line-clamp-2">{p.name}</h4>
-                  <div className="flex items-end justify-between">
-                    <p className="text-lg font-black text-[#7B8E76]">¥{(p.price || getLowestPrice(p.shops)).toLocaleString()}</p>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-[#A5A19E] bg-[#FFF9E6] px-2 py-0.5 rounded-full"><Star className="w-3 h-3 text-[#D4AF37] fill-current" /> {Number(p.rating || 0).toFixed(1)}</div>
-                  </div>
+          <div className="space-y-10">
+            {grouped.map(group => (
+              <div key={group.name}>
+                <div className="flex items-center gap-2 mb-4 px-1">
+                  <span className="text-lg">{CATEGORY_TREE.find(c => c.name === group.name)?.icon || '📦'}</span>
+                  <h4 className="font-black text-[#5A4C4C] text-lg">{group.name}</h4>
+                  <span className="text-[10px] font-bold text-[#A5A19E] bg-[#F9F6F3] px-2 py-0.5 rounded-full">評価順</span>
+                </div>
+                <div className="space-y-3">
+                  {group.items.map((p, idx) => (
+                    <div key={p.id || idx} className="bg-white rounded-[2rem] p-4 flex gap-4 border border-[#F4EFEB] shadow-[0_4px_20px_rgb(0,0,0,0.02)] relative active:scale-95 transition-all cursor-pointer" onClick={() => openProduct(p)}>
+                      <div className={`absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow border-2 border-white ${idx === 0 ? 'bg-[#F9DC5C] text-[#5A4C4C]' : idx === 1 ? 'bg-[#C0C0C0] text-white' : idx === 2 ? 'bg-[#D4AF37] text-white' : 'bg-[#7B8E76] text-white'}`}>{idx + 1}</div>
+                      <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-[#F9F6F3]"><img src={p.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=HB"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=..."; }} className="w-full h-full object-cover" alt={p.name} /></div>
+                      <div className="flex-1 flex flex-col justify-center min-w-0">
+                        <h4 className="text-sm font-bold text-[#5A4C4C] leading-tight mb-1.5 line-clamp-2">{p.name}</h4>
+                        <div className="flex items-center justify-between">
+                          <p className="text-base font-black text-[#7B8E76]">¥{(p.price || getLowestPrice(p.shops)).toLocaleString()}</p>
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-[#A5A19E] bg-[#FFF9E6] px-2 py-0.5 rounded-full"><Star className="w-3 h-3 text-[#D4AF37] fill-current" />{Number(p.rating || 0).toFixed(1)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
