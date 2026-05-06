@@ -362,7 +362,7 @@ const App = () => {
       seen.add(p.name);
       return true;
     });
-    setRankingProducts(deduped.slice(0, 20));
+    setRankingProducts(deduped);
     setIsRankingLoading(false);
   };
 
@@ -708,7 +708,7 @@ const App = () => {
       }
 
       // 生データから整形する共通関数
-      const formatRawItems = (items) => items.slice(0, 20).map((p, i) => ({
+      const formatRawItems = (items) => items.map((p, i) => ({
         id: `remote-${i}-${Date.now()}`,
         name: p.name,
         brand: "メーカー不明",
