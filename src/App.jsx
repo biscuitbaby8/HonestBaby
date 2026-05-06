@@ -107,7 +107,8 @@ const App = () => {
   const [selectedSubSubCategory, setSelectedSubSubCategory] = useState("すべて");
   const [sortOrder, setSortOrder] = useState("standard");
   const [searchTerm, setSearchTerm] = useState("");
-  const [giftFilter, setGiftFilter] = useState("すべて");
+  const [giftBudgetFilter, setGiftBudgetFilter] = useState("すべて");
+  const [giftSceneFilter, setGiftSceneFilter] = useState("すべて");
 
   // 管理モード: URLに ?admin=1 を付けると ON（localStorage で保持）
   const [isAdminMode, setIsAdminMode] = useState(() => {
@@ -417,18 +418,44 @@ const App = () => {
   };
 
   // ギフトタブ: 楽天検索APIから直接取得（VITE_キー使用）
-  const fetchGiftProducts = async (filter = 'すべて') => {
+  const fetchGiftProducts = async (budgetFilter = 'すべて', sceneFilter = 'すべて') => {
     setIsGiftLoading(true);
     const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
     const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
     const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
     if (!appId) { setIsGiftLoading(false); return; }
 
-    const keyword = ['出産祝い', 'ギフト', filter !== 'すべて' && !filter.includes('円') ? filter : ''].filter(Boolean).join(' ');
+    const sceneKeywordMap = {
+      '出産祝い': '出産祝い ベビーギフト',
+      'ハーフバースデー': 'ハーフバースデー 赤ちゃん ギフト',
+      '友人へ': '出産祝い おしゃれ ギフト',
+      '同僚へ': '出産祝い 実用的 ギフト',
+      '家族・親戚から': '出産祝い セット ギフト',
+    };
+    const baseKeyword = sceneFilter !== 'すべて' ? sceneKeywordMap[sceneFilter] || '出産祝い ベビーギフト' : '出産祝い ベビーギフト セット';
+
+    const priceParams = {
+      '3000円〜': { minPrice: 3000, maxPrice: 4999 },
+      '5000円〜': { minPrice: 5000, maxPrice: 9999 },
+      '10000円〜': { minPrice: 10000, maxPrice: '' },
+    };
+    const price = priceParams[budgetFilter] || {};
+
     try {
-      const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&availability=1&affiliateId=${affiliateId}`;
+      const params = new URLSearchParams({
+        applicationId: appId,
+        ...(accessKey && { accessKey }),
+        ...(affiliateId && { affiliateId }),
+        keyword: baseKeyword,
+        sort: '-reviewCount',
+        hits: 30,
+        availability: 1,
+        ...(price.minPrice && { minPrice: price.minPrice }),
+        ...(price.maxPrice && { maxPrice: price.maxPrice }),
+      });
+      const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?${params}`;
       const data = await fetch(url).then(r => r.json());
-      let products = (data.Items || []).map(item => ({
+      const products = filterAccessories((data.Items || []).map(item => ({
         id: `gift-${item.Item.itemCode}`,
         name: item.Item.itemName,
         price: item.Item.itemPrice,
@@ -438,10 +465,7 @@ const App = () => {
         rating: parseFloat(item.Item.reviewAverage) || 4.5,
         category: 'ギフトセット',
         shops: [{ name: item.Item.shopName || '楽天市場', price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
-      }));
-      if (filter === '3000円〜') products = products.filter(p => p.price >= 3000 && p.price < 5000);
-      else if (filter === '5000円〜') products = products.filter(p => p.price >= 5000 && p.price < 10000);
-      else if (filter === '10000円〜') products = products.filter(p => p.price >= 10000);
+      })));
       setGiftProducts(products);
     } catch (e) {
       console.error('Gift fetch error:', e);
@@ -454,8 +478,8 @@ const App = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'gift') fetchGiftProducts(giftFilter);
-  }, [activeTab, giftFilter]);
+    if (activeTab === 'gift') fetchGiftProducts(giftBudgetFilter, giftSceneFilter);
+  }, [activeTab, giftBudgetFilter, giftSceneFilter]);
 
   useEffect(() => {
     if (!window.visualViewport) return;
@@ -1447,14 +1471,14 @@ ${userText}
         <h3 className="font-black text-[#5A4C4C] mb-4 px-1">予算から探す</h3>
         <div className="flex flex-wrap gap-2 mb-8">
           {["すべて", "3000円〜", "5000円〜", "10000円〜"].map(tag => (
-            <button key={tag} onClick={() => setGiftFilter(tag)} className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all ${giftFilter === tag ? 'bg-[#F2ABAC] text-white shadow-sm' : 'bg-white border border-[#F4EFEB] text-[#A5A19E]'}`}>{tag}</button>
+            <button key={tag} onClick={() => setGiftBudgetFilter(tag)} className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all ${giftBudgetFilter === tag ? 'bg-[#F2ABAC] text-white shadow-sm' : 'bg-white border border-[#F4EFEB] text-[#A5A19E]'}`}>{tag}</button>
           ))}
         </div>
 
         <h3 className="font-black text-[#5A4C4C] mb-4 px-1">シーン・贈る相手から探す</h3>
         <div className="flex flex-wrap gap-2 mb-8">
-          {["出産祝い", "ハーフバースデー", "友人へ", "同僚へ", "家族・親戚から"].map(tag => (
-            <button key={tag} onClick={() => setGiftFilter(tag)} className={`px-4 py-2 rounded-xl text-[11px] font-bold transition-all ${giftFilter === tag ? 'bg-[#7B8E76] text-white shadow-sm' : 'bg-[#F9F6F3] text-[#8E8282]'}`}>{tag}</button>
+          {["すべて", "出産祝い", "ハーフバースデー", "友人へ", "同僚へ", "家族・親戚から"].map(tag => (
+            <button key={tag} onClick={() => setGiftSceneFilter(tag)} className={`px-4 py-2 rounded-xl text-[11px] font-bold transition-all ${giftSceneFilter === tag ? 'bg-[#7B8E76] text-white shadow-sm' : 'bg-[#F9F6F3] text-[#8E8282]'}`}>{tag}</button>
           ))}
         </div>
 
