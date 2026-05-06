@@ -57,16 +57,31 @@ const LEGAL_PAGES = {
   }
 };
 
-// アクセサリー除外ワード: 本体商品名には絶対に含まれない、アクセサリー専用の言葉のみ
+// アクセサリー除外ワード: 本体商品名に含まれない、アクセサリー専用の言葉
 const ACCESSORY_EXCLUDE_WORDS = [
+  // ベビーカーアクセサリー
   'ドリンクホルダー', 'カップホルダー', 'スマホホルダー', 'スマートフォンホルダー',
   'レインカバー', 'ハンドルカバー', 'フットマフ', 'バンパーバー', 'サンキャノピー',
-  '延長ベルト', 'アームバー', 'ベビーカード',
-  'タイヤ交換', 'シート生地', 'レインカバー単品', '車輪のみ',
+  '延長ベルト', 'アームバー', 'ベビーカード', 'タイヤ交換', 'シート生地', '車輪のみ',
+  'ペットボトルホルダー', 'スマホスタンド', 'アクセサリーセット', '収納ポーチ',
+  'よだれカバー', 'サンシェード単品', 'フック単品',
+  // チャイルドシートアクセサリー
+  'シートベルトカバー', 'シートプロテクター', 'ミラー取付',
+  // 抱っこ紐アクセサリー
+  'よだれパッド', '침받이',
+  // おむつ関連（おむつカテゴリ以外での混入防止）
+  'おむつポーチ', 'おむつバッグ', 'おむつストッカー',
 ];
+
+// おむつサイズマッピング（検索精度向上用）
+const DIAPER_SIZE_MAP = {
+  '新生児': '新生児', 'S': 'Sサイズ', 'M': 'Mサイズ',
+  'L': 'Lサイズ', 'BIG': 'BIGサイズ', 'BIGより大きい': 'ビッグより大きい',
+};
 
 const filterAccessories = (items, getNameFn = (p) => p.name || p.itemName || '') =>
   items.filter(item => !ACCESSORY_EXCLUDE_WORDS.some(w => getNameFn(item).includes(w)));
+
 
 const App = () => {
   const [dbProducts, setDbProducts] = useState([]);
@@ -483,8 +498,10 @@ const App = () => {
 
       let rawItems;
       if (useSearch) {
-        // サブカテゴリー: genreId で親ジャンルを固定 + サブ/3段階キーワードで絞り込み（3ページ並列）
-        const subKeyword = [genre.keyword, subCat !== "すべて" ? subCat : "", subSubCat !== "すべて" ? subSubCat : ""].filter(Boolean).join(" ").trim();
+        // おむつサイズの場合、「S」→「Sサイズ」に正規化して検索精度を上げる
+        const normalizedSubSub = (catName === 'おむつ' && DIAPER_SIZE_MAP[subSubCat])
+          ? DIAPER_SIZE_MAP[subSubCat] : subSubCat;
+        const subKeyword = [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
         const mkUrl = (page) => `${searchUrl(subKeyword, page)}&genreId=${genreId}`;
         const [res1, res2, res3] = await Promise.all([fetch(mkUrl(1)), fetch(mkUrl(2)), fetch(mkUrl(3))]);
         if (!res1.ok) throw new Error(`Search API Error: ${res1.status}`);
@@ -493,6 +510,20 @@ const App = () => {
         const data3 = res3.ok ? await res3.json() : { Items: [] };
         const combined = [...(data1.Items || []), ...(data2.Items || []), ...(data3.Items || [])];
         rawItems = dedupeAndMergeShops(mapItems(combined, catName));
+
+        // おむつサイズ指定時: 対象サイズが名前に含まれる商品のみに絞り込む
+        if (catName === 'おむつ' && subSubCat && subSubCat !== 'すべて' && DIAPER_SIZE_MAP[subSubCat]) {
+          const sizeLabel = DIAPER_SIZE_MAP[subSubCat];
+          const altLabel = subSubCat; // 元の表記("S"等)でも検索
+          const sizeFiltered = rawItems.filter(p => {
+            const name = p.name || '';
+            if (!name.includes(sizeLabel) && !name.includes(altLabel)) return false;
+            // バラエティ・まとめ買いセット（複数サイズ混在）を除外
+            if (/バラエティ|お試し|各サイズ|まとめ買い|詰め合わせ|セット内容|各種サイズ/.test(name)) return false;
+            return true;
+          });
+          if (sizeFiltered.length > 0) rawItems = sizeFiltered;
+        }
       } else {
         // メインカテゴリー: 商品価格ナビAPIを優先（3ページ並列）、失敗時はRanking APIにフォールバック
         try {
