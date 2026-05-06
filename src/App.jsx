@@ -469,7 +469,7 @@ const App = () => {
       if (!appId) throw new Error("VITE_RAKUTEN_APP_ID not set");
 
       const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
-      const searchUrl = (keyword, page = 1) => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
+      const searchUrl = (keyword, page = 1, sort = '-reviewCount') => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
 
       const normalizeKey = (name) => name.replace(/[\s　]/g, '').toLowerCase().slice(0, 25);
       const dedupeAndMergeShops = (items) => {
@@ -502,13 +502,18 @@ const App = () => {
         const normalizedSubSub = (catName === 'おむつ' && DIAPER_SIZE_MAP[subSubCat])
           ? DIAPER_SIZE_MAP[subSubCat] : subSubCat;
         const subKeyword = [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
-        const mkUrl = (page) => `${searchUrl(subKeyword, page)}&genreId=${genreId}`;
-        const [res1, res2, res3] = await Promise.all([fetch(mkUrl(1)), fetch(mkUrl(2)), fetch(mkUrl(3))]);
-        if (!res1.ok) throw new Error(`Search API Error: ${res1.status}`);
-        const data1 = await res1.json();
-        const data2 = res2.ok ? await res2.json() : { Items: [] };
-        const data3 = res3.ok ? await res3.json() : { Items: [] };
-        const combined = [...(data1.Items || []), ...(data2.Items || []), ...(data3.Items || [])];
+        // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
+        const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
+        const subFetches = SORTS.flatMap(sort =>
+          [1, 2, 3].map(p =>
+            fetch(`${searchUrl(subKeyword, p, sort)}&genreId=${genreId}`)
+              .then(r => r.ok ? r.json() : { Items: [] })
+              .catch(() => ({ Items: [] }))
+          )
+        );
+        const subResults = await Promise.all(subFetches);
+        if (!subResults[0]?.Items && !subResults[1]?.Items) throw new Error('Search API Error');
+        const combined = subResults.flatMap(d => d.Items || []);
         rawItems = dedupeAndMergeShops(mapItems(combined, catName));
 
         // おむつサイズ指定時: 対象サイズが名前に含まれる商品のみに絞り込む
@@ -532,6 +537,7 @@ const App = () => {
             if (genre.keyword) p.set('query', genre.keyword);
             return `/api/rakuten-product?${p}`;
           };
+          // 商品価格ナビAPI: 3ページ並列
           const [pRes1, pRes2, pRes3] = await Promise.all([fetch(mkProductUrl(1)), fetch(mkProductUrl(2)), fetch(mkProductUrl(3))]);
           if (pRes1.ok) {
             const pData1 = await pRes1.json();
@@ -555,7 +561,28 @@ const App = () => {
           }
         } catch (_) { /* フォールバックへ */ }
 
-        // 商品価格ナビで取得できなければ Ranking API（既存・ジャンル保証）
+        // 通常商品検索APIを複数ソートで並列取得しマージ（市場網羅）
+        if (genre.keyword) {
+          try {
+            const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
+            const mainFetches = SORTS.flatMap(sort =>
+              [1, 2, 3].map(p =>
+                fetch(`${searchUrl(genre.keyword, p, sort)}&genreId=${genreId}`)
+                  .then(r => r.ok ? r.json() : { Items: [] })
+                  .catch(() => ({ Items: [] }))
+              )
+            );
+            const mainResults = await Promise.all(mainFetches);
+            const searchItems = dedupeAndMergeShops(mapItems(mainResults.flatMap(d => d.Items || []), catName));
+            if (searchItems.length > 0) {
+              // 商品価格ナビ結果とマージして重複排除
+              const merged = [...(rawItems || []), ...searchItems];
+              rawItems = dedupeAndMergeShops(merged);
+            }
+          } catch (_) { /* 失敗しても既存rawItemsを維持 */ }
+        }
+
+        // 何も取れなかった場合のみ Ranking API にフォールバック
         if (!rawItems || rawItems.length === 0) {
           const rankingRes = await fetch(rankingUrl(genreId));
           if (!rankingRes.ok) throw new Error(`Ranking API Error: ${rankingRes.status}`);
