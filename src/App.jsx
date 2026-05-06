@@ -366,6 +366,16 @@ const App = () => {
     if (activeTab === 'gift') fetchGiftProducts(giftFilter);
   }, [activeTab, giftFilter]);
 
+  useEffect(() => {
+    if (!window.visualViewport) return;
+    const handleResize = () => {
+      document.documentElement.style.setProperty('--app-height', `${window.visualViewport.height}px`);
+    };
+    window.visualViewport.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.visualViewport.removeEventListener('resize', handleResize);
+  }, []);
+
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
   const fetchRankingsWithAI = async (catName, subCat = "すべて", subSubCat = "すべて") => {
     const genre = CATEGORY_TREE.find(c => c.name === catName) || CATEGORY_TREE[0];
@@ -808,42 +818,90 @@ const App = () => {
     setIsAiTyping(true);
 
     try {
-      const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!gApiKey) {
-        setChatMessages([...newMessages, { role: 'assistant', text: "エラー: .env に VITE_GEMINI_API_KEY が設定されていません。" }]);
-        setIsAiTyping(false);
-        return;
+      // 1. 手動検索済み商品を使う
+      let contextProducts = searchResults.slice(0, 6);
+
+      // 2. Rakuten APIでカテゴリキーワード検索
+      if (contextProducts.length === 0) {
+        const categorySearchMap = [
+          { keywords: ['ベビーカー', 'バギー'], search: 'ベビーカー' },
+          { keywords: ['抱っこ紐', '抱っこひも', 'だっこ', 'スリング'], search: '抱っこ紐' },
+          { keywords: ['おむつ', 'オムツ', 'パンツ型'], search: 'ベビーおむつ' },
+          { keywords: ['ミルク', '粉ミルク', '授乳', '哺乳瓶', '搾乳'], search: '赤ちゃん ミルク' },
+          { keywords: ['ベッド', '寝具', 'ねんね', 'ベビーベッド'], search: 'ベビーベッド' },
+          { keywords: ['おもちゃ', 'ガラガラ', '知育'], search: 'ベビーおもちゃ' },
+          { keywords: ['チャイルドシート', 'カーシート'], search: 'チャイルドシート' },
+          { keywords: ['離乳食', '食器', 'スプーン'], search: 'ベビー離乳食' },
+          { keywords: ['お風呂', 'バス', 'ベビーバス'], search: 'ベビーバス' },
+          { keywords: ['抱き枕', '授乳クッション'], search: '授乳クッション' },
+        ];
+        try {
+          const matched = categorySearchMap.find(m => m.keywords.some(k => userText.includes(k)));
+          const searchKeyword = matched ? matched.search : `ベビー ${userText.slice(0, 15)}`;
+          const res = await fetch(`/api/rakuten?query=${encodeURIComponent(searchKeyword)}`);
+          const resData = await res.json();
+          if (!resData.error && resData.products?.length > 0) {
+            const excludeWords = ['タイヤ', '部品', 'パーツ', '交換用', 'シート生地', 'レインカバー単品'];
+            contextProducts = (resData.products || [])
+              .filter(p => !excludeWords.some(w => p.name?.includes(w)))
+              .slice(0, 6)
+              .map((item, i) => ({
+                id: `chat-${i}-${Date.now()}`,
+                name: item.name,
+                brand: item.brand || '楽天市場',
+                category: matched?.search || userText,
+                image: item.image || '',
+                rating: item.rating || 4.0,
+                reviews_count: 0,
+                ai_analysis: null,
+                shops: [{ shop_name: '楽天市場', shop_type: 'mall', lowest_price: item.price, url: item.url }]
+              }));
+          }
+        } catch (e) {
+          console.error('Rakuten chat search failed:', e);
+        }
       }
 
-      // 簡易コンテキストとして商品知識をAIに教える
-      const productContext = dbProducts.map(p => `${p.name} (最安目安: ¥${getLowestPrice(p.shops)})`).join(', ');
-      
-      const payload = {
-        contents: [{
-          role: "user",
-          parts: [{ text: `あなたは Honest Baby という次世代ベビー用品比較アプリの専属AIコンサルタントです。
-現在手元にある比較可能な商品は以下の通りです：
-${productContext}
+      let prompt;
+      if (contextProducts.length > 0) {
+        const productList = contextProducts.map((p, i) =>
+          `${i + 1}. ${p.name}（¥${(p.shops?.[0]?.lowest_price || p.price || 0).toLocaleString()}）`
+        ).join('\n');
+        prompt = `あなたはベビー用品比較アプリ Honest Baby のAIコンサルタントです。
 
-ユーザーの質問に、絵文字を使いつつ、優しく友人のように（簡潔に3〜4文程度で）答えてください。
-ユーザーの質問: ${userText}` }]
-        }]
-      };
+【絶対ルール】
+- 以下の商品リストにある商品だけを番号で言及してください
+- リストにない商品名は絶対に作らないでください
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gApiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+【商品リスト】
+${productList}
+
+【ユーザーの質問】${userText}
+
+2〜3商品を番号で選び、絵文字を使って友人のように簡潔に答えてください。`;
+      } else {
+        prompt = `あなたはベビー用品アドバイザーです。
+今回は商品リストが取得できていないため、具体的な商品名・ブランド名は一切挙げないでください。
+代わりに、選び方のポイントや注意点を3〜4文で友人のように絵文字を使って答えてください。
+ユーザーの質問: ${userText}`;
+      }
+
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
       });
+      const data = await res.json();
+      const aiText = data.text || data.error || "すみません、一時的に考え込んでしまいました💦";
 
-      if (!response.ok) throw new Error(`API Error: ${response.status}`);
-      const data = await response.json();
-      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "すみません、一時的に考え込んでしまいました💦";
-      
-      setChatMessages([...newMessages, { role: 'assistant', text: aiText }]);
+      setChatMessages([...newMessages, {
+        role: 'assistant',
+        text: aiText,
+        products: contextProducts.length > 0 ? contextProducts.slice(0, 3) : undefined
+      }]);
     } catch (e) {
-      console.error("Gemini API Error:", e);
-      setChatMessages([...newMessages, { role: 'assistant', text: "ネットワークエラーが発生しました。設定をご確認ください。" }]);
+      console.error("AI chat error:", e);
+      setChatMessages([...newMessages, { role: 'assistant', text: "ネットワークエラーが発生しました💦" }]);
     } finally {
       setIsAiTyping(false);
     }
@@ -1667,7 +1725,7 @@ ${productContext}
           </div>
         )}
         {activeTab === 'ai' && (
-          <div className="flex flex-col h-[75vh] bg-white rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom duration-300 border border-[#F4EFEB]">
+          <div className="flex flex-col bg-white rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-in slide-in-from-bottom duration-300 border border-[#F4EFEB]" style={{height: 'calc(var(--app-height, 100dvh) - 200px)'}}>
              <div className="p-6 border-b border-[#F4EFEB] flex items-center gap-4 bg-[#FFF5F5]">
                 <div className="w-12 h-12 rounded-full bg-[#F2ABAC] flex items-center justify-center text-white shadow-md"><Bot className="w-6 h-6" /></div>
                 <div>
@@ -1677,12 +1735,27 @@ ${productContext}
               </div>
               <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FFFDFB]">
                 {chatMessages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                     <div className={`max-w-[80%] p-4 text-sm font-medium leading-relaxed ${
                       msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'
                     }`}>
                       {msg.text}
                     </div>
+                    {msg.products && msg.products.length > 0 && (
+                      <div className="mt-2 space-y-2 w-[85%]">
+                        {msg.products.map(p => (
+                          <button key={p.id} onClick={() => openProduct(p)}
+                            className="w-full flex items-center gap-3 bg-white rounded-2xl p-3 text-left border border-[#F4EFEB] shadow-sm active:scale-[0.98] transition-transform">
+                            <img src={p.image} alt={p.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0 bg-[#F9F6F3]" onError={(e) => { e.target.style.display='none'; }} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-black text-[#5A4C4C] line-clamp-2">{p.name}</p>
+                              <p className="text-xs text-[#7B8E76] font-bold mt-1">¥{(p.shops?.[0]?.lowest_price || 0).toLocaleString()}</p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-[#A5A19E] flex-shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {isAiTyping && <div className="flex gap-1.5 p-2"><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-75"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-150"></div></div>}
