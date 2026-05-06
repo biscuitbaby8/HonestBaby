@@ -57,47 +57,16 @@ const LEGAL_PAGES = {
   }
 };
 
-// カテゴリ別フィルター: 本体のみを通しアクセサリーを除外する
-const CATEGORY_FILTERS = {
-  'ベビーカー': {
-    genreId: '200833',
-    mustAny: ['ベビーカー', 'バギー', 'ストローラー'],
-    excludeAny: ['ベビーカード', 'ホルダー', 'レインカバー', '日よけ', '虫よけ', 'ファン',
-      '扇風機', 'ドリンク', 'マグ', 'カップ', 'スマホ', 'テーブル', 'フック', '収納バッグ',
-      'ハンドルカバー', 'アームバー', 'フットマフ', 'シート生地', 'タイヤ', '部品',
-      'パーツ', '交換', 'クッション', 'ブランケット', '保冷', '保温', 'ネット', 'バンパーバー',
-      '延長ベルト', 'サンキャノピー', 'オーガナイザー', 'バッグ', 'ポケット']
-  },
-  '抱っこ紐': {
-    genreId: '412209',
-    mustAny: ['抱っこ紐', '抱っこひも', 'スリング', 'ヒップシート', 'キャリア', 'おんぶ紐', 'ベビーキャリア'],
-    excludeAny: ['収納袋', 'よだれパッド', 'クリップ', 'ケープ', '専用バッグ']
-  },
-  'おむつ': {
-    genreId: '205197',
-    mustAny: ['おむつ', 'オムツ', 'パンパース', 'メリーズ', 'ムーニー', 'グーン', 'テープタイプ', 'パンツタイプ', 'ゲンキ'],
-    excludeAny: ['ゴミ箱', 'ゴミ袋', 'おむつカバー', 'おむつポーチ', 'おしりふき']
-  },
-  'チャイルドシート': {
-    genreId: '566088',
-    mustAny: ['チャイルドシート', 'カーシート', 'ジュニアシート', 'ベビーシート'],
-    excludeAny: ['シートベルト', 'ミラー', 'サンシェード', 'カバー', 'シートプロテクター']
-  },
-};
+// アクセサリー除外ワード: 本体商品名には絶対に含まれない、アクセサリー専用の言葉のみ
+const ACCESSORY_EXCLUDE_WORDS = [
+  'ドリンクホルダー', 'カップホルダー', 'スマホホルダー', 'スマートフォンホルダー',
+  'レインカバー', 'ハンドルカバー', 'フットマフ', 'バンパーバー', 'サンキャノピー',
+  '延長ベルト', 'アームバー', 'ベビーカード',
+  'タイヤ交換', 'シート生地', 'レインカバー単品', '車輪のみ',
+];
 
-// excludeOnly=true: ランキングAPIなどgenreIdで絞り込み済みの場合はアクセサリー除外のみ
-// excludeOnly=false: キーワード検索結果には本体必須チェックも適用
-const filterCategoryProducts = (items, categoryHint, getNameFn = (p) => p.name || p.itemName || '', excludeOnly = false) => {
-  const filter = CATEGORY_FILTERS[categoryHint]
-    || Object.values(CATEGORY_FILTERS).find(f => f.mustAny.some(w => categoryHint?.includes(w)));
-  if (!filter) return items;
-  return items.filter(item => {
-    const name = getNameFn(item);
-    if (filter.excludeAny.some(w => name.includes(w))) return false;
-    if (excludeOnly) return true;
-    return filter.mustAny.some(w => name.includes(w));
-  });
-};
+const filterAccessories = (items, getNameFn = (p) => p.name || p.itemName || '') =>
+  items.filter(item => !ACCESSORY_EXCLUDE_WORDS.some(w => getNameFn(item).includes(w)));
 
 const App = () => {
   const [dbProducts, setDbProducts] = useState([]);
@@ -580,10 +549,9 @@ const App = () => {
       }
 
       // ランキングAPIはgenreId済みなのでアクセサリー除外のみ（mustAny不要）
-      if (CATEGORY_FILTERS[catName]) {
-        const categoryFiltered = filterCategoryProducts(rawItems, catName, undefined, true);
-        if (categoryFiltered.length > 0) rawItems = categoryFiltered;
-      }
+      // アクセサリー除外（本体商品のみ残す）
+      const accessoryFiltered = filterAccessories(rawItems);
+      if (accessoryFiltered.length > 0) rawItems = accessoryFiltered;
 
       // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
       const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
@@ -730,9 +698,8 @@ const App = () => {
           }))
         : [];
 
-      // カテゴリフィルター: 本体商品のみを通す（アクセサリー除外）
       const raw = [...rakutenItems, ...yahooItems];
-      const filtered = filterCategoryProducts(raw, keyword, undefined, true);
+      const filtered = filterAccessories(raw);
       const allItems = filtered.length > 0 ? filtered : raw;
 
       if (allItems.length === 0) {
@@ -915,8 +882,7 @@ const App = () => {
           const res = await fetch(rankingUrl, { headers: { Referer: 'https://honestbaby-care.com' } });
           const resData = await res.json();
           const allItems = (resData.Items || []).map(i => i.Item).filter(Boolean);
-          const categoryName = matched?.keywords?.[0] || '';
-          const filtered = filterCategoryProducts(allItems, categoryName, item => item.itemName || '', true);
+          const filtered = filterAccessories(allItems, item => item.itemName || '');
           contextProducts = (filtered.length > 0 ? filtered : allItems)
             .slice(0, 6)
             .map((item, i) => ({
