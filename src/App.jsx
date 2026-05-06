@@ -159,6 +159,7 @@ const App = () => {
   // --- ランキング・ギフト States ---
   const [rankingProducts, setRankingProducts] = useState([]);
   const [isRankingLoading, setIsRankingLoading] = useState(false);
+  const [rankingCategory, setRankingCategory] = useState('ベビーカー');
   const [giftProducts, setGiftProducts] = useState([]);
   const [isGiftLoading, setIsGiftLoading] = useState(false);
 
@@ -1369,9 +1370,11 @@ ${userText}
       items: rankingProducts.filter(p => p.category === cat).sort((a, b) => (b.rating || 0) - (a.rating || 0))
     })).filter(g => g.items.length > 0);
 
+    const activeCat = grouped.find(g => g.name === rankingCategory) || grouped[0];
+
     return (
       <div className="animate-in slide-in-from-bottom duration-300">
-        <div className="flex items-center gap-3 mb-8 px-1 mt-2">
+        <div className="flex items-center gap-3 mb-6 px-1 mt-2">
           <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] shadow-sm"><Award className="w-7 h-7" /></div>
           <div>
             <h3 className="font-serif font-black text-[#5A4C4C] text-2xl">カテゴリ別ランキング</h3>
@@ -1381,16 +1384,30 @@ ${userText}
         {isRankingLoading ? (
           <div className="text-center py-20 text-[#A5A19E] text-xs font-bold animate-pulse">ランキングを読み込み中...</div>
         ) : (
-          <div className="space-y-10">
-            {grouped.map(group => (
-              <div key={group.name}>
+          <>
+            <div className="flex gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide -mx-6 px-6">
+              {grouped.map(g => (
+                <button
+                  key={g.name}
+                  onClick={() => setRankingCategory(g.name)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                    (activeCat?.name === g.name) ? 'bg-[#7B8E76] text-white shadow-md' : 'bg-[#F0EBE6] text-[#7B8E76]'
+                  }`}
+                >
+                  <span>{CATEGORY_TREE.find(c => c.name === g.name)?.icon || '📦'}</span>
+                  {g.name}
+                </button>
+              ))}
+            </div>
+            {activeCat && (
+              <div>
                 <div className="flex items-center gap-2 mb-4 px-1">
-                  <span className="text-lg">{CATEGORY_TREE.find(c => c.name === group.name)?.icon || '📦'}</span>
-                  <h4 className="font-black text-[#5A4C4C] text-lg">{group.name}</h4>
+                  <span className="text-lg">{CATEGORY_TREE.find(c => c.name === activeCat.name)?.icon || '📦'}</span>
+                  <h4 className="font-black text-[#5A4C4C] text-lg">{activeCat.name}</h4>
                   <span className="text-[10px] font-bold text-[#A5A19E] bg-[#F9F6F3] px-2 py-0.5 rounded-full">評価順</span>
                 </div>
                 <div className="space-y-3">
-                  {group.items.map((p, idx) => (
+                  {activeCat.items.map((p, idx) => (
                     <div key={p.id || idx} className="bg-white rounded-[2rem] p-4 flex gap-4 border border-[#F4EFEB] shadow-[0_4px_20px_rgb(0,0,0,0.02)] relative active:scale-95 transition-all cursor-pointer" onClick={() => openProduct(p)}>
                       <div className={`absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow border-2 border-white ${idx === 0 ? 'bg-[#F9DC5C] text-[#5A4C4C]' : idx === 1 ? 'bg-[#C0C0C0] text-white' : idx === 2 ? 'bg-[#D4AF37] text-white' : 'bg-[#7B8E76] text-white'}`}>{idx + 1}</div>
                       <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-[#F9F6F3]"><img src={p.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=HB"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=..."; }} className="w-full h-full object-cover" alt={p.name} /></div>
@@ -1405,8 +1422,8 @@ ${userText}
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     );
