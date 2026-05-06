@@ -57,6 +57,48 @@ const LEGAL_PAGES = {
   }
 };
 
+// カテゴリ別商品フィルター: 本体商品のみを通し、アクセサリーを除外する
+const CATEGORY_PRODUCT_FILTERS = {
+  'ベビーカー': {
+    mustAny: ['ベビーカー', 'バギー', 'ストローラー'],
+    excludeAny: ['ベビーカード', 'ホルダー', 'レインカバー', '日よけ', '虫よけ', 'ファン', '扇風機',
+      'ドリンク', 'マグ', 'カップ', 'スマホ', 'テーブル', 'フック', '収納バッグ',
+      'ハンドルカバー', 'ハンドルバー', 'アームバー', 'フットマフ', 'シート生地',
+      'タイヤ', '部品', 'パーツ', '交換', 'クッション', 'ブランケット', '保冷', '保温', 'ネット']
+  },
+  '抱っこ紐': {
+    mustAny: ['抱っこ紐', '抱っこひも', 'スリング', 'ヒップシート', 'キャリア', 'おんぶ紐'],
+    excludeAny: ['収納袋', 'カバー', 'よだれパッド', 'クリップ', 'バッグ']
+  },
+  'ベビーおむつ': {
+    mustAny: ['おむつ', 'オムツ', 'パンパース', 'メリーズ', 'ムーニー', 'グーン', 'ナチュラル'],
+    excludeAny: ['ゴミ箱', 'ケース', 'カバー', 'バッグ', 'おしりふき']
+  },
+  'ベビーベッド': {
+    mustAny: ['ベビーベッド', 'ベビーふとん', 'ベッドイン', 'ミニベッド', 'ハーフベッド'],
+    excludeAny: ['シーツ', 'カバー', 'ガード', 'メリー', 'モビール', 'マットレスのみ']
+  },
+  'チャイルドシート': {
+    mustAny: ['チャイルドシート', 'カーシート', 'ジュニアシート', 'ベビーシート'],
+    excludeAny: ['カバー', 'シートベルト', 'ミラー', 'サンシェード']
+  },
+  '授乳クッション': {
+    mustAny: ['授乳クッション', '抱き枕', '授乳まくら'],
+    excludeAny: ['カバーのみ', '洗い替え']
+  },
+};
+
+const filterMainProducts = (products, searchKeyword) => {
+  const filter = CATEGORY_PRODUCT_FILTERS[searchKeyword];
+  if (!filter) return products;
+  return products.filter(p => {
+    const name = p.name || p.itemName || '';
+    const hasMain = filter.mustAny.some(w => name.includes(w));
+    const hasExclude = filter.excludeAny.some(w => name.includes(w));
+    return hasMain && !hasExclude;
+  });
+};
+
 const App = () => {
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
@@ -519,6 +561,12 @@ const App = () => {
         }
       }
 
+      // カテゴリフィルター: アクセサリーを除外して本体商品のみを残す
+      if (CATEGORY_PRODUCT_FILTERS[catName]) {
+        const filtered = filterMainProducts(rawItems, catName);
+        if (filtered.length > 0) rawItems = filtered;
+      }
+
       if (rawItems.length === 0) {
         setRemoteProducts([]);
         return;
@@ -841,9 +889,7 @@ const App = () => {
           const res = await fetch(`/api/rakuten?query=${encodeURIComponent(searchKeyword)}`);
           const resData = await res.json();
           if (!resData.error && resData.products?.length > 0) {
-            const excludeWords = ['タイヤ', '部品', 'パーツ', '交換用', 'シート生地', 'レインカバー単品'];
-            contextProducts = (resData.products || [])
-              .filter(p => !excludeWords.some(w => p.name?.includes(w)))
+            contextProducts = filterMainProducts(resData.products || [], matched?.search || '')
               .slice(0, 6)
               .map((item, i) => ({
                 id: `chat-${i}-${Date.now()}`,
