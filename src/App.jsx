@@ -361,38 +361,89 @@ const App = () => {
     fetchCross();
   }, [selectedProduct]);
 
-  // ランキングタブ: 楽天Ranking APIから上位カテゴリを並列取得
+  // ランキングタブ: 楽天Ranking APIから直接取得（VITE_キー使用）
   const fetchRankingProducts = async () => {
     setIsRankingLoading(true);
-    const topGenres = ['205197', '200833', '412209', '205208']; // おむつ・ベビーカー・抱っこ紐・ミルク授乳
-    const results = await Promise.allSettled(
-      topGenres.map(g => fetch(`/api/ranking?genreId=${g}`).then(r => r.json()))
-    );
-    const merged = results
-      .filter(r => r.status === 'fulfilled')
-      .flatMap(r => r.value.products || []);
-    const seen = new Set();
-    const deduped = merged.filter(p => {
-      if (seen.has(p.name)) return false;
-      seen.add(p.name);
-      return true;
-    });
-    setRankingProducts(deduped);
+    const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
+    const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
+    const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
+    if (!appId) { setIsRankingLoading(false); return; }
+
+    const genres = [
+      { id: '200833', name: 'ベビーカー' },
+      { id: '412209', name: '抱っこ紐' },
+      { id: '205197', name: 'おむつ' },
+      { id: '205208', name: 'ミルク・授乳' },
+      { id: '201591', name: 'おもちゃ' },
+      { id: '200822', name: '寝具・ベッド' },
+      { id: '566088', name: '車用品' },
+      { id: '200815', name: 'お風呂用品' },
+    ];
+
+    try {
+      const results = await Promise.allSettled(
+        genres.map(g =>
+          fetch(`https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${g.id}&affiliateId=${affiliateId}`)
+            .then(r => r.json()).then(d => ({ ...d, _catName: g.name }))
+        )
+      );
+      const merged = results.flatMap(r => {
+        if (r.status !== 'fulfilled') return [];
+        const catName = r.value._catName;
+        return (r.value.Items || []).map(item => ({
+          id: `ranking-${item.Item.itemCode}`,
+          name: item.Item.itemName,
+          price: item.Item.itemPrice,
+          image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
+          url: item.Item.affiliateUrl || item.Item.itemUrl,
+          category: catName,
+          rating: parseFloat(item.Item.reviewAverage) || 4.5,
+          shops: [{ name: item.Item.shopName || '楽天市場', price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
+        }));
+      });
+      const accessoryFiltered = filterAccessories(merged);
+      const seen = new Set();
+      setRankingProducts((accessoryFiltered.length > 0 ? accessoryFiltered : merged).filter(p => {
+        if (seen.has(p.name)) return false;
+        seen.add(p.name);
+        return true;
+      }));
+    } catch (e) {
+      console.error('Ranking fetch error:', e);
+    }
     setIsRankingLoading(false);
   };
 
-  // ギフトタブ: 楽天検索APIからギフト商品を取得
+  // ギフトタブ: 楽天検索APIから直接取得（VITE_キー使用）
   const fetchGiftProducts = async (filter = 'すべて') => {
     setIsGiftLoading(true);
+    const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
+    const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
+    const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
+    if (!appId) { setIsGiftLoading(false); return; }
+
     const keyword = ['出産祝い', 'ギフト', filter !== 'すべて' && !filter.includes('円') ? filter : ''].filter(Boolean).join(' ');
     try {
-      const result = await fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`).then(r => r.json());
-      let products = result.products || [];
+      const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&availability=1&affiliateId=${affiliateId}`;
+      const data = await fetch(url).then(r => r.json());
+      let products = (data.Items || []).map(item => ({
+        id: `gift-${item.Item.itemCode}`,
+        name: item.Item.itemName,
+        price: item.Item.itemPrice,
+        image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
+        url: item.Item.affiliateUrl || item.Item.itemUrl,
+        brand: item.Item.shopName || '楽天市場',
+        rating: parseFloat(item.Item.reviewAverage) || 4.5,
+        category: 'ギフトセット',
+        shops: [{ name: item.Item.shopName || '楽天市場', price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
+      }));
       if (filter === '3000円〜') products = products.filter(p => p.price >= 3000 && p.price < 5000);
       else if (filter === '5000円〜') products = products.filter(p => p.price >= 5000 && p.price < 10000);
       else if (filter === '10000円〜') products = products.filter(p => p.price >= 10000);
       setGiftProducts(products);
-    } catch {}
+    } catch (e) {
+      console.error('Gift fetch error:', e);
+    }
     setIsGiftLoading(false);
   };
 
