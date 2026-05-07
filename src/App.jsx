@@ -34,8 +34,6 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
 import { Helmet } from 'react-helmet-async';
 import { supabase } from './lib/supabaseClient';
 
-const apiKey = "";
-
 // ＝＝＝＝＝ 商品データはSupabaseから取得します ＝＝＝＝＝
 
 // 市場網羅のための詳細カテゴリツリー
@@ -59,7 +57,7 @@ const CATEGORY_TREE = [
   { name: "お風呂用品",  id: "200815", keyword: "ベビー お風呂",     subs: ["ベビーバス", "ベビー用ソープ", "保湿クリーム"] },
   { name: "トイレ用品",  id: "200819", keyword: "おまる",            subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
   { name: "車用品",      id: "566088", keyword: "チャイルドシート",   subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ", "周辺グッズ"] },
-  { name: "マタニティ",  id: "100533", keyword: "マタニティ",        subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
+  { name: "マタニティ",  id: "553946", keyword: "マタニティ",        subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
   { name: "ギフトセット",id: "205222", keyword: "出産祝い ギフト",    subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
 ];
 
@@ -91,7 +89,7 @@ const ACCESSORY_EXCLUDE_WORDS = [
   // チャイルドシートアクセサリー
   'シートベルトカバー', 'シートプロテクター', 'ミラー取付',
   // 抱っこ紐アクセサリー
-  'よだれパッド', '침받이',
+  'よだれパッド',
   // おむつ関連（おむつカテゴリ以外での混入防止）
   'おむつポーチ', 'おむつバッグ', 'おむつストッカー',
 ];
@@ -682,17 +680,7 @@ const App = () => {
         }
       }
 
-      // 0件のとき: Ranking API（genreId） → ベビー全体の順にフォールバック
       if (!rawItems || rawItems.length === 0) {
-        const fallbackId = genreId !== '100533' ? genreId : '100533';
-        const fallbackRes = await fetch(rankingUrl(fallbackId));
-        if (fallbackRes.ok) {
-          const fallbackData = await fallbackRes.json();
-          rawItems = fallbackData.Items ? mapItems(fallbackData.Items, catName) : [];
-        }
-      }
-
-      if (rawItems.length === 0) {
         setRemoteProducts([]);
         return;
       }
@@ -828,7 +816,6 @@ const App = () => {
       }));
 
       // 2. Gemini AI で厳選（キーがなければ生データをそのまま使う）
-      const gApiKey = import.meta.env.VITE_GEMINI_API_KEY;
       let formatted;
 
       try {
