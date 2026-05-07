@@ -654,10 +654,11 @@ const App = () => {
         return;
       }
 
-      // ランキングAPIはgenreId済みなのでアクセサリー除外のみ（mustAny不要）
-      // アクセサリー除外（本体商品のみ残す）
-      const accessoryFiltered = filterAccessories(rawItems);
-      if (accessoryFiltered.length > 0) rawItems = accessoryFiltered;
+      // 周辺グッズ選択時はアクセサリーも正当な商品なのでフィルタをスキップ
+      if (subCat !== '周辺グッズ') {
+        const accessoryFiltered = filterAccessories(rawItems);
+        if (accessoryFiltered.length > 0) rawItems = accessoryFiltered;
+      }
 
       // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
       const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
