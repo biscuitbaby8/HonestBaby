@@ -179,9 +179,6 @@ const App = () => {
   const [searchError, setSearchError] = useState(null);
 
   // --- ランキング・ギフト States ---
-  const [rankingProducts, setRankingProducts] = useState([]);
-  const [isRankingLoading, setIsRankingLoading] = useState(false);
-  const [rankingCategory, setRankingCategory] = useState('ベビーカー');
   const [giftProducts, setGiftProducts] = useState([]);
   const [isGiftLoading, setIsGiftLoading] = useState(false);
 
@@ -384,51 +381,6 @@ const App = () => {
     fetchCross();
   }, [selectedProduct]);
 
-  // ランキングタブ: 楽天Ranking APIから直接取得（VITE_キー使用）
-  const fetchRankingProducts = async () => {
-    setIsRankingLoading(true);
-    const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
-    const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
-    const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
-    if (!appId) { setIsRankingLoading(false); return; }
-
-    const genres = CATEGORY_TREE.filter(c => c.name !== 'すべて').map(c => ({ id: c.id, name: c.name }));
-
-    try {
-      const results = await Promise.allSettled(
-        genres.map(g =>
-          fetch(`https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${g.id}&affiliateId=${affiliateId}`)
-            .then(r => r.json()).then(d => ({ ...d, _catName: g.name }))
-        )
-      );
-      const merged = results.flatMap(r => {
-        if (r.status !== 'fulfilled') return [];
-        const catName = r.value._catName;
-        return (r.value.Items || []).map(item => ({
-          id: `ranking-${item.Item.itemCode}`,
-          name: item.Item.itemName,
-          price: item.Item.itemPrice,
-          image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
-          url: item.Item.affiliateUrl || item.Item.itemUrl,
-          category: catName,
-          rating: parseFloat(item.Item.reviewAverage) || 4.5,
-          shops: [{ name: item.Item.shopName || '楽天市場', price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
-        }));
-      });
-      const accessoryFiltered = filterAccessories(merged);
-      const seen = new Set();
-      const deduped = (accessoryFiltered.length > 0 ? accessoryFiltered : merged).filter(p => {
-        if (seen.has(p.name)) return false;
-        seen.add(p.name);
-        return true;
-      });
-      setRankingProducts(deduped.sort((a, b) => (b.rating || 0) - (a.rating || 0)));
-    } catch (e) {
-      console.error('Ranking fetch error:', e);
-    }
-    setIsRankingLoading(false);
-  };
-
   // ギフトタブ: 楽天検索APIから直接取得（VITE_キー使用）
   const fetchGiftProducts = async (budgetFilter = 'すべて', sceneFilter = 'すべて') => {
     setIsGiftLoading(true);
@@ -484,10 +436,6 @@ const App = () => {
     }
     setIsGiftLoading(false);
   };
-
-  useEffect(() => {
-    if (activeTab === 'ranking') fetchRankingProducts();
-  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'gift') fetchGiftProducts(giftBudgetFilter, giftSceneFilter);
@@ -1228,7 +1176,12 @@ ${userText}
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
     const showRemote = remoteProducts.length > 0 || isRemoteLoading;
 
-    if (sortOrder === "popular") filtered = [...filtered].sort((a, b) => b.rating - a.rating);
+    if (sortOrder === "popular")
+      filtered = [...filtered].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    else if (sortOrder === "price_asc")
+      filtered = [...filtered].sort((a, b) => (a.price || getLowestPrice(a.shops) || 0) - (b.price || getLowestPrice(b.shops) || 0));
+    else if (sortOrder === "price_desc")
+      filtered = [...filtered].sort((a, b) => (b.price || getLowestPrice(b.shops) || 0) - (a.price || getLowestPrice(a.shops) || 0));
 
     return (
       <div className="animate-in fade-in duration-500">
@@ -1353,6 +1306,20 @@ ${userText}
           </div>
         )}
 
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 -mx-4 px-4 mb-4">
+          {[
+            { key: 'standard',   label: '標準' },
+            { key: 'popular',    label: '評価順' },
+            { key: 'price_asc',  label: '価格↑' },
+            { key: 'price_desc', label: '価格↓' },
+          ].map(s => (
+            <button key={s.key} onClick={() => setSortOrder(s.key)}
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] font-bold transition-all ${
+                sortOrder === s.key ? 'bg-[#5A4C4C] text-white shadow-sm' : 'bg-[#F0EBE6] text-[#7B8E76]'
+              }`}>{s.label}</button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-2 gap-4 mb-8">
           {/* リモート（API）から取得した最新の市場トレンド商品を最優先（上部）に表示 */}
           {remoteProducts.length > 0 && remoteProducts.map((p) => (
@@ -1388,71 +1355,7 @@ ${userText}
     );
   };
 
-  const renderRanking = () => {
-    const categoryOrder = CATEGORY_TREE.filter(c => c.name !== 'すべて').map(c => c.name);
-    const grouped = categoryOrder.map(cat => ({
-      name: cat,
-      items: rankingProducts.filter(p => p.category === cat).sort((a, b) => (b.rating || 0) - (a.rating || 0))
-    })).filter(g => g.items.length > 0);
 
-    const activeCat = grouped.find(g => g.name === rankingCategory) || grouped[0];
-
-    return (
-      <div className="animate-in slide-in-from-bottom duration-300">
-        <div className="flex items-center gap-3 mb-6 px-1 mt-2">
-          <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] shadow-sm"><Award className="w-7 h-7" /></div>
-          <div>
-            <h3 className="font-serif font-black text-[#5A4C4C] text-2xl">カテゴリ別ランキング</h3>
-            <p className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest leading-none mt-1">Top Rated by Category</p>
-          </div>
-        </div>
-        {isRankingLoading ? (
-          <div className="text-center py-20 text-[#A5A19E] text-xs font-bold animate-pulse">ランキングを読み込み中...</div>
-        ) : (
-          <>
-            <div className="flex gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide -mx-6 px-6">
-              {grouped.map(g => (
-                <button
-                  key={g.name}
-                  onClick={() => setRankingCategory(g.name)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all ${
-                    (activeCat?.name === g.name) ? 'bg-[#7B8E76] text-white shadow-md' : 'bg-[#F0EBE6] text-[#7B8E76]'
-                  }`}
-                >
-                  <CategoryIcon name={g.name} className="w-4 h-4" />
-                  {g.name}
-                </button>
-              ))}
-            </div>
-            {activeCat && (
-              <div>
-                <div className="flex items-center gap-2 mb-4 px-1">
-                  <CategoryIcon name={activeCat.name} className="w-5 h-5" />
-                  <h4 className="font-black text-[#5A4C4C] text-lg">{activeCat.name}</h4>
-                  <span className="text-[10px] font-bold text-[#A5A19E] bg-[#F9F6F3] px-2 py-0.5 rounded-full">評価順</span>
-                </div>
-                <div className="space-y-3">
-                  {activeCat.items.map((p, idx) => (
-                    <div key={p.id || idx} className="bg-white rounded-[2rem] p-4 flex gap-4 border border-[#F4EFEB] shadow-[0_4px_20px_rgb(0,0,0,0.02)] relative active:scale-95 transition-all cursor-pointer" onClick={() => openProduct(p)}>
-                      <div className={`absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow border-2 border-white ${idx === 0 ? 'bg-[#F9DC5C] text-[#5A4C4C]' : idx === 1 ? 'bg-[#C0C0C0] text-white' : idx === 2 ? 'bg-[#D4AF37] text-white' : 'bg-[#7B8E76] text-white'}`}>{idx + 1}</div>
-                      <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-[#F9F6F3]"><img src={p.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=HB"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=..."; }} className="w-full h-full object-cover" alt={p.name} /></div>
-                      <div className="flex-1 flex flex-col justify-center min-w-0">
-                        <h4 className="text-sm font-bold text-[#5A4C4C] leading-tight mb-1.5 line-clamp-2">{p.name}</h4>
-                        <div className="flex items-center justify-between">
-                          <p className="text-base font-black text-[#7B8E76]">¥{(p.price || getLowestPrice(p.shops)).toLocaleString()}</p>
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-[#A5A19E] bg-[#FFF9E6] px-2 py-0.5 rounded-full"><Star className="w-3 h-3 text-[#D4AF37] fill-current" />{Number(p.rating || 0).toFixed(1)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    );
-  };
 
   const renderGift = () => {
     return (
@@ -1797,7 +1700,6 @@ ${userText}
 
       <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden' : 'px-6 pt-4'} style={activeTab === 'ai' ? {paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)'} : {}}>
         {activeTab === 'home' && renderHome()}
-        {activeTab === 'ranking' && renderRanking()}
         {activeTab === 'gift' && renderGift()}
         {activeTab === 'user' && renderUser()}
         
@@ -2307,9 +2209,7 @@ ${userText}
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'home' ? 'text-[#7B8E76] scale-110' : 'text-[#D4CDC7] hover:text-[#A5A19E]'}`}>
           <Home className={`w-6 h-6 ${activeTab === 'home' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">ホーム</span>
         </button>
-        <button onClick={() => setActiveTab('ranking')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'ranking' ? 'text-[#7B8E76] scale-110' : 'text-[#D4CDC7] hover:text-[#A5A19E]'}`}>
-          <Award className={`w-6 h-6 ${activeTab === 'ranking' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">順位</span>
-        </button>
+        <div className="w-12" />
         <div className="relative -mt-16">
           <button onClick={() => setActiveTab('ai')} className={`p-5 rounded-full shadow-lg transition-all active:scale-90 border-[4px] border-[#FFFDFB] ${activeTab === 'ai' ? 'bg-[#F2ABAC] text-white shadow-[#F2ABAC]/30' : 'bg-[#7B8E76] text-white shadow-[#7B8E76]/20'}`}>
             <Bot className="w-7 h-7" />
