@@ -484,9 +484,9 @@ const App = () => {
     ];
     const cleanName = (name) => name
       .replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g, '')
-      .replace(/^(楽天|第)\s*[0-9０-９]+\s*位[受賞]?\s*/g, '')
-      .replace(/^[0-9０-９]+位[受賞]?\s*/g, '')
-      .replace(/^\s*[0-9０-９]+%OFF[クーポン\w]*[配布中]?\s*[\/／]\s*/g, '')
+      .replace(/^(楽天|第)\s*[0-9０-９]+\s*位(受賞)?\s*/g, '')
+      .replace(/^[0-9０-９]+位(受賞)?\s*/g, '')
+      .replace(/^\s*\d+%OFF[^\s\/]*\s*[\/／]\s*/g, '')
       .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
       .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
       .replace(/\s*(送料無料|あす楽|即納|限定|新品|正規品|公式|人気|売れ筋|ランキング1位).*$/, '')
@@ -555,9 +555,12 @@ const App = () => {
         // おむつサイズの場合、「S」→「Sサイズ」に正規化して検索精度を上げる
         const normalizedSubSub = (catName === 'おむつ' && DIAPER_SIZE_MAP[subSubCat])
           ? DIAPER_SIZE_MAP[subSubCat] : subSubCat;
-        // おしりふきは「おむつ」を前置すると逆にヒットしなくなるため単独キーワードを使用
+        // おしりふきは「おむつ」を前置するとヒットしないため単独キーワード
+        // 周辺グッズは商品名に「周辺グッズ」が入らないためカテゴリキーワードのみで検索
         const subKeyword = (catName === 'おむつ' && subCat === 'おしりふき')
           ? 'ベビー おしりふき'
+          : subCat === '周辺グッズ'
+          ? genre.keyword
           : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
         // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
         const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
