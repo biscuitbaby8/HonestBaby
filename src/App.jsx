@@ -1176,12 +1176,15 @@ ${userText}
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
     const showRemote = remoteProducts.length > 0 || isRemoteLoading;
 
-    if (sortOrder === "popular")
-      filtered = [...filtered].sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    else if (sortOrder === "price_asc")
-      filtered = [...filtered].sort((a, b) => (a.price || getLowestPrice(a.shops) || 0) - (b.price || getLowestPrice(b.shops) || 0));
-    else if (sortOrder === "price_desc")
-      filtered = [...filtered].sort((a, b) => (b.price || getLowestPrice(b.shops) || 0) - (a.price || getLowestPrice(a.shops) || 0));
+    const applySortOrder = (arr) => {
+      if (sortOrder === "popular")
+        return [...arr].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      if (sortOrder === "price_asc")
+        return [...arr].sort((a, b) => (a.price || getLowestPrice(a.shops) || 0) - (b.price || getLowestPrice(b.shops) || 0));
+      if (sortOrder === "price_desc")
+        return [...arr].sort((a, b) => (b.price || getLowestPrice(b.shops) || 0) - (a.price || getLowestPrice(a.shops) || 0));
+      return arr;
+    };
 
     return (
       <div className="animate-in fade-in duration-500">
@@ -1321,19 +1324,16 @@ ${userText}
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {/* リモート（API）から取得した最新の市場トレンド商品を最優先（上部）に表示 */}
-          {remoteProducts.length > 0 && remoteProducts.map((p) => (
+          {remoteProducts.length > 0 && applySortOrder(remoteProducts).map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
 
-          {/* Supabase蓄積商品（ユーザー検索で積み上がった全体共有データ） */}
           {!isRemoteLoading && remoteProducts.length === 0 && filtered.length > 0 && (
-            filtered.map((p) => <ProductCard key={p.id} product={p} />)
+            applySortOrder(filtered).map((p) => <ProductCard key={p.id} product={p} />)
           )}
 
-          {/* localStorageキャッシュ（Supabaseも空の場合の即時フォールバック） */}
           {!isRemoteLoading && remoteProducts.length === 0 && filtered.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
-            cachedProducts[selectedCategory].map((p) => <ProductCard key={p.id} product={p} />)
+            applySortOrder(cachedProducts[selectedCategory]).map((p) => <ProductCard key={p.id} product={p} />)
           )}
 
           {/* Empty State */}
@@ -2209,7 +2209,9 @@ ${userText}
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'home' ? 'text-[#7B8E76] scale-110' : 'text-[#D4CDC7] hover:text-[#A5A19E]'}`}>
           <Home className={`w-6 h-6 ${activeTab === 'home' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">ホーム</span>
         </button>
-        <div className="w-12" />
+        <button onClick={() => setActiveTab('search')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'search' ? 'text-[#7B8E76] scale-110' : 'text-[#D4CDC7] hover:text-[#A5A19E]'}`}>
+          <Search className={`w-6 h-6 ${activeTab === 'search' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">検索</span>
+        </button>
         <div className="relative -mt-16">
           <button onClick={() => setActiveTab('ai')} className={`p-5 rounded-full shadow-lg transition-all active:scale-90 border-[4px] border-[#FFFDFB] ${activeTab === 'ai' ? 'bg-[#F2ABAC] text-white shadow-[#F2ABAC]/30' : 'bg-[#7B8E76] text-white shadow-[#7B8E76]/20'}`}>
             <Bot className="w-7 h-7" />
