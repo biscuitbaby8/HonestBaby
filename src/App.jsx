@@ -92,6 +92,9 @@ const ACCESSORY_EXCLUDE_WORDS = [
   'よだれパッド',
   // おむつ関連（おむつカテゴリ以外での混入防止）
   'おむつポーチ', 'おむつバッグ', 'おむつストッカー',
+  // ベビーカー・チャイルドシート・抱っこ紐アクセサリー追加
+  'シューズクリップ', 'ファンシート', '抜け出し防止', 'ベビーカーシート',
+  '防寒ケープ', '抱っこ紐ケープ', 'ハグウォーマー',
 ];
 
 // おむつサイズマッピング（検索精度向上用）
@@ -419,9 +422,18 @@ const App = () => {
       });
       const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?${params}`;
       const data = await fetch(url).then(r => r.json());
+      const giftCleanName = (n) => n
+        .replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g, '')
+        .replace(/^(楽天|第)\s*[0-9０-９]+\s*位[受賞]?\s*/g, '')
+        .replace(/^[0-9０-９]+位[受賞]?\s*/g, '')
+        .replace(/^\s*[0-9０-９]+%OFF[\w]*[配布中]?\s*[\/／]\s*/g, '')
+        .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
+        .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
+        .replace(/\s*(送料無料|あす楽|即納|限定|新品|正規品|公式|人気|売れ筋|ランキング1位).*$/, '')
+        .replace(/[\s　]+/g, ' ').trim().slice(0, 60);
       const products = filterAccessories((data.Items || []).map(item => ({
         id: `gift-${item.Item.itemCode}`,
-        name: item.Item.itemName,
+        name: giftCleanName(item.Item.itemName),
         price: item.Item.itemPrice,
         image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
         url: item.Item.affiliateUrl || item.Item.itemUrl,
@@ -471,12 +483,16 @@ const App = () => {
       'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース'
     ];
     const cleanName = (name) => name
+      .replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g, '')
+      .replace(/^(楽天|第)\s*[0-9０-９]+\s*位[受賞]?\s*/g, '')
+      .replace(/^[0-9０-９]+位[受賞]?\s*/g, '')
+      .replace(/^\s*[0-9０-９]+%OFF[クーポン\w]*[配布中]?\s*[\/／]\s*/g, '')
       .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
       .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
       .replace(/\s*(送料無料|あす楽|即納|限定|新品|正規品|公式|人気|売れ筋|ランキング1位).*$/, '')
       .replace(/[\s　]+/g, ' ')
       .trim()
-      .slice(0, 50);
+      .slice(0, 60);
 
     const mapItems = (items, cat) => items
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
@@ -497,7 +513,8 @@ const App = () => {
           unitName: unitCount ? "枚" : null,
           shops: [{ name: item.Item.shopName || "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
         };
-      });
+      })
+      .filter(p => p.name.length >= 4);
 
     try {
       const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
@@ -544,9 +561,10 @@ const App = () => {
           : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
         // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
         const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
+        const isWipes = catName === 'おむつ' && subCat === 'おしりふき';
         const subFetches = SORTS.flatMap(sort =>
           [1, 2, 3].map(p =>
-            fetch(`${searchUrl(subKeyword, p, sort)}&genreId=${genreId}`)
+            fetch(`${searchUrl(subKeyword, p, sort)}${isWipes ? '' : '&genreId=' + genreId}`)
               .then(r => r.ok ? r.json() : { Items: [] })
               .catch(() => ({ Items: [] }))
           )
@@ -927,7 +945,7 @@ const App = () => {
             .slice(0, 6)
             .map((item, i) => ({
               id: `chat-${i}-${Date.now()}`,
-              name: item.itemName,
+              name: (n => n.replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g,'').replace(/^(楽天|第)\s*[0-9０-９]+\s*位[受賞]?\s*/g,'').replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g,'').replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g,'').replace(/[\s　]+/g,' ').trim().slice(0,60))(item.itemName),
               brand: item.shopName || '楽天市場',
               category: matched ? userText : 'ベビー用品',
               image: (item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
