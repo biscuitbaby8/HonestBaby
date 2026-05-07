@@ -106,6 +106,52 @@ const DIAPER_SIZE_MAP = {
 const filterAccessories = (items, getNameFn = (p) => p.name || p.itemName || '') =>
   items.filter(item => !ACCESSORY_EXCLUDE_WORDS.some(w => getNameFn(item).includes(w)));
 
+// 商品名クリーニング: プロモ・ランキング表記・記号・括弧を除去
+const cleanName = (name) => (name || '')
+  .replace(/^[<＜〈]?\s*\d{1,2}[\/／]\d{1,2}\s*[〜～\-―]\s*\d{1,2}[\/／]\d{1,2}[^\s]*\s*[\/／]?\s*/g, '')
+  .replace(/^[\(（]?\s*(ポイント\d+倍|\d+倍ポイント)\s*[\/／\)）]?\s*/g, '')
+  .replace(/^[★☆◆■●▲]*\s*(当選確実|エントリー|抽選|抽選で)\s*[★☆◆■●▲]*\s*/g, '')
+  .replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g, '')
+  .replace(/^(楽天|第)\s*[0-9０-９]+\s*位(受賞)?\s*/g, '')
+  .replace(/^[0-9０-９]+位(受賞)?\s*/g, '')
+  .replace(/^\s*\d+%OFF[^\s\/]*\s*[\/／]\s*/g, '')
+  .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
+  .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
+  .replace(/\s*(送料無料|あす楽|即納|新品未開封|正規品|公式正規品|売れ筋ランキング|ランキング1位)\s*.*$/, '')
+  .replace(/[\s　]+/g, ' ')
+  .trim()
+  .slice(0, 60);
+
+// 商品の品質バリデーション
+const validateProduct = (p) => {
+  if (!p || !p.name || p.name.length < 6) return false;
+  if (!p.image) return false;
+  if (!p.price || p.price < 100) return false;
+  if (/^[0-9\s\/／・,，\-\.]+$/.test(p.name)) return false;
+  if (/^(楽天|商品|アイテム)$/.test(p.name)) return false;
+  return true;
+};
+
+// 公式ショップ判定
+const OFFICIAL_SHOP_RULES = [
+  { match: /cybex[-_.]?(jp|store)|cybex公式|サイベックス公式/i, brand: 'CYBEX' },
+  { match: /aprica[-_.]?(jp|official)|アップリカ公式/i, brand: 'Aprica' },
+  { match: /combi[-_.]?(official|store)|コンビ公式/i, brand: 'Combi' },
+  { match: /pigeon[-_.]?(official|store)|ピジョン公式/i, brand: 'Pigeon' },
+  { match: /bugaboo[-_.]?(jp|official)/i, brand: 'Bugaboo' },
+  { match: /stokke[-_.]?(jp|official)|ストッケ公式/i, brand: 'Stokke' },
+  { match: /ergobaby[-_.]?(jp|official)|エルゴベビー公式/i, brand: 'Ergobaby' },
+  { match: /(公式|official)(ショップ|ストア|店)?/i, brand: null },
+];
+
+const detectOfficialShop = (shop) => {
+  const target = `${shop?.name || ''} ${shop?.url || ''}`;
+  for (const rule of OFFICIAL_SHOP_RULES) {
+    if (rule.match.test(target)) return { isOfficial: true, brand: rule.brand };
+  }
+  return { isOfficial: false, brand: null };
+};
+
 
 const App = () => {
   const [dbProducts, setDbProducts] = useState([]);
@@ -422,18 +468,9 @@ const App = () => {
       });
       const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?${params}`;
       const data = await fetch(url).then(r => r.json());
-      const giftCleanName = (n) => n
-        .replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g, '')
-        .replace(/^(楽天|第)\s*[0-9０-９]+\s*位[受賞]?\s*/g, '')
-        .replace(/^[0-9０-９]+位[受賞]?\s*/g, '')
-        .replace(/^\s*[0-9０-９]+%OFF[\w]*[配布中]?\s*[\/／]\s*/g, '')
-        .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
-        .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
-        .replace(/\s*(送料無料|あす楽|即納|限定|新品|正規品|公式|人気|売れ筋|ランキング1位).*$/, '')
-        .replace(/[\s　]+/g, ' ').trim().slice(0, 60);
       const products = filterAccessories((data.Items || []).map(item => ({
         id: `gift-${item.Item.itemCode}`,
-        name: giftCleanName(item.Item.itemName),
+        name: cleanName(item.Item.itemName),
         price: item.Item.itemPrice,
         image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
         url: item.Item.affiliateUrl || item.Item.itemUrl,
@@ -441,7 +478,7 @@ const App = () => {
         rating: parseFloat(item.Item.reviewAverage) || 4.5,
         category: 'ギフトセット',
         shops: [{ name: item.Item.shopName || '楽天市場', price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
-      })));
+      })).filter(validateProduct));
       setGiftProducts(products);
     } catch (e) {
       console.error('Gift fetch error:', e);
@@ -482,18 +519,6 @@ const App = () => {
       'ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍',
       'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース'
     ];
-    const cleanName = (name) => name
-      .replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g, '')
-      .replace(/^(楽天|第)\s*[0-9０-９]+\s*位(受賞)?\s*/g, '')
-      .replace(/^[0-9０-９]+位(受賞)?\s*/g, '')
-      .replace(/^\s*\d+%OFF[^\s\/]*\s*[\/／]\s*/g, '')
-      .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
-      .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
-      .replace(/\s*(送料無料|あす楽|即納|限定|新品|正規品|公式|人気|売れ筋|ランキング1位).*$/, '')
-      .replace(/[\s　]+/g, ' ')
-      .trim()
-      .slice(0, 60);
-
     const mapItems = (items, cat) => items
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
       .map(item => {
@@ -514,7 +539,7 @@ const App = () => {
           shops: [{ name: item.Item.shopName || "楽天市場", price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
         };
       })
-      .filter(p => p.name.length >= 4);
+      .filter(validateProduct);
 
     try {
       const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
@@ -525,11 +550,14 @@ const App = () => {
       const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
       const searchUrl = (keyword, page = 1, sort = '-reviewCount') => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
 
-      const normalizeKey = (name) => name.replace(/[\s　]/g, '').toLowerCase().slice(0, 25);
+      // 重複排除キー: 画像URL（サイズパラメータ除去）優先 → 名前先頭20文字
+      const imageKey = (url) => (url || '').replace(/[?&]_ex=\d+x\d+/g, '').replace(/[?&].*$/, '');
+      const nameKey = (name) => (name || '').replace(/[\s　]/g, '').toLowerCase().slice(0, 20);
       const dedupeAndMergeShops = (items) => {
         const map = new Map();
         for (const item of items) {
-          const key = normalizeKey(item.name);
+          const key = imageKey(item.image) || nameKey(item.name);
+          if (!key) continue;
           if (!map.has(key)) {
             map.set(key, { ...item, shops: [...item.shops] });
           } else {
@@ -539,6 +567,7 @@ const App = () => {
             if (item.price < existing.price) {
               existing.price = item.price;
               existing.image = item.image;
+              existing.name = item.name;
             }
           }
         }
@@ -657,8 +686,14 @@ const App = () => {
         return;
       }
 
-      // 周辺グッズ選択時はアクセサリーも正当な商品なのでフィルタをスキップ
-      if (subCat !== '周辺グッズ') {
+      // 周辺グッズ選択時はアクセサリー専用ビュー（反転フィルタ）
+      if (subCat === '周辺グッズ') {
+        const onlyAccessories = rawItems.filter(p => {
+          const n = p.name || '';
+          return ACCESSORY_EXCLUDE_WORDS.some(w => n.includes(w));
+        });
+        if (onlyAccessories.length > 0) rawItems = onlyAccessories;
+      } else {
         const accessoryFiltered = filterAccessories(rawItems);
         if (accessoryFiltered.length > 0) rawItems = accessoryFiltered;
       }
@@ -884,8 +919,9 @@ const App = () => {
   const normalizeShop = (shop) => {
     if (!shop) return { name: 'ショップ', type: 'mall', lowestPrice: 0, sellers: [] };
     const name = shop.name || shop.shop_name || 'ショップ';
-    const type = shop.type || shop.shop_type || 'mall';
     const lowestPrice = Number(shop.lowestPrice || shop.lowest_price || shop.price || 0);
+    const { isOfficial, brand } = detectOfficialShop({ name, url: shop.url });
+    const type = isOfficial ? 'official' : (shop.type || shop.shop_type || 'mall');
     let rawSellers = shop.sellers;
     if (typeof rawSellers === 'string') {
       try { rawSellers = JSON.parse(rawSellers); } catch { rawSellers = []; }
@@ -893,7 +929,7 @@ const App = () => {
     const sellers = Array.isArray(rawSellers) && rawSellers.length > 0
       ? rawSellers
       : (shop.url ? [{ name, price: lowestPrice, shipping: shop.shipping ?? 0, points: shop.points ?? 0, url: shop.url, note: shop.note || '' }] : []);
-    return { ...shop, name, type, lowestPrice, sellers };
+    return { ...shop, name, type, lowestPrice, sellers, brandName: brand };
   };
 
   const normalizeShops = (shops) => {
@@ -949,7 +985,8 @@ const App = () => {
             .slice(0, 6)
             .map((item, i) => ({
               id: `chat-${i}-${Date.now()}`,
-              name: (n => n.replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g,'').replace(/^(楽天|第)\s*[0-9０-９]+\s*位[受賞]?\s*/g,'').replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g,'').replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g,'').replace(/[\s　]+/g,' ').trim().slice(0,60))(item.itemName),
+              name: cleanName(item.itemName),
+              price: item.itemPrice,
               brand: item.shopName || '楽天市場',
               category: matched ? userText : 'ベビー用品',
               image: (item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
@@ -957,7 +994,8 @@ const App = () => {
               reviews_count: 0,
               ai_analysis: null,
               shops: [{ shop_name: '楽天市場', shop_type: 'mall', lowest_price: item.itemPrice, url: item.affiliateUrl || item.itemUrl }]
-            }));
+            }))
+            .filter(validateProduct);
         } catch (e) {
           console.error('Ranking chat fetch failed:', e);
         }
@@ -1949,8 +1987,18 @@ ${userText}
               <div className="space-y-4">
                 {(() => {
                   const existingShops = normalizeShops(selectedProduct.shops);
-                  const existingNames = new Set(existingShops.map(s => s.name));
-                  const mergedShops = [...existingShops, ...crossPlatformShops.filter(s => !existingNames.has(s.name))];
+                  // 同一ショップ名は最安値1件に集約
+                  const shopByName = new Map();
+                  for (const s of existingShops) {
+                    const key = (s.name || '').replace(/\s+/g, '').toLowerCase();
+                    const cur = shopByName.get(key);
+                    if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
+                      shopByName.set(key, s);
+                    }
+                  }
+                  const dedupedExisting = Array.from(shopByName.values());
+                  const existingNames = new Set(dedupedExisting.map(s => s.name));
+                  const mergedShops = [...dedupedExisting, ...crossPlatformShops.filter(s => !existingNames.has(s.name))];
                   return mergedShops;
                 })().map((shop, idx) => (
                   <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
