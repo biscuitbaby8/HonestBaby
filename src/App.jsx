@@ -538,7 +538,10 @@ const App = () => {
         // おむつサイズの場合、「S」→「Sサイズ」に正規化して検索精度を上げる
         const normalizedSubSub = (catName === 'おむつ' && DIAPER_SIZE_MAP[subSubCat])
           ? DIAPER_SIZE_MAP[subSubCat] : subSubCat;
-        const subKeyword = [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
+        // おしりふきは「おむつ」を前置すると逆にヒットしなくなるため単独キーワードを使用
+        const subKeyword = (catName === 'おむつ' && subCat === 'おしりふき')
+          ? 'ベビー おしりふき'
+          : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
         // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
         const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
         const subFetches = SORTS.flatMap(sort =>
