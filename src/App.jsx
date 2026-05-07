@@ -394,16 +394,7 @@ const App = () => {
     const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
     if (!appId) { setIsRankingLoading(false); return; }
 
-    const genres = [
-      { id: '200833', name: 'ベビーカー' },
-      { id: '412209', name: '抱っこ紐' },
-      { id: '205197', name: 'おむつ' },
-      { id: '205208', name: 'ミルク・授乳' },
-      { id: '201591', name: 'おもちゃ' },
-      { id: '200822', name: '寝具・ベッド' },
-      { id: '566088', name: '車用品' },
-      { id: '200815', name: 'お風呂用品' },
-    ];
+    const genres = CATEGORY_TREE.filter(c => c.name !== 'すべて').map(c => ({ id: c.id, name: c.name }));
 
     try {
       const results = await Promise.allSettled(
@@ -1411,7 +1402,7 @@ ${userText}
   };
 
   const renderRanking = () => {
-    const categoryOrder = ['ベビーカー', '抱っこ紐', 'おむつ', 'ミルク・授乳', 'おもちゃ', '寝具・ベッド', '車用品', 'お風呂用品'];
+    const categoryOrder = CATEGORY_TREE.filter(c => c.name !== 'すべて').map(c => c.name);
     const grouped = categoryOrder.map(cat => ({
       name: cat,
       items: rankingProducts.filter(p => p.category === cat).sort((a, b) => (b.rating || 0) - (a.rating || 0))
