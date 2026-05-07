@@ -6,8 +6,31 @@ import {
   Settings, History, Bookmark, Sparkles, Send, Bot, 
   Package, Layers, ChevronDown, ChevronUp, Calculator, 
   Store, Gift, ChevronLeft, ShieldCheck, Baby, BellRing, Edit3,
-  FileText, Shield, Info, Edit2, Camera
+  FileText, Shield, Info, Edit2, Camera,
+  LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind
 } from 'lucide-react';
+
+const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
+  const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
+  switch (name) {
+    case 'すべて':      return <LayoutGrid className={className} />;
+    case 'おむつ':      return <svg {...s}><path d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8z"/><path d="M4 11c2.5 2.5 5.5 0 8 0s5.5 2.5 8 0"/></svg>;
+    case 'ベビーカー':  return <svg {...s}><circle cx="8" cy="18" r="2"/><circle cx="16" cy="18" r="2"/><path d="M4 5l2 7h12V8.5A2.5 2.5 0 0015.5 6H9L7 5H4"/><path d="M18.5 4v4"/></svg>;
+    case '抱っこ紐':    return <svg {...s}><circle cx="12" cy="5" r="2"/><path d="M9 10c0 2 1.5 4 3 4s3-2 3-4"/><path d="M9 10c-2 0-3 1-3 3v2h12v-2c0-2-1-3-3-3"/><circle cx="12" cy="17" r="1.5"/></svg>;
+    case 'ウェア':      return <Shirt className={className} />;
+    case 'ミルク・授乳': return <svg {...s}><path d="M10 2h4v3l2 2v13a2 2 0 01-2 2h-4a2 2 0 01-2-2V7l2-2V2z"/><path d="M10 5h4"/><path d="M10 12h4"/></svg>;
+    case '離乳食・食器': return <Utensils className={className} />;
+    case '寝具・ベッド': return <Moon className={className} />;
+    case 'おもちゃ':    return <Puzzle className={className} />;
+    case '安全グッズ':  return <ShieldCheck className={className} />;
+    case 'お風呂用品':  return <Waves className={className} />;
+    case 'トイレ用品':  return <Wind className={className} />;
+    case '車用品':      return <Car className={className} />;
+    case 'マタニティ':  return <Leaf className={className} />;
+    case 'ギフトセット': return <Gift className={className} />;
+    default:            return <Package className={className} />;
+  }
+};
 import { Helmet } from 'react-helmet-async';
 import { supabase } from './lib/supabaseClient';
 
@@ -18,26 +41,26 @@ const apiKey = "";
 // 市場網羅のための詳細カテゴリツリー
 // ジャンルID は ranking.rakuten.co.jp/daily/<id>/ の URL から確認した実際のID
 const CATEGORY_TREE = [
-  { name: "すべて",      id: "100533", keyword: "",                         icon: "🏠", subs: [] },
-  { name: "おむつ",      id: "205197", keyword: "おむつ",                   icon: "🩲", subs: [
+  { name: "すべて",      id: "100533", keyword: "",                  subs: [] },
+  { name: "おむつ",      id: "205197", keyword: "おむつ",            subs: [
     { name: "テープタイプ", subsubs: ["新生児", "S", "M", "L", "BIG", "BIGより大きい"] },
     { name: "パンツタイプ", subsubs: ["S", "M", "L", "BIG", "BIGより大きい"] },
     { name: "夜用おむつ",   subsubs: ["M", "L", "BIG", "BIGより大きい"] },
     { name: "おしりふき" },
   ]},
-  { name: "ベビーカー",  id: "200833", keyword: "ベビーカー",               icon: "🚼", subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
-  { name: "抱っこ紐",    id: "412209", keyword: "抱っこ紐",                 icon: "🤱", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
-  { name: "ウェア",      id: "111102", keyword: "ベビー服",                 icon: "👕", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
-  { name: "ミルク・授乳",id: "205208", keyword: "ミルク 授乳",              icon: "🍼", subs: ["ミルク", "哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
-  { name: "離乳食・食器",id: "213980", keyword: "離乳食",                   icon: "🥣", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
-  { name: "寝具・ベッド",id: "200822", keyword: "ベビーベッド",             icon: "🛏️", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
-  { name: "おもちゃ",    id: "201591", keyword: "おもちゃ",                 icon: "🧸", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
-  { name: "安全グッズ",  id: "200841", keyword: "ベビーゲート",             icon: "🔒", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止", "ベビーモニター"] },
-  { name: "お風呂用品",  id: "200815", keyword: "ベビー お風呂",            icon: "🛁", subs: ["ベビーバス", "ベビー用ソープ", "保湿クリーム"] },
-  { name: "トイレ用品",  id: "200819", keyword: "おまる",                   icon: "🚿", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
-  { name: "車用品",      id: "566088", keyword: "チャイルドシート",          icon: "🚗", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ", "周辺グッズ"] },
-  { name: "マタニティ",  id: "100533", keyword: "マタニティ",               icon: "🤰", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
-  { name: "ギフトセット",id: "205222", keyword: "出産祝い ギフト",           icon: "🎁", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
+  { name: "ベビーカー",  id: "200833", keyword: "ベビーカー",        subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
+  { name: "抱っこ紐",    id: "412209", keyword: "抱っこ紐",          subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
+  { name: "ウェア",      id: "111102", keyword: "ベビー服",          subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
+  { name: "ミルク・授乳",id: "205208", keyword: "ミルク 授乳",       subs: ["ミルク", "哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
+  { name: "離乳食・食器",id: "213980", keyword: "離乳食",            subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
+  { name: "寝具・ベッド",id: "200822", keyword: "ベビーベッド",      subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
+  { name: "おもちゃ",    id: "201591", keyword: "おもちゃ",          subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
+  { name: "安全グッズ",  id: "200841", keyword: "ベビーゲート",      subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止", "ベビーモニター"] },
+  { name: "お風呂用品",  id: "200815", keyword: "ベビー お風呂",     subs: ["ベビーバス", "ベビー用ソープ", "保湿クリーム"] },
+  { name: "トイレ用品",  id: "200819", keyword: "おまる",            subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
+  { name: "車用品",      id: "566088", keyword: "チャイルドシート",   subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ", "周辺グッズ"] },
+  { name: "マタニティ",  id: "100533", keyword: "マタニティ",        subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
+  { name: "ギフトセット",id: "205222", keyword: "出産祝い ギフト",    subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
 ];
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
@@ -203,7 +226,7 @@ const App = () => {
 
   // AI Chat States
   const [chatMessages, setChatMessages] = useState([
-    { role: 'assistant', text: 'こんにちは！Honest BabyのAIコンサルタントです🧸 ご自宅用からギフトまで、何でも相談してね！' }
+    { role: 'assistant', text: 'こんにちは！Honest BabyのAIコンサルタントです。ご自宅用からギフトまで、何でも相談してください。' }
   ]);
   const [userInput, setUserInput] = useState("");
   const [isAiTyping, setIsAiTyping] = useState(false);
@@ -1000,8 +1023,8 @@ const App = () => {
 【絶対ルール】
 - 必ず以下の【商品リスト】にある番号と商品名だけを使ってください
 - リストに存在しない商品名（例：マグネタック、マリオバティ等）は絶対に作ってはいけません
-- 2〜3個の商品を選び、各商品を「✅ X番：おすすめ理由（1〜2文）」の形式で答えてください
-- 絵文字を使って友人のように温かく答えてください
+- 2〜3個の商品を選び、各商品を「■ X番：おすすめ理由（1〜2文）」の形式で答えてください
+- 絵文字は使わず、簡潔に友人のように温かく答えてください
 
 【商品リスト】
 ${productList}
@@ -1010,10 +1033,10 @@ ${productList}
 ${userText}
 
 【回答例】
-お探しですね😊 おすすめはこちらです！
+お探しですね。おすすめはこちらです。
 
-✅ 1番：〇〇という理由でとても人気です👶
-✅ 3番：コスパが良く〜な方にぴったりです💕
+■ 1番：〇〇という理由でとても人気です。
+■ 3番：コスパが良く〜な方にぴったりです。
 
 上記フォーマットで答えてください。リスト外の商品名は絶対に使わないでください。`;
       } else {
@@ -1036,7 +1059,7 @@ ${userText}
         setChatMessages([...newMessages, { role: 'assistant', text: `⚠️ エラー: ${data.error}` }]);
         return;
       }
-      const aiText = data.text || "すみません、一時的に考え込んでしまいました💦";
+      const aiText = data.text || "すみません、一時的にエラーが発生しました。もう一度お試しください。";
       setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: contextProducts.slice(0, 3) }]);
     } catch (e) {
       console.error("AI Chat Error:", e);
@@ -1239,7 +1262,7 @@ ${userText}
               <span className="text-[10px] font-black uppercase tracking-widest text-[#F2ABAC]">AI Concierge</span>
             </div>
             <h4 className="text-2xl font-black mb-2 text-[#5A4C4C] leading-tight">AIに育児アイテムを<br/>相談してみる</h4>
-            <p className="text-[11px] text-[#8E8282] max-w-[200px] font-bold">ぴったりのベビー用品をAIが比較・提案します🧸</p>
+            <p className="text-[11px] text-[#8E8282] max-w-[200px] font-bold">ぴったりのベビー用品をAIが比較・提案します</p>
           </div>
           <div className="absolute right-[-10%] bottom-[-20%] w-48 h-48 bg-[#FFE6E6] rounded-full opacity-50 blur-2xl"></div>
           <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
@@ -1418,7 +1441,7 @@ ${userText}
                     (activeCat?.name === g.name) ? 'bg-[#7B8E76] text-white shadow-md' : 'bg-[#F0EBE6] text-[#7B8E76]'
                   }`}
                 >
-                  <span>{CATEGORY_TREE.find(c => c.name === g.name)?.icon || '📦'}</span>
+                  <CategoryIcon name={g.name} className="w-4 h-4" />
                   {g.name}
                 </button>
               ))}
@@ -1426,7 +1449,7 @@ ${userText}
             {activeCat && (
               <div>
                 <div className="flex items-center gap-2 mb-4 px-1">
-                  <span className="text-lg">{CATEGORY_TREE.find(c => c.name === activeCat.name)?.icon || '📦'}</span>
+                  <CategoryIcon name={activeCat.name} className="w-5 h-5" />
                   <h4 className="font-black text-[#5A4C4C] text-lg">{activeCat.name}</h4>
                   <span className="text-[10px] font-bold text-[#A5A19E] bg-[#F9F6F3] px-2 py-0.5 rounded-full">評価順</span>
                 </div>
@@ -1561,7 +1584,7 @@ ${userText}
               ) : (
                 <>
                   <p className="text-[10px] font-bold text-[#8E8282] mb-1">年齢・月齢を登録すると</p>
-                  <p className="text-sm font-black text-[#5A4C4C]">ぴったりのアイテムをAIが提案✨</p>
+                  <p className="text-sm font-black text-[#5A4C4C]">ぴったりのアイテムをAIが提案</p>
                 </>
               )}
             </div>
@@ -2208,7 +2231,7 @@ ${userText}
                     </div>
                   ) : (
                     <div className="py-12 bg-[#F9F6F3] rounded-[2rem] text-center border-2 border-dashed border-[#F4EFEB]">
-                      <p className="text-xs text-[#A5A19E] font-bold uppercase tracking-widest leading-loose">現在SNSでの口コミを<br/>収集中です🧸</p>
+                      <p className="text-xs text-[#A5A19E] font-bold uppercase tracking-widest leading-loose">現在SNSでの口コミを<br/>収集中です</p>
                     </div>
                   )}
                 </div>
