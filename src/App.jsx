@@ -153,6 +153,25 @@ const detectOfficialShop = (shop) => {
   return { isOfficial: false, brand: null };
 };
 
+// ValueCommerce MyLink: 対象ドメインのURLをアフィリエイトURLにラップ
+const VC_SID = import.meta.env.VITE_VC_SID || '3768537';
+const VC_DOMAIN_PIDS = {
+  'dadway-onlineshop.com': import.meta.env.VITE_VC_PID_DADWAY   || '892608374',
+  'ergobaby.jp':           import.meta.env.VITE_VC_PID_ERGOBABY || '892609670',
+};
+const toVCUrl = (url) => {
+  if (!url || url === '#') return url;
+  try {
+    const normalized = url.startsWith('//') ? 'https:' + url : url;
+    const hostname = new URL(normalized).hostname;
+    const pid = Object.entries(VC_DOMAIN_PIDS).find(([domain]) => hostname.includes(domain))?.[1];
+    if (!pid) return url;
+    return `https://ck.jp.ap.valuecommerce.com/servlet/referral?sid=${VC_SID}&pid=${pid}&vc_url=${encodeURIComponent(normalized)}`;
+  } catch {
+    return url;
+  }
+};
+
 
 const App = () => {
   const navigate = useNavigate();
@@ -2292,7 +2311,7 @@ ${userText}
                             </div>
                             <div className="flex flex-col items-end gap-2 border-l border-[#F4EFEB] pl-4">
                                <span className="text-sm font-black text-[#7B8E76]">¥{seller.price.toLocaleString()}</span>
-                               <a href={seller.url || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
+                               <a href={toVCUrl(seller.url) || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
                                  ショップへ
                                </a>
                             </div>
