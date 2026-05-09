@@ -940,8 +940,8 @@ const App = () => {
         : [];
 
       const raw = [...rakutenItems, ...yahooItems];
-      const filtered = filterAccessories(raw);
-      const allItems = filtered.length > 0 ? filtered : raw;
+      // 検索はユーザーが意図的に指定しているのでアクセサリーフィルタを適用しない
+      const allItems = raw;
 
       if (allItems.length === 0) {
         if (dbMatches.length > 0) {
