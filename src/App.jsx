@@ -1810,6 +1810,7 @@ ${userText}
   return (
     <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`}>
       <Helmet>
+        <meta name="google-site-verification" content="bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI" />
         {/* タイトル */}
         {selectedProduct
           ? <title>{selectedProduct.name} の最安値・価格比較 | HonestBaby</title>
