@@ -974,13 +974,10 @@ const App = () => {
     );
 
     try {
-      // 1. 楽天・Yahoo両方から並列取得（ベビー関連語がなければ補完）
-      const babyWords = ['ベビー', '赤ちゃん', 'おむつ', '抱っこ', '哺乳', 'おもちゃ', 'ミルク', 'マタニティ'];
-      const needsBaby = !babyWords.some(w => keyword.includes(w));
-      const searchKeyword = needsBaby ? `ベビー ${keyword}` : keyword;
+      // 1. 楽天・Yahoo両方から並列取得
       const [rakutenResult, yahooResult] = await Promise.allSettled([
-        fetch(`/api/rakuten?query=${encodeURIComponent(searchKeyword)}`).then(r => r.json()),
-        fetch(`/api/yahoo?query=${encodeURIComponent(searchKeyword)}`).then(r => r.json())
+        fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`).then(r => r.json()),
+        fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}`).then(r => r.json())
       ]);
 
       const rakutenItems = rakutenResult.status === 'fulfilled'
@@ -1138,8 +1135,8 @@ const App = () => {
       try { rawSellers = JSON.parse(rawSellers); } catch { rawSellers = []; }
     }
     const sellers = Array.isArray(rawSellers) && rawSellers.length > 0
-      ? rawSellers
-      : (shop.url ? [{ name, price: lowestPrice, shipping: shop.shipping ?? 0, points: shop.points ?? 0, url: shop.url, note: shop.note || '' }] : []);
+      ? rawSellers.filter(s => s.url && s.url !== '#')
+      : (shop.url && shop.url !== '#' ? [{ name, price: lowestPrice, shipping: shop.shipping ?? 0, points: shop.points ?? 0, url: shop.url, note: shop.note || '' }] : []);
     return { ...shop, name, type, lowestPrice, sellers, brandName: brand };
   };
 
@@ -2252,8 +2249,15 @@ ${userText}
                     }
                   }
                   const dedupedExisting = Array.from(shopByName.values());
-                  const existingNames = new Set(dedupedExisting.map(s => s.name));
-                  const mergedShops = [...dedupedExisting, ...crossPlatformShops.filter(s => !existingNames.has(s.name))];
+                  // 有効なsellersを持つショップ名のみcrossPlatformをブロック（url='#'のみのショップは上書き許可）
+                  const existingNames = new Set(
+                    dedupedExisting.filter(s => s.sellers && s.sellers.length > 0).map(s => s.name)
+                  );
+                  // DBに有効URLがないショップはcrossPlatformで上書き、新規ショップは追記
+                  const mergedShops = [
+                    ...dedupedExisting.filter(s => s.sellers && s.sellers.length > 0),
+                    ...crossPlatformShops.filter(s => !existingNames.has(s.name)),
+                  ];
                   return mergedShops;
                 })().map((shop, idx) => (
                   <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
