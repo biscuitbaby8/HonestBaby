@@ -7,7 +7,7 @@ import {
   Settings, History, Bookmark, Sparkles, Send, Bot, 
   Package, Layers, ChevronDown, ChevronUp, Calculator, 
   Store, Gift, ChevronLeft, ShieldCheck, Baby, BellRing, Edit3,
-  FileText, Shield, Info, Edit2, Camera,
+  FileText, Shield, Info, Edit2, Camera, Mail,
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind
 } from 'lucide-react';
 
@@ -223,6 +223,26 @@ const App = () => {
   });
   const signOut = () => supabase.auth.signOut().then(() => setUser(null));
 
+  const handleContactSubmit = async () => {
+    if (!contactContent.trim() || isContactSending) return;
+    setIsContactSending(true);
+    try {
+      const { error } = await supabase.from('inquiries').insert([{
+        user_id: user.id,
+        user_email: user.email,
+        category: contactCategory,
+        content: contactContent.trim(),
+      }]);
+      if (error) throw error;
+      setContactSent(true);
+      setContactContent('');
+    } catch (e) {
+      console.error('Contact submit error:', e);
+    } finally {
+      setIsContactSending(false);
+    }
+  };
+
   const migrateLocalFavoritesToDB = async (userId) => {
     try {
       const local = JSON.parse(localStorage.getItem('honestBabyFavorites') || '[]');
@@ -292,6 +312,11 @@ const App = () => {
   // Modal & Expand States
   const [expandedMall, setExpandedMall] = useState(null);
   const [activeLegalPage, setActiveLegalPage] = useState(null);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactCategory, setContactCategory] = useState('商品について');
+  const [contactContent, setContactContent] = useState('');
+  const [isContactSending, setIsContactSending] = useState(false);
+  const [contactSent, setContactSent] = useState(false);
   
   // --- 新機能: 口コミ関連 States ---
   const [reviewTab, setReviewTab] = useState('honest'); // 'honest' or 'sns'
@@ -1811,6 +1836,7 @@ ${userText}
         {/* 法的リンク */}
         <div className="px-2 border-t border-[#F4EFEB] pt-8">
           <div className="flex flex-col gap-4">
+            <button onClick={() => { setShowContactModal(true); setContactSent(false); setContactContent(''); setContactCategory('商品について'); }} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Mail className="w-4 h-4 mr-2" /> お問い合わせ</button>
             <button onClick={() => setActiveLegalPage('terms')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 利用規約</button>
             <button onClick={() => setActiveLegalPage('privacy')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Shield className="w-4 h-4 mr-2" /> プライバシーポリシー</button>
             <button onClick={() => setActiveLegalPage('disclaimer')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors text-left leading-relaxed"><Info className="w-4 h-4 mr-2 flex-shrink-0" /> 運営者情報・免責事項<br/>(アフィリエイトについて)</button>
@@ -2622,6 +2648,56 @@ ${userText}
             }} className="w-full py-4 bg-[#7B8E76] text-white rounded-full font-black text-sm active:scale-95 transition-transform">
               保存する
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* お問い合わせモーダル */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center"
+             onClick={() => setShowContactModal(false)}>
+          <div className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10"
+               onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-base font-black text-[#5A4C4C]">お問い合わせ</h2>
+              <button onClick={() => setShowContactModal(false)}>
+                <X className="w-5 h-5 text-[#A5A19E]" />
+              </button>
+            </div>
+
+            {!user ? (
+              <p className="text-sm text-[#A5A19E] font-bold text-center py-8">
+                お問い合わせにはログインが必要です
+              </p>
+            ) : contactSent ? (
+              <div className="text-center py-8">
+                <p className="text-sm font-black text-[#7B8E76]">送信しました</p>
+                <p className="text-xs text-[#A5A19E] mt-1 font-bold">お問い合わせありがとうございます</p>
+              </div>
+            ) : (
+              <>
+                <select
+                  value={contactCategory}
+                  onChange={e => setContactCategory(e.target.value)}
+                  className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm text-[#5A4C4C] font-bold mb-3 bg-white">
+                  {['商品について', 'バグ報告', 'ご要望', 'その他'].map(c => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+                <textarea
+                  value={contactContent}
+                  onChange={e => setContactContent(e.target.value)}
+                  placeholder="お問い合わせ内容をご記入ください"
+                  rows={5}
+                  className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm text-[#5A4C4C] font-bold resize-none mb-4" />
+                <button
+                  onClick={handleContactSubmit}
+                  disabled={!contactContent.trim() || isContactSending}
+                  className="w-full bg-[#7B8E76] text-white font-black text-sm py-3 rounded-2xl disabled:opacity-40 active:scale-95 transition-transform">
+                  {isContactSending ? '送信中...' : '送信する'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
