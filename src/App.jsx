@@ -280,6 +280,11 @@ const App = () => {
   const [showBabyModal, setShowBabyModal] = useState(false);
   const [showPriceAlertModal, setShowPriceAlertModal] = useState(false);
   const [showSaveSearchModal, setShowSaveSearchModal] = useState(false);
+
+  // PWA ホーム追加プロンプト
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
   const [babyForm, setBabyForm] = useState({ name: '', birthYear: new Date().getFullYear(), birthMonth: 1, gender: '' });
   const [alertTargetPrice, setAlertTargetPrice] = useState('');
   const [saveSearchLabel, setSaveSearchLabel] = useState('');
@@ -306,6 +311,41 @@ const App = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+  // PWA ホーム追加プロンプト
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    if (window.navigator.standalone) return;
+    const dismissed = localStorage.getItem('honestBabyInstallDismissed');
+    if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.MSStream;
+    setIsIOS(ios);
+
+    const handler = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setTimeout(() => setShowInstallBanner(true), 3000);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    if (ios) setTimeout(() => setShowInstallBanner(true), 3000);
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const dismissInstallBanner = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('honestBabyInstallDismissed', String(Date.now()));
+  };
+
+  const handleInstallClick = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') setInstallPrompt(null);
+    }
+    dismissInstallBanner();
+  };
+
   // Auth: Googleログイン状態の監視
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
@@ -317,18 +357,64 @@ const App = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // URL直アクセス対応: /product/:id → sessionStorageから復元
+  const formatDbProduct = (p) => ({
+    ...p,
+    rating: Number(p.rating),
+    subCategory: p.sub_category,
+    reviewsCount: p.reviews_count,
+    image: p.image_url,
+    aiAnalysis: p.ai_analysis,
+    giftTags: p.gift_tags || [],
+    usedPrice: p.used_price_estimate,
+    unitCount: p.unit_count,
+    unitName: p.unit_name,
+    shops: (p.shops || []).map(s => {
+      let sellers = s.sellers;
+      if (typeof sellers === 'string') {
+        try { sellers = JSON.parse(sellers); } catch { sellers = []; }
+      }
+      return { ...s, name: s.shop_name, type: s.shop_type, lowestPrice: s.lowest_price, sellers: Array.isArray(sellers) ? sellers : [] };
+    }),
+    honestReviews: (p.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
+    snsReviews: (p.snsReviews || []).map(r => ({ ...r, user: r.user_handle }))
+  });
+
+  // URL直アクセス対応: sessionStorage → localStorage → Supabase → home
   useEffect(() => {
     const match = location.pathname.match(/^\/product\/(.+)$/);
-    if (match && !selectedProduct) {
+    if (!match || selectedProduct) return;
+    const productId = decodeURIComponent(match[1]);
+
+    const restore = async () => {
+      // 1. sessionStorage（同タブ）
       try {
-        const stored = sessionStorage.getItem('honestBabyOpenProduct');
-        if (stored) {
-          const p = JSON.parse(stored);
-          setSelectedProduct(p);
-        }
+        const s = sessionStorage.getItem('honestBabyOpenProduct');
+        if (s) { const p = JSON.parse(s); if (String(p.id) === productId) { setSelectedProduct(p); return; } }
       } catch {}
-    }
+
+      // 2. localStorage キャッシュ（別タブ・URL共有）
+      try {
+        const cache = JSON.parse(localStorage.getItem('honestBabyProductCache') || '{}');
+        if (cache[productId]) { setSelectedProduct(cache[productId]); return; }
+      } catch {}
+
+      // 3. Supabase（UUID形式のDB商品）
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(productId)) {
+        try {
+          const { data } = await supabase
+            .from('products')
+            .select('*, shops:shops_prices(*), honestReviews:reviews(*), snsReviews:sns_reviews(*)')
+            .eq('id', productId)
+            .single();
+          if (data) { setSelectedProduct(formatDbProduct(data)); return; }
+        } catch {}
+      }
+
+      // 4. 見つからない → ホームへ
+      navigate('/', { replace: true });
+    };
+
+    restore();
   }, [location.pathname]);
 
   useEffect(() => {
@@ -1167,6 +1253,13 @@ ${userText}
       return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
     });
     try { sessionStorage.setItem('honestBabyOpenProduct', JSON.stringify(product)); } catch {}
+    try {
+      const cache = JSON.parse(localStorage.getItem('honestBabyProductCache') || '{}');
+      cache[product.id] = product;
+      const keys = Object.keys(cache);
+      if (keys.length > 100) delete cache[keys[0]];
+      localStorage.setItem('honestBabyProductCache', JSON.stringify(cache));
+    } catch {}
     navigate(`/product/${encodeURIComponent(product.id)}`);
   };
 
@@ -2356,6 +2449,28 @@ ${userText}
       )}
 
       {/* 下部ナビゲーション */}
+      {/* PWA ホーム追加バナー */}
+      {showInstallBanner && (
+        <div className="fixed bottom-[72px] left-0 right-0 z-50 px-4 pointer-events-none">
+          <div className="bg-white border border-[#F2ABAC]/40 rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 pointer-events-auto max-w-md mx-auto">
+            <div className="w-9 h-9 rounded-xl bg-[#FFF5F5] flex items-center justify-center flex-shrink-0">
+              <img src="/icons/icon-192x192.png" alt="" className="w-6 h-6 rounded-lg" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-black text-[#5A4C4C] leading-tight">ホーム画面に追加</p>
+              {isIOS
+                ? <p className="text-[10px] text-[#A5A19E] font-bold leading-tight">下の共有ボタン → 「ホーム画面に追加」</p>
+                : <p className="text-[10px] text-[#A5A19E] font-bold leading-tight">アプリとして使えてさらに便利</p>
+              }
+            </div>
+            {!isIOS && (
+              <button onClick={handleInstallClick} className="text-[10px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full flex-shrink-0 active:scale-95 transition-transform">追加</button>
+            )}
+            <button onClick={dismissInstallBanner} className="text-[#D4CDC7] flex-shrink-0 p-1 -mr-1"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
+
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-[#F4EFEB] px-8 pt-4 flex justify-between items-center rounded-t-[3rem] shadow-[0_-10px_40px_rgb(0,0,0,0.03)]" style={{paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)'}}>
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'home' ? 'text-[#7B8E76] scale-110' : 'text-[#D4CDC7] hover:text-[#A5A19E]'}`}>
           <Home className={`w-6 h-6 ${activeTab === 'home' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">ホーム</span>
