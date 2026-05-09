@@ -373,39 +373,47 @@ const App = () => {
 
   // Auth: Googleログイン状態の監視
   useEffect(() => {
-    // OAuthコールバック: URLハッシュを直接パースしてsetSession（最も確実な方法）
-    const hash = window.location.hash;
-    if (hash.includes('access_token=')) {
-      const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
-      const access_token = params.get('access_token');
-      const refresh_token = params.get('refresh_token') || '';
-      if (access_token) {
-        window.history.replaceState({}, '', '/');
-        supabase.auth.setSession({ access_token, refresh_token }).then(({ data }) => {
-          if (data?.session?.user) {
-            setUser(data.session.user);
-            setActiveTab('user');
-            migrateLocalFavoritesToDB(data.session.user.id);
-          }
-        });
-        return;
-      }
-    }
-
-    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
+    // Always subscribe first so we don't miss events from detectSessionInUrl processing
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) migrateLocalFavoritesToDB(u.id);
       if (event === 'SIGNED_IN') setActiveTab('user');
     });
-    // iOS PWA対応: フォーカス復帰時にセッションを再チェック
+
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
+
+    // Handle OAuth callback — support both implicit (#access_token) and PKCE (?code) flows
+    const hash = window.location.hash;
+    const searchCode = new URLSearchParams(window.location.search).get('code');
+
+    if (hash.includes('access_token=')) {
+      // Implicit flow: token arrives as URL hash fragment
+      const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token') || '';
+      if (access_token) {
+        window.history.replaceState({}, '', '/');
+        supabase.auth.setSession({ access_token, refresh_token });
+        // onAuthStateChange handles setUser / setActiveTab
+      }
+    } else if (searchCode) {
+      // PKCE flow: exchange the server-issued code for a session
+      window.history.replaceState({}, '', '/');
+      supabase.auth.exchangeCodeForSession(searchCode).catch(() => {
+        // Code may already have been consumed by detectSessionInUrl; check existing session
+        supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
+      });
+    } else {
+      // Normal page load: restore any existing session
+      supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
+    }
+
     return () => {
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibility);
@@ -1886,10 +1894,6 @@ ${userText}
 
   return (
     <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`}>
-      {/* 🔧 DEBUG: ログイン診断（後で削除） */}
-      <div style={{position:'fixed',top:0,left:0,right:0,background:'#333',color:'#fff',fontSize:11,padding:'4px 8px',zIndex:99999,wordBreak:'break-all'}}>
-        hash: {window.location.hash.slice(0,80) || '(なし)'} | user: {user?.email || 'null'}
-      </div>
       <Helmet>
         <meta name="google-site-verification" content="bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI" />
         {/* タイトル */}
