@@ -373,12 +373,22 @@ const App = () => {
 
   // Auth: Googleログイン状態の監視
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
+    const isOAuthCallback = window.location.hash.includes('access_token') ||
+                            window.location.search.includes('code=');
+    supabase.auth.getSession().then(({ data }) => {
+      const u = data.session?.user ?? null;
+      setUser(u);
+      // OAuthコールバック後にマイタブへ遷移してURLを綺麗にする
+      if (u && isOAuthCallback) {
+        setActiveTab('user');
+        window.history.replaceState({}, '', '/');
+      }
+      if (u) migrateLocalFavoritesToDB(u.id);
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) migrateLocalFavoritesToDB(u.id);
-      // ログイン完了時はマイタブへ遷移
       if (event === 'SIGNED_IN') setActiveTab('user');
     });
     // iOS PWA対応: アプリがフォーカスを取り戻した時にセッションを再チェック
