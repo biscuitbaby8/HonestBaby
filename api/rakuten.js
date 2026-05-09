@@ -8,7 +8,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Missing Rakuten App ID (RAKUTEN_APP_ID or VITE_RAKUTEN_APP_ID) in server environment variables' });
   }
 
-  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1&affiliateId=${affiliateId || ''}`;
+  // genreId=566382 (キッズ・ベビー・マタニティ) で楽天検索をベビー用品に限定
+  // minPrice=500 で価格が極端に低いアクセサリ・部品を除外
+  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1&genreId=566382&minPrice=500&affiliateId=${affiliateId || ''}`;
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');

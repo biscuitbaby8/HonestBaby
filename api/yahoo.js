@@ -9,8 +9,10 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Missing Yahoo Client ID (YAHOO_CLIENT_ID)' });
   }
 
-  // Yahoo Shopping API V3 (ItemSearch) - 30件取得、価格昇順
-  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${clientId}&query=${encodeURIComponent(query || '')}&results=30&sort=%2Bprice`;
+  // Yahoo Shopping API V3 (ItemSearch) - 30件取得
+  // category_id=13457 (ベビー、キッズ、マタニティ) でカテゴリ限定
+  // price_from=500 で価格が極端に低いアクセサリ・部品を除外
+  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${clientId}&query=${encodeURIComponent(query || '')}&results=30&category_id=13457&price_from=500`;
 
   try {
     const response = await fetch(url);
