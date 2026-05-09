@@ -19,5 +19,11 @@ if (supabaseUrl === 'https://placeholder-project.supabase.co' || !supabaseUrl) {
 
 export const supabase = createClient(
   supabaseUrl,
-  supabaseAnonKey
+  supabaseAnonKey,
+  {
+    auth: {
+      flowType: 'pkce',
+      detectSessionInUrl: true,
+    }
+  }
 );
