@@ -374,12 +374,24 @@ const App = () => {
   // Auth: Googleログイン状態の監視
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) migrateLocalFavoritesToDB(u.id);
+      // ログイン完了時はマイタブへ遷移
+      if (event === 'SIGNED_IN') setActiveTab('user');
     });
-    return () => subscription.unsubscribe();
+    // iOS PWA対応: アプリがフォーカスを取り戻した時にセッションを再チェック
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const formatDbProduct = (p) => ({
@@ -1681,6 +1693,14 @@ ${userText}
             <div className="bg-[#FFF5F5] border border-[#FFEBEB] p-4 rounded-[1.5rem] mb-4 text-center">
               <p className="text-xs font-bold text-[#5A4C4C] mb-1">ログインでお気に入りを同期・口コミを投稿</p>
               <button onClick={signInWithGoogle} className="text-xs font-black text-[#F2ABAC] underline">Googleアカウントでログイン</button>
+              {/iPhone|iPad|iPod/.test(navigator.userAgent) && window.navigator.standalone && (
+                <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">
+                  ログインできない場合は{' '}
+                  <a href={window.location.href} target="_blank" rel="noreferrer" className="underline text-[#7B8E76]">
+                    Safariで開いてログイン
+                  </a>
+                </p>
+              )}
             </div>
           )}
           <div className="bg-white p-6 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#F4EFEB] flex items-center gap-5 relative overflow-hidden">
