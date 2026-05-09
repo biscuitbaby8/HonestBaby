@@ -1886,6 +1886,10 @@ ${userText}
 
   return (
     <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`}>
+      {/* 🔧 DEBUG: ログイン診断（後で削除） */}
+      <div style={{position:'fixed',top:0,left:0,right:0,background:'#333',color:'#fff',fontSize:11,padding:'4px 8px',zIndex:99999,wordBreak:'break-all'}}>
+        hash: {window.location.hash.slice(0,80) || '(なし)'} | user: {user?.email || 'null'}
+      </div>
       <Helmet>
         <meta name="google-site-verification" content="bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI" />
         {/* タイトル */}
