@@ -903,6 +903,12 @@ const App = () => {
     setSearchError(null);
     setSearchResults([]);
 
+    // DBの商品もキーワードで絞り込んで先頭に追加
+    const kw = keyword.toLowerCase();
+    const dbMatches = dbProducts.filter(p =>
+      [p.name, p.brand, p.sub_category, p.category].some(f => f && f.toLowerCase().includes(kw))
+    );
+
     try {
       // 1. 楽天・Yahoo両方から並列取得（ベビー関連語がなければ補完）
       const babyWords = ['ベビー', '赤ちゃん', 'おむつ', '抱っこ', '哺乳', 'おもちゃ', 'ミルク', 'マタニティ'];
@@ -938,6 +944,10 @@ const App = () => {
       const allItems = filtered.length > 0 ? filtered : raw;
 
       if (allItems.length === 0) {
+        if (dbMatches.length > 0) {
+          setSearchResults(dbMatches);
+          return;
+        }
         setSearchError("検索結果が見つかりませんでした。別のキーワードをお試しください。");
         return;
       }
@@ -1013,7 +1023,7 @@ const App = () => {
           formatted = formatRawItems(allItems);
         }
 
-      setSearchResults(formatted);
+      setSearchResults([...dbMatches, ...formatted]);
       autoSaveSearchResultsToDb(formatted, keyword);
     } catch (err) {
       console.error("Remote Search Error:", err);
