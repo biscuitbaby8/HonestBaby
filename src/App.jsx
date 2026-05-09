@@ -373,25 +373,33 @@ const App = () => {
 
   // Auth: Googleログイン状態の監視
   useEffect(() => {
-    const isOAuthCallback = window.location.hash.includes('access_token') ||
-                            window.location.search.includes('code=');
-    supabase.auth.getSession().then(({ data }) => {
-      const u = data.session?.user ?? null;
-      setUser(u);
-      // OAuthコールバック後にマイタブへ遷移してURLを綺麗にする
-      if (u && isOAuthCallback) {
-        setActiveTab('user');
+    // OAuthコールバック: URLハッシュを直接パースしてsetSession（最も確実な方法）
+    const hash = window.location.hash;
+    if (hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token') || '';
+      if (access_token) {
         window.history.replaceState({}, '', '/');
+        supabase.auth.setSession({ access_token, refresh_token }).then(({ data }) => {
+          if (data?.session?.user) {
+            setUser(data.session.user);
+            setActiveTab('user');
+            migrateLocalFavoritesToDB(data.session.user.id);
+          }
+        });
+        return;
       }
-      if (u) migrateLocalFavoritesToDB(u.id);
-    });
+    }
+
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) migrateLocalFavoritesToDB(u.id);
       if (event === 'SIGNED_IN') setActiveTab('user');
     });
-    // iOS PWA対応: アプリがフォーカスを取り戻した時にセッションを再チェック
+    // iOS PWA対応: フォーカス復帰時にセッションを再チェック
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
