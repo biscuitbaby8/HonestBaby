@@ -357,18 +357,64 @@ const App = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // URL直アクセス対応: /product/:id → sessionStorageから復元
+  const formatDbProduct = (p) => ({
+    ...p,
+    rating: Number(p.rating),
+    subCategory: p.sub_category,
+    reviewsCount: p.reviews_count,
+    image: p.image_url,
+    aiAnalysis: p.ai_analysis,
+    giftTags: p.gift_tags || [],
+    usedPrice: p.used_price_estimate,
+    unitCount: p.unit_count,
+    unitName: p.unit_name,
+    shops: (p.shops || []).map(s => {
+      let sellers = s.sellers;
+      if (typeof sellers === 'string') {
+        try { sellers = JSON.parse(sellers); } catch { sellers = []; }
+      }
+      return { ...s, name: s.shop_name, type: s.shop_type, lowestPrice: s.lowest_price, sellers: Array.isArray(sellers) ? sellers : [] };
+    }),
+    honestReviews: (p.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
+    snsReviews: (p.snsReviews || []).map(r => ({ ...r, user: r.user_handle }))
+  });
+
+  // URL直アクセス対応: sessionStorage → localStorage → Supabase → home
   useEffect(() => {
     const match = location.pathname.match(/^\/product\/(.+)$/);
-    if (match && !selectedProduct) {
+    if (!match || selectedProduct) return;
+    const productId = decodeURIComponent(match[1]);
+
+    const restore = async () => {
+      // 1. sessionStorage（同タブ）
       try {
-        const stored = sessionStorage.getItem('honestBabyOpenProduct');
-        if (stored) {
-          const p = JSON.parse(stored);
-          setSelectedProduct(p);
-        }
+        const s = sessionStorage.getItem('honestBabyOpenProduct');
+        if (s) { const p = JSON.parse(s); if (String(p.id) === productId) { setSelectedProduct(p); return; } }
       } catch {}
-    }
+
+      // 2. localStorage キャッシュ（別タブ・URL共有）
+      try {
+        const cache = JSON.parse(localStorage.getItem('honestBabyProductCache') || '{}');
+        if (cache[productId]) { setSelectedProduct(cache[productId]); return; }
+      } catch {}
+
+      // 3. Supabase（UUID形式のDB商品）
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(productId)) {
+        try {
+          const { data } = await supabase
+            .from('products')
+            .select('*, shops:shops_prices(*), honestReviews:reviews(*), snsReviews:sns_reviews(*)')
+            .eq('id', productId)
+            .single();
+          if (data) { setSelectedProduct(formatDbProduct(data)); return; }
+        } catch {}
+      }
+
+      // 4. 見つからない → ホームへ
+      navigate('/', { replace: true });
+    };
+
+    restore();
   }, [location.pathname]);
 
   useEffect(() => {
@@ -1207,6 +1253,13 @@ ${userText}
       return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
     });
     try { sessionStorage.setItem('honestBabyOpenProduct', JSON.stringify(product)); } catch {}
+    try {
+      const cache = JSON.parse(localStorage.getItem('honestBabyProductCache') || '{}');
+      cache[product.id] = product;
+      const keys = Object.keys(cache);
+      if (keys.length > 100) delete cache[keys[0]];
+      localStorage.setItem('honestBabyProductCache', JSON.stringify(cache));
+    } catch {}
     navigate(`/product/${encodeURIComponent(product.id)}`);
   };
 
