@@ -967,12 +967,6 @@ const App = () => {
     setSearchError(null);
     setSearchResults([]);
 
-    // DBの商品もキーワードで絞り込んで先頭に追加
-    const kw = keyword.toLowerCase();
-    const dbMatches = dbProducts.filter(p =>
-      [p.name, p.brand, p.sub_category, p.category].some(f => f && f.toLowerCase().includes(kw))
-    );
-
     try {
       // 1. 楽天・Yahoo両方から並列取得
       const [rakutenResult, yahooResult] = await Promise.allSettled([
@@ -1005,10 +999,6 @@ const App = () => {
       const allItems = raw;
 
       if (allItems.length === 0) {
-        if (dbMatches.length > 0) {
-          setSearchResults(dbMatches);
-          return;
-        }
         setSearchError("検索結果が見つかりませんでした。別のキーワードをお試しください。");
         return;
       }
@@ -1084,7 +1074,7 @@ const App = () => {
           formatted = formatRawItems(allItems);
         }
 
-      setSearchResults([...dbMatches, ...formatted]);
+      setSearchResults(formatted);
       autoSaveSearchResultsToDb(formatted, keyword);
     } catch (err) {
       console.error("Remote Search Error:", err);
