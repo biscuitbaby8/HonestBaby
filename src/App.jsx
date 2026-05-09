@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Search, Heart, ExternalLink, X, Star, MessageCircle, 
   Instagram, Twitter, TrendingUp, ChevronRight, 
@@ -154,9 +155,15 @@ const detectOfficialShop = (shop) => {
 
 
 const App = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
   const [dbError, setDbError] = useState(null);
+
+  // Auth state
+  const [user, setUser] = useState(null);
 
   // New: Remote Search States
   const [remoteProducts, setRemoteProducts] = useState([]);
@@ -209,6 +216,25 @@ const App = () => {
       console.error("Failed to save favorites", e);
     }
   }, [favorites]);
+
+  const signInWithGoogle = () => supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin }
+  });
+  const signOut = () => supabase.auth.signOut().then(() => setUser(null));
+
+  const migrateLocalFavoritesToDB = async (userId) => {
+    try {
+      const local = JSON.parse(localStorage.getItem('honestBabyFavorites') || '[]');
+      if (!local.length) return;
+      await supabase.from('user_favorites').upsert(
+        local.map(p => ({ user_id: userId, item_code: String(p.id), product_data: p })),
+        { onConflict: 'user_id,item_code' }
+      );
+      localStorage.removeItem('honestBabyFavorites');
+      setFavorites(local);
+    } catch {}
+  };
 
   // --- 検索キャッシュ（localStorage → カテゴリ別）---
   const [cachedProducts, setCachedProducts] = useState(() => {
@@ -279,6 +305,31 @@ const App = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
+
+  // Auth: Googleログイン状態の監視
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) migrateLocalFavoritesToDB(u.id);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // URL直アクセス対応: /product/:id → sessionStorageから復元
+  useEffect(() => {
+    const match = location.pathname.match(/^\/product\/(.+)$/);
+    if (match && !selectedProduct) {
+      try {
+        const stored = sessionStorage.getItem('honestBabyOpenProduct');
+        if (stored) {
+          const p = JSON.parse(stored);
+          setSelectedProduct(p);
+        }
+      } catch {}
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -1061,9 +1112,13 @@ ${userText}
   // --- 新機能: レビュー投稿ハンドラ ---
   const submitReview = async () => {
     if (!reviewForm.content.trim() || !selectedProduct) return;
-    
+    if (!user) {
+      alert("口コミを投稿するにはGoogleアカウントでログインしてください。\nマイページからログインできます。");
+      return;
+    }
     setIsSubmittingReview(true);
-    
+    const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'ユーザー';
+
     // SupabaseにINSERT（RLSポリシーで許可済）
     const { data, error } = await supabase
        .from('reviews')
@@ -1071,7 +1126,7 @@ ${userText}
          product_id: selectedProduct.id,
          rating: reviewForm.rating,
          content: reviewForm.content,
-         user_name: "ゲスト" // 匿名利用
+         user_name: displayName
        }])
        .select();
 
@@ -1111,6 +1166,16 @@ ${userText}
       const filtered = prev.filter(p => p.id !== product.id);
       return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
     });
+    try { sessionStorage.setItem('honestBabyOpenProduct', JSON.stringify(product)); } catch {}
+    navigate(`/product/${encodeURIComponent(product.id)}`);
+  };
+
+  const closeProduct = () => {
+    setSelectedProduct(null);
+    setExpandedMall(null);
+    setReviewTab('honest');
+    try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch {}
+    navigate(-1);
   };
 
   const ProductCard = ({ product, localRank = null }) => (
@@ -1476,15 +1541,28 @@ ${userText}
         <div className="bg-gradient-to-b from-[#FFF9F0] to-transparent -mx-6 px-6 pt-2 pb-8 mb-4">
           <div className="flex items-center justify-between mb-8">
             <h2 className="font-serif font-black text-[#5A4C4C] text-2xl">マイページ</h2>
+            {user
+              ? <button onClick={signOut} className="text-[10px] font-black text-[#A5A19E] bg-[#F9F6F3] px-3 py-1.5 rounded-full border border-[#F4EFEB] active:scale-95 transition-transform">ログアウト</button>
+              : <button onClick={signInWithGoogle} className="text-[10px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform">Googleでログイン</button>
+            }
           </div>
+          {!user && (
+            <div className="bg-[#FFF5F5] border border-[#FFEBEB] p-4 rounded-[1.5rem] mb-4 text-center">
+              <p className="text-xs font-bold text-[#5A4C4C] mb-1">ログインでお気に入りを同期・口コミを投稿</p>
+              <button onClick={signInWithGoogle} className="text-xs font-black text-[#F2ABAC] underline">Googleアカウントでログイン</button>
+            </div>
+          )}
           <div className="bg-white p-6 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#F4EFEB] flex items-center gap-5 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5"><Baby className="w-32 h-32 text-[#7B8E76]" /></div>
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#F2ABAC] to-[#F9DC5C] flex items-center justify-center text-white shadow-md relative z-10">
-              {babyInfo ? <Baby className="w-8 h-8" /> : <User className="w-8 h-8" />}
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#F2ABAC] to-[#F9DC5C] flex items-center justify-center text-white shadow-md relative z-10 overflow-hidden">
+              {user?.user_metadata?.avatar_url
+                ? <img src={user.user_metadata.avatar_url} alt="" className="w-full h-full object-cover" />
+                : babyInfo ? <Baby className="w-8 h-8" /> : <User className="w-8 h-8" />
+              }
             </div>
             <div className="relative z-10">
               <h3 className="text-xl font-black text-[#5A4C4C] leading-tight">
-                {babyInfo?.name ? `${babyInfo.name}のママ・パパ` : 'ゲスト様'}
+                {user?.user_metadata?.full_name || (babyInfo?.name ? `${babyInfo.name}のママ・パパ` : 'ゲスト様')}
               </h3>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 {babyAgeLabel && (
@@ -1657,7 +1735,7 @@ ${userText}
 
         {/* canonical */}
         {selectedProduct
-          ? <link rel="canonical" href={`https://honestbaby-care.com/?product=${encodeURIComponent(selectedProduct.id)}`} />
+          ? <link rel="canonical" href={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
           : selectedCategory !== "すべて"
             ? <link rel="canonical" href={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
             : <link rel="canonical" href="https://honestbaby-care.com/" />
@@ -1678,7 +1756,7 @@ ${userText}
         }
         <meta property="og:image" content={selectedProduct?.image || "https://honestbaby-care.com/logo.png"} />
         {selectedProduct
-          ? <meta property="og:url" content={`https://honestbaby-care.com/?product=${encodeURIComponent(selectedProduct.id)}`} />
+          ? <meta property="og:url" content={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
           : selectedCategory !== "すべて"
             ? <meta property="og:url" content={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
             : <meta property="og:url" content="https://honestbaby-care.com/" />
@@ -1919,7 +1997,7 @@ ${userText}
       {selectedProduct && (
         <div className="fixed inset-0 z-[60] bg-[#FFFDFB] flex flex-col animate-in slide-in-from-bottom duration-300">
           <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
-            <button onClick={() => { setSelectedProduct(null); setExpandedMall(null); setReviewTab('honest'); }} className="p-2 -ml-2 bg-[#F9F6F3] rounded-full text-[#5A4C4C]"><ChevronLeft className="w-6 h-6" /></button>
+            <button onClick={closeProduct} className="p-2 -ml-2 bg-[#F9F6F3] rounded-full text-[#5A4C4C]"><ChevronLeft className="w-6 h-6" /></button>
             <span className="text-sm font-black text-[#5A4C4C]">商品詳細</span>
             <button className="p-2 -mr-2 text-[#A5A19E]"><Share2 className="w-5 h-5" /></button>
           </div>
