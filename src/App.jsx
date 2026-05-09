@@ -583,8 +583,8 @@ const App = () => {
         const priceInRange = (p) => origPrice === 0 || (p >= priceMin && p <= priceMax);
 
         const [rakutenResult, yahooResult] = await Promise.allSettled([
-          fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`).then(r => r.json()),
-          fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}`).then(r => r.json())
+          fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1`).then(r => r.json()),
+          fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}&noFilter=1`).then(r => r.json())
         ]);
         const shops = [];
         if (rakutenResult.status === 'fulfilled') {
@@ -2229,24 +2229,32 @@ ${userText}
               <div className="space-y-4">
                 {(() => {
                   const existingShops = normalizeShops(selectedProduct.shops);
-                  // 同一ショップ名は最安値1件に集約
-                  const shopByName = new Map();
+                  // ショップ名 or 遷移先URL のホスト名で重複判定
+                  const shopKey = (s) => {
+                    const nameKey = (s.name || '').replace(/[\s!！?？]/g, '').toLowerCase();
+                    const firstUrl = s.sellers?.[0]?.url;
+                    let urlKey = '';
+                    try {
+                      if (firstUrl) {
+                        const u = new URL(firstUrl.startsWith('//') ? 'https:' + firstUrl : firstUrl);
+                        urlKey = u.hostname + u.pathname.split('/').slice(0, 3).join('/');
+                      }
+                    } catch {}
+                    return urlKey || nameKey;
+                  };
+                  const shopByKey = new Map();
                   for (const s of existingShops) {
-                    const key = (s.name || '').replace(/\s+/g, '').toLowerCase();
-                    const cur = shopByName.get(key);
+                    const key = shopKey(s);
+                    const cur = shopByKey.get(key);
                     if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
-                      shopByName.set(key, s);
+                      shopByKey.set(key, s);
                     }
                   }
-                  const dedupedExisting = Array.from(shopByName.values());
-                  // 有効なsellersを持つショップ名のみcrossPlatformをブロック（url='#'のみのショップは上書き許可）
-                  const existingNames = new Set(
-                    dedupedExisting.filter(s => s.sellers && s.sellers.length > 0).map(s => s.name)
-                  );
-                  // DBに有効URLがないショップはcrossPlatformで上書き、新規ショップは追記
+                  const dedupedExisting = Array.from(shopByKey.values()).filter(s => s.sellers && s.sellers.length > 0);
+                  const existingKeys = new Set(dedupedExisting.map(shopKey));
                   const mergedShops = [
-                    ...dedupedExisting.filter(s => s.sellers && s.sellers.length > 0),
-                    ...crossPlatformShops.filter(s => !existingNames.has(s.name)),
+                    ...dedupedExisting,
+                    ...crossPlatformShops.filter(s => !existingKeys.has(shopKey(s))),
                   ];
                   return mergedShops;
                 })().map((shop, idx) => (
