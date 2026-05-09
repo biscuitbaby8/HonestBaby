@@ -219,7 +219,7 @@ const App = () => {
 
   const signInWithGoogle = () => supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin }
+    options: { redirectTo: 'https://honestbaby-care.com/' }
   });
   const signOut = () => supabase.auth.signOut().then(() => setUser(null));
 
