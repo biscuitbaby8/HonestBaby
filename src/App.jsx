@@ -512,8 +512,11 @@ const App = () => {
         const priceMin = origPrice > 0 ? origPrice * 0.25 : 0;
         const priceMax = origPrice > 0 ? origPrice * 4 : Infinity;
         const selectedWords = keyword.split(' ').filter(w => w.length >= 2).map(w => w.toLowerCase());
+        // 型番（数字を含む語）が一致する場合はそれを必須条件にし、別モデルの混入を防ぐ
+        const modelWords = selectedWords.filter(w => /[0-9０-９]/.test(w));
         const nameMatches = (itemName) => {
           const lower = (itemName || '').toLowerCase().replace(/[\s　]/g, '');
+          if (modelWords.length > 0) return modelWords.every(w => lower.includes(w));
           return selectedWords.some(w => lower.includes(w));
         };
         const priceInRange = (p) => origPrice === 0 || (p >= priceMin && p <= priceMax);
