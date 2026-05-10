@@ -237,8 +237,7 @@ const App = () => {
   }, [favorites]);
 
   const signInWithGoogle = () => supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo: window.location.origin }
+    provider: 'google'
   });
   const signOut = () => supabase.auth.signOut().then(() => setUser(null));
 
