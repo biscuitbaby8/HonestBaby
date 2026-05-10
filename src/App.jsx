@@ -391,6 +391,14 @@ const App = () => {
 
   // Auth: Googleログイン状態の監視
   useEffect(() => {
+    // 🔍 究極のデバッグ：URLにエラーが含まれているかチェックして画面に表示する
+    if (window.location.hash.includes('error=')) {
+      const params = new URLSearchParams(window.location.hash.replace('#', '?'));
+      const error = params.get('error');
+      const desc = params.get('error_description');
+      alert(`【ログイン失敗エラー】\n種類: ${error}\n詳細: ${desc}\n\nこの画面をスクショして教えてください！`);
+    }
+
     // detectSessionInUrl: true + flowType: 'pkce' でSDKがコールバックURLを自動処理するため
     // ここでは onAuthStateChange を待つだけで十分
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
