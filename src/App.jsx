@@ -391,15 +391,7 @@ const App = () => {
 
   // Auth: Googleログイン状態の監視
   useEffect(() => {
-    // 🔍 究極のデバッグ：URLにエラーが含まれているかチェックして画面に表示する
-    if (window.location.hash.includes('error=')) {
-      const params = new URLSearchParams(window.location.hash.replace('#', '?'));
-      const error = params.get('error');
-      const desc = params.get('error_description');
-      alert(`【ログイン失敗エラー】\n種類: ${error}\n詳細: ${desc}\n\nこの画面をスクショして教えてください！`);
-    }
-
-    // detectSessionInUrl: true + flowType: 'pkce' でSDKがコールバックURLを自動処理するため
+    // detectSessionInUrl: true でSDKがコールバックURLを自動処理するため
     // ここでは onAuthStateChange を待つだけで十分
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
@@ -436,6 +428,10 @@ const App = () => {
     usedPrice: p.used_price_estimate,
     unitCount: p.unit_count,
     unitName: p.unit_name,
+    popularity_rank: p.popularity_rank,
+    isMarketWide: p.is_market_wide,
+    isBestSeller: p.popularity_rank && p.popularity_rank <= 3,
+    isTopRated: Number(p.rating) >= 4.8,
     shops: (p.shops || []).map(s => {
       let sellers = s.sellers;
       if (typeof sellers === 'string') {
@@ -564,10 +560,8 @@ const App = () => {
     setRemoteProducts(prev => prev.filter(p => p.id !== product.id));
   };
 
-  // 初回ロード安定化: DBデータを表示しつつ、裏側で市場最新データをAPIで取得（Discovery Engine）
-  useEffect(() => {
-    fetchRankingsWithAI("すべて");
-  }, []);
+  // 初回ロード: DBに事前保存されたデータを表示（Cronバッチで毎晩自動更新）
+  // リアルタイムAPI呼び出しは不要（カテゴリ切替時のみフォールバックとして利用）
 
   // 商品詳細を開いたとき楽天＋Yahoo を並列検索してクロスプラットフォーム価格比較
   useEffect(() => {
@@ -1455,12 +1449,14 @@ ${userText}
       );
     }
 
-    let filtered = dbProducts.filter(p => {
-      const matchCat = selectedCategory === "すべて" || p.category === selectedCategory;
-      const matchSub = selectedSubCategory === "すべて" || p.subCategory === selectedSubCategory;
-      const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
-      return matchCat && matchSub && matchSubSub;
-    });
+    let filtered = dbProducts
+      .filter(p => {
+        const matchCat = selectedCategory === "すべて" || p.category === selectedCategory;
+        const matchSub = selectedSubCategory === "すべて" || p.subCategory === selectedSubCategory;
+        const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
+        return matchCat && matchSub && matchSubSub;
+      })
+      .sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999));
     
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
     const showRemote = remoteProducts.length > 0 || isRemoteLoading;
@@ -1613,20 +1609,22 @@ ${userText}
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {remoteProducts.length > 0 && applySortOrder(remoteProducts).map((p) => (
+          {/* DB商品を優先表示（Cronバッチで毎晩自動更新） */}
+          {filtered.length > 0 && applySortOrder(filtered).map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
 
-          {!isRemoteLoading && remoteProducts.length === 0 && filtered.length > 0 && (
-            applySortOrder(filtered).map((p) => <ProductCard key={p.id} product={p} />)
-          )}
+          {/* DB商品がないカテゴリではリモート検索結果をフォールバック表示 */}
+          {filtered.length === 0 && remoteProducts.length > 0 && applySortOrder(remoteProducts).map((p) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
 
-          {!isRemoteLoading && remoteProducts.length === 0 && filtered.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
+          {filtered.length === 0 && remoteProducts.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
             applySortOrder(cachedProducts[selectedCategory]).map((p) => <ProductCard key={p.id} product={p} />)
           )}
 
           {/* Empty State */}
-          {!isRemoteLoading && remoteProducts.length === 0 && filtered.length === 0 && !cachedProducts[selectedCategory]?.length && (
+          {!isRemoteLoading && filtered.length === 0 && remoteProducts.length === 0 && !cachedProducts[selectedCategory]?.length && (
              <div className="col-span-2 py-20 text-center text-[#A5A19E] text-xs font-bold uppercase tracking-widest leading-loose">該当する商品は見つかりませんでした</div>
           )}
         </div>

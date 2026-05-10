@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/sync-products?manual=1",
+      "schedule": "0 18 * * *"
+    }
+  ],
   "redirects": [
     {
       "source": "/:path*",
@@ -13,6 +19,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
