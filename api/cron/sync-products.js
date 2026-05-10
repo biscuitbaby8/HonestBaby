@@ -210,7 +210,7 @@ async function syncCategory(cat, log) {
   try {
     // 検索API（レビュー数順、2ページ分）
     const res1 = await fetchRakutenSearch(cat.keyword, cat.genreId, 1);
-    await new Promise(r => setTimeout(r, 1000)); // 1秒待機 (429対策)
+    await new Promise(r => setTimeout(r, 2000)); // 2秒待機 (より慎重に)
     const res2 = await fetchRakutenSearch(cat.keyword, cat.genreId, 2);
     
     allItems = [
@@ -221,7 +221,7 @@ async function syncCategory(cat, log) {
     log.push(`  ⚠️ 検索API失敗: ${e.message}`);
   }
 
-  await new Promise(r => setTimeout(r, 1000)); // 1秒待機 (429対策)
+  await new Promise(r => setTimeout(r, 2000)); // 2秒待機 (より慎重に)
 
   // ランキングAPIも追加取得
   try {
