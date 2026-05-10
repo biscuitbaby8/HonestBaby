@@ -201,14 +201,18 @@ function deduplicateProducts(products) {
 async function syncCategory(cat, log) {
   log.push(`📦 カテゴリ「${cat.name}」の同期開始...`);
 
+  if (!RAKUTEN_APP_ID) {
+    log.push(`  ⚠️ RAKUTEN_APP_IDが設定されていません`);
+  }
+
   let allItems = [];
 
   try {
     // 検索API（レビュー数順、2ページ分）
-    const [res1, res2] = await Promise.all([
-      fetchRakutenSearch(cat.keyword, cat.genreId, 1),
-      fetchRakutenSearch(cat.keyword, cat.genreId, 2),
-    ]);
+    const res1 = await fetchRakutenSearch(cat.keyword, cat.genreId, 1);
+    await new Promise(r => setTimeout(r, 1000)); // 1秒待機 (429対策)
+    const res2 = await fetchRakutenSearch(cat.keyword, cat.genreId, 2);
+    
     allItems = [
       ...normalizeRakutenItems(res1.Items || [], cat.name),
       ...normalizeRakutenItems(res2.Items || [], cat.name),
@@ -216,6 +220,8 @@ async function syncCategory(cat, log) {
   } catch (e) {
     log.push(`  ⚠️ 検索API失敗: ${e.message}`);
   }
+
+  await new Promise(r => setTimeout(r, 1000)); // 1秒待機 (429対策)
 
   // ランキングAPIも追加取得
   try {
