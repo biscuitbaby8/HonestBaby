@@ -1236,14 +1236,25 @@ const App = () => {
 
       let prompt;
       const isDiagnosis = userText.includes('診断');
+      const isExpert = userText.includes('[商品詳細データ]');
 
-      if (isDiagnosis) {
+      if (isExpert) {
+        prompt = `あなたはベビー用品のプロ購買コンサルタントです。提供された【商品詳細データ】を元に、以下の点に重点を置いて回答してください。
+1. その商品の市場価値（他店と比較して安いか、買い時か）
+2. 専門家から見たメリット・デメリット
+3. どんなユーザーにおすすめか
+決して嘘をつかず、具体的な数値（価格など）に言及して、ユーザーの決断を助けてください。
+回答は簡潔に、箇条書きを活用して読みやすくしてください。
+
+【ユーザーからの相談】
+${userText}`;
+      } else if (isDiagnosis) {
         prompt = `あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
-ユーザーは「5秒診断」を希望しています。以下の手順で進めてください。
-1. まず明るく挨拶し、どのカテゴリ（ベビーカー、抱っこ紐など）の診断を希望するか聞いてください。
-2. 次に、選ばれたカテゴリに対して1つずつ質問を投げ、ユーザーのライフスタイルを聞き出してください。
-3. 合計3つ程度の質問のあと、ユーザーに最適な商品を提案してください。
-4. 回答は絵文字を多用せず、シンプルで高級感のあるトーンにしてください。
+ユーザーは「5秒診断」を希望しています。以下の手順で厳格に進めてください。
+1. まず明るく挨拶し、「どんなアイテム（ベビーカー、抱っこ紐など）をお探しですか？」と1つだけ質問してください。
+2. その後、ライフスタイルや予算について1つずつ質問を投げてください。
+3. 合計3つ程度の対話のあと、データベース ${JSON.stringify(dbProducts.slice(0, 10).map(p => p.name))} の中から最適なものを提案してください。
+4. 回答は親しみやすく、かつプレミアムな印象を与えてください。
 
 【ユーザーの入力】
 ${userText}`;
@@ -2270,7 +2281,20 @@ ${userText}
             <section className="mb-10 bg-[#FFF5F5] border border-[#FFEBEB] p-8 rounded-[2.5rem] relative overflow-hidden">
               <div className="flex items-center gap-2 mb-4 relative z-10"><Sparkles className="w-5 h-5 text-[#F2ABAC]" /><h3 className="font-black text-[#5A4C4C] text-lg">AIによる分析</h3></div>
               <p className="text-sm text-[#8E8282] leading-relaxed font-medium mb-8 relative z-10">{selectedProduct.aiAnalysis}</p>
-              <button onClick={() => { setActiveTab('ai'); setUserInput(`${selectedProduct.name}についてもっと詳しく教えて`); setSelectedProduct(null); }} className="w-full py-4 bg-white border border-[#F2ABAC] text-[#F2ABAC] rounded-full text-xs font-black shadow-sm active:scale-95 transition-transform relative z-10">AIコンサルタントにさらに聞く</button>
+              <button onClick={() => { 
+                setActiveTab('ai'); 
+                const shopInfo = (selectedProduct.shops || []).map(s => `${s.name}: ¥${s.lowestPrice.toLocaleString()}`).join(', ');
+                const context = `[商品詳細データ]
+名前: ${selectedProduct.name}
+ブランド: ${selectedProduct.brand}
+価格帯: ${selectedProduct.price?.toLocaleString()}円
+ショップ状況: ${shopInfo}
+AI分析: ${selectedProduct.aiAnalysis}
+
+この商品について、他と比較したメリット・デメリットや、今の買い得度を詳しく教えてください。`;
+                setUserInput(context); 
+                setSelectedProduct(null); 
+              }} className="w-full py-4 bg-white border border-[#F2ABAC] text-[#F2ABAC] rounded-full text-xs font-black shadow-sm active:scale-95 transition-transform relative z-10">AIコンサルタントにさらに聞く</button>
               <button onClick={() => { setAlertTargetPrice(''); setShowPriceAlertModal(true); }} className="w-full mt-3 py-4 bg-[#FFF9E6] border border-[#F9DC5C]/40 text-[#B8860B] rounded-full text-xs font-black shadow-sm active:scale-95 transition-transform relative z-10 flex items-center justify-center gap-2">
                 <BellRing className="w-4 h-4" /> 価格アラートを設定する
               </button>
