@@ -96,26 +96,86 @@ function parseDiaperCount(name) {
   return m ? parseInt(m[1]) : null;
 }
 
-// --- 楽天API呼び出し ---
+// --- 楽天API呼び出し（リトライ付き） ---
+async function fetchWithRetry(url, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const res = await fetch(url, {
+      headers: { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' }
+    });
+    if (res.ok) return res.json();
+    if (res.status === 429 || res.status === 403) {
+      // 403も一時的なWAF遮断の可能性があるためリトライ対象に含める
+      const waitTime = (i + 1) * 3000; // 3s, 6s, 9s
+      await new Promise(r => setTimeout(r, waitTime));
+      continue;
+    }
+    throw new Error(`API Error ${res.status}`);
+  }
+  throw new Error(`Max retries reached`);
+}
+
 async function fetchRakutenSearch(keyword, genreId, page = 1) {
   const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
-  const res = await fetch(url, {
-    headers: { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' }
-  });
-  if (!res.ok) throw new Error(`Rakuten Search API ${res.status}`);
-  return res.json();
+  return fetchWithRetry(url);
 }
 
 async function fetchRakutenRanking(genreId) {
   const url = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
-  const res = await fetch(url, {
-    headers: { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' }
-  });
-  if (!res.ok) throw new Error(`Rakuten Ranking API ${res.status}`);
-  return res.json();
+  return fetchWithRetry(url);
 }
 
-// --- Yahoo API呼び出し ---
+// --- Yahoo API呼び出し（フォールバック用） ---
+async function fetchYahooSearchFallback(keyword, category) {
+  if (!YAHOO_CLIENT_ID) return [];
+  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=30&sort=-review_count`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    
+    const requiredKws = REQUIRED_KEYWORDS[category] || [];
+    
+    return (data.hits || [])
+      .filter(item => !NG_KEYWORDS.some(kw => item.name.includes(kw)))
+      .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.name.includes(kw)))
+      .map(item => {
+        const rawName = item.name;
+        const name = cleanName(rawName);
+        const brand = extractBrand(rawName);
+        const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
+        let rawUrl = item.url || '';
+        if (/yahoo\.co\.jp/.test(rawUrl)) {
+          const sep = rawUrl.includes('?') ? '&' : '?';
+          rawUrl = `${rawUrl}${sep}sc_e=afvc_shp_${VC_SID}`;
+        }
+        
+        return {
+          name,
+          category,
+          brand,
+          image_url: item.image?.medium || '',
+          rating: parseFloat(item.review?.rate) || 0,
+          reviews_count: parseInt(item.review?.count) || 0,
+          rakuten_item_code: `yahoo-${item.code}`, // 一意なIDとして代用
+          is_market_wide: true,
+          unit_count: unitCount,
+          unit_name: unitCount ? '枚' : null,
+          last_synced_at: new Date().toISOString(),
+          _rakuten_shop: {
+            shop_name: item.seller?.name || 'Yahoo!ショッピング',
+            price: item.price,
+            url: rawUrl,
+            shipping: item.shipping?.code === 2 ? 0 : null,
+            points: 0,
+          }
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+// --- Yahoo API呼び出し（価格取得用） ---
 async function fetchYahooPrice(keyword) {
   if (!YAHOO_CLIENT_ID) return [];
   const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=5&sort=-review_count`;
@@ -206,11 +266,12 @@ async function syncCategory(cat, log) {
   }
 
   let allItems = [];
+  let rakutenFailed = false;
 
   try {
     // 検索API（レビュー数順、2ページ分）
     const res1 = await fetchRakutenSearch(cat.keyword, cat.genreId, 1);
-    await new Promise(r => setTimeout(r, 2000)); // 2秒待機 (より慎重に)
+    await new Promise(r => setTimeout(r, 2000)); // 2秒待機
     const res2 = await fetchRakutenSearch(cat.keyword, cat.genreId, 2);
     
     allItems = [
@@ -218,10 +279,11 @@ async function syncCategory(cat, log) {
       ...normalizeRakutenItems(res2.Items || [], cat.name),
     ];
   } catch (e) {
-    log.push(`  ⚠️ 検索API失敗: ${e.message}`);
+    log.push(`  ⚠️ 楽天検索API失敗: ${e.message}`);
+    rakutenFailed = true;
   }
 
-  await new Promise(r => setTimeout(r, 2000)); // 2秒待機 (より慎重に)
+  await new Promise(r => setTimeout(r, 2000));
 
   // ランキングAPIも追加取得
   try {
@@ -229,7 +291,20 @@ async function syncCategory(cat, log) {
     const rankingItems = normalizeRakutenItems(rankingData.Items || [], cat.name);
     allItems = [...allItems, ...rankingItems];
   } catch (e) {
-    log.push(`  ⚠️ ランキングAPI失敗: ${e.message}`);
+    log.push(`  ⚠️ 楽天ランキングAPI失敗: ${e.message}`);
+    rakutenFailed = true;
+  }
+
+  // 楽天が完全に失敗した場合はYahooから取得（フォールバック）
+  if (allItems.length === 0 && rakutenFailed) {
+    log.push(`  🔄 楽天API全滅のため、YahooショッピングAPIから代替取得を試みます...`);
+    const yahooItems = await fetchYahooSearchFallback(cat.keyword, cat.name);
+    if (yahooItems.length > 0) {
+      log.push(`  ✅ Yahoo APIから ${yahooItems.length}件 取得成功`);
+      allItems = yahooItems;
+    } else {
+      log.push(`  ⚠️ Yahoo APIからも取得できませんでした`);
+    }
   }
 
   if (allItems.length === 0) {
