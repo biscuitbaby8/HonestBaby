@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-// FORCE REBUILD FOR EXTREME IMAGE QUALITY AND PERFORMANCE - 2026-05-11
+// FORCE REBUILD V3 - DEPLOYMENT CHECK - 2026-05-11
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Heart, ExternalLink, X, Star, MessageCircle,
@@ -2481,7 +2481,8 @@ AI分析: ${selectedProduct.aiAnalysis}
                         ))}
                       </div>
                     )}
-                  </div>
+                    <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.1.0</p>
+              </div>
                 ))}
               </div>
             </section>
