@@ -708,7 +708,7 @@ const App = () => {
         id: `gift-${item.Item.itemCode}`,
         name: cleanName(item.Item.itemName),
         price: item.Item.itemPrice,
-        image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
+        image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=640x640'),
         url: item.Item.affiliateUrl || item.Item.itemUrl,
         brand: item.Item.shopName || '楽天市場',
         rating: parseFloat(item.Item.reviewAverage) || 4.5,
@@ -765,7 +765,7 @@ const App = () => {
           id: `ranking-${item.Item.itemCode}`,
           name,
           price: item.Item.itemPrice,
-          image: rawImg.replace(/_ex=\d+x\d+/, '_ex=400x400'),
+          image: rawImg.replace(/_ex=\d+x\d+/, '_ex=640x640'),
           url: item.Item.affiliateUrl || item.Item.itemUrl,
           brand: "",
           category: cat,
@@ -1222,7 +1222,7 @@ const App = () => {
               price: item.itemPrice,
               brand: item.shopName || '楽天市場',
               category: matched ? userText : 'ベビー用品',
-              image: (item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
+              image: (item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=640x640'),
               rating: parseFloat(item.reviewAverage) || 4.0,
               reviews_count: 0,
               ai_analysis: null,
@@ -1397,8 +1397,29 @@ ${userText}
 
   // --- 共通コンポーネント ---
 
-  const openProduct = (product) => {
+  const openProduct = async (product) => {
+    // 既存の基本情報でまず開く
     setSelectedProduct(product);
+    
+    // 背景で最新の口コミ情報を取得してマージする
+    try {
+      const { data } = await supabase
+        .from('products')
+        .select('*, honestReviews:reviews(*), snsReviews:sns_reviews(*)')
+        .eq('name', product.name) // 名前でマッチさせる（外部API商品も考慮）
+        .single();
+      
+      if (data) {
+        setSelectedProduct(prev => ({
+          ...prev,
+          honestReviews: (data.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
+          snsReviews: data.snsReviews || []
+        }));
+      }
+    } catch (e) {
+      console.warn('Review fetch failed:', e);
+    }
+
     setRecentlyViewed(prev => {
       const filtered = prev.filter(p => p.id !== product.id);
       return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
