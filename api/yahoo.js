@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       id: `yahoo-${item.code || Math.random()}`,
       name: item.name,
       price: item.price,
-      image: item.image?.medium || item.image?.small || '',
+      image: item.image?.large || item.image?.medium || item.image?.small || '',
       url: addAffiliate(item.url),
       brand: item.seller?.name || item.brand?.name || 'Yahoo!ショッピング',
       rating: item.review?.rate || 4.5,

@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       id: `rakuten-${item.Item.itemCode}`,
       name: item.Item.itemName,
       price: item.Item.itemPrice,
-      image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=400x400'),
+      image: (item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=800x800'),
       url: item.Item.affiliateUrl || item.Item.itemUrl,
       brand: item.Item.shopName || '楽天市場',
       rating: parseFloat(item.Item.reviewAverage) || 4.5,
