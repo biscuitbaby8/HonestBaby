@@ -96,6 +96,39 @@ function parseDiaperCount(name) {
   return m ? parseInt(m[1]) : null;
 }
 
+// サブカテゴリ推定ロジック
+function extractSubCategory(category, itemName) {
+  const rules = {
+    "おむつ": [
+      { match: /パンツ/, sub: "パンツタイプ" },
+      { match: /テープ/, sub: "テープタイプ" },
+      { match: /おしりふき/, sub: "おしりふき" },
+    ],
+    "ベビーカー": [
+      { match: /[AＡ]型/, sub: "A型" },
+      { match: /[BＢ]型/, sub: "B型" },
+      { match: /AB型/, sub: "AB型" },
+      { match: /バギー/, sub: "バギー" },
+    ],
+    "抱っこ紐": [
+      { match: /スリング/, sub: "スリング" },
+      { match: /ヒップシート/, sub: "ヒップシート" },
+    ],
+    "車用品": [
+      { match: /ジュニアシート/, sub: "ジュニアシート" },
+      { match: /新生児/, sub: "新生児用" },
+    ]
+  };
+
+  const catRules = rules[category];
+  if (catRules) {
+    for (const r of catRules) {
+      if (r.match.test(itemName)) return r.sub;
+    }
+  }
+  return "本体"; // デフォルト
+}
+
 // --- 楽天API呼び出し（リトライ付き） ---
 async function fetchWithRetry(url, maxRetries = 1) {
   for (let i = 0; i <= maxRetries; i++) {
@@ -154,6 +187,7 @@ async function fetchYahooSearchFallback(keyword, category) {
         const rawName = item.name;
         const name = cleanName(rawName);
         const brand = extractBrand(rawName);
+        const subCategory = extractSubCategory(category, rawName);
         const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
         let rawUrl = item.url || '';
         if (/yahoo\.co\.jp/.test(rawUrl)) {
@@ -164,6 +198,7 @@ async function fetchYahooSearchFallback(keyword, category) {
         return {
           name,
           category,
+          sub_category: subCategory,
           brand,
           image_url: item.image?.medium || '',
           rating: parseFloat(item.review?.rate) || 0,
@@ -224,12 +259,14 @@ function normalizeRakutenItems(items, category) {
       const rawName = item.Item.itemName;
       const name = cleanName(rawName);
       const brand = extractBrand(rawName);
+      const subCategory = extractSubCategory(category, rawName);
       const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
       const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || '';
 
       return {
         name,
         category,
+        sub_category: subCategory,
         brand,
         image_url: rawImg.replace(/_ex=\d+x\d+/, '_ex=400x400'),
         rating: parseFloat(item.Item.reviewAverage) || 0,
@@ -365,6 +402,7 @@ async function syncCategory(cat, log) {
             rating: product.rating,
             reviews_count: product.reviews_count,
             popularity_rank: product.popularity_rank,
+            sub_category: product.sub_category,
             brand: product.brand || undefined,
             last_synced_at: product.last_synced_at,
           })
