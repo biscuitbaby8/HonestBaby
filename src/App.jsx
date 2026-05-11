@@ -159,7 +159,7 @@ const VC_DOMAIN_PIDS = {
   'dadway-onlineshop.com': import.meta.env.VITE_VC_PID_DADWAY   || '892608374',
   'ergobaby.jp':           import.meta.env.VITE_VC_PID_ERGOBABY || '892609670',
 };
-const AMAZON_TAG = import.meta.env.VITE_AMAZON_TAG || 'honestbaby-22'; // デフォルトID
+const AMAZON_TAG = import.meta.env.VITE_AMAZON_TAG || 'honestbaby-22';
 
 const toVCUrl = (url) => {
   if (!url || url === '#') return url;
