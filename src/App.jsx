@@ -159,6 +159,8 @@ const VC_DOMAIN_PIDS = {
   'dadway-onlineshop.com': import.meta.env.VITE_VC_PID_DADWAY   || '892608374',
   'ergobaby.jp':           import.meta.env.VITE_VC_PID_ERGOBABY || '892609670',
 };
+const AMAZON_TAG = import.meta.env.VITE_AMAZON_TAG || 'honestbaby-22'; // デフォルトID
+
 const toVCUrl = (url) => {
   if (!url || url === '#') return url;
   try {
@@ -170,6 +172,10 @@ const toVCUrl = (url) => {
   } catch {
     return url;
   }
+};
+
+const getAmazonUrl = (keyword) => {
+  return `https://www.amazon.co.jp/s?k=${encodeURIComponent(keyword)}&tag=${AMAZON_TAG}`;
 };
 
 
@@ -2330,24 +2336,17 @@ ${userText}
                 ))}
               </div>
               {/* Amazonで検索リンク */}
-              {(() => {
-                const amzKeyword = selectedProduct.name.split(/[\s　]+/).slice(0, 4).join('+');
-                const amzTag = import.meta.env.VITE_AMAZON_PARTNER_TAG || '';
-                const amzUrl = `https://www.amazon.co.jp/s?k=${encodeURIComponent(amzKeyword)}${amzTag ? `&tag=${amzTag}` : ''}`;
-                return (
-                  <a href={amzUrl} target="_blank" rel="noopener noreferrer"
-                    className="mt-4 flex items-center justify-between bg-[#232F3E] text-white rounded-[2rem] px-6 py-4 active:scale-95 transition-all shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg font-black tracking-tight text-[#FF9900]">amazon</span>
-                      <div>
-                        <p className="text-xs font-black">Amazonで検索する</p>
-                        <p className="text-[10px] text-white/50">価格・在庫をAmazonで確認</p>
-                      </div>
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-white/60" />
-                  </a>
-                );
-              })()}
+              <a href={getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' '))} target="_blank" rel="noopener noreferrer"
+                className="mt-4 flex items-center justify-between bg-[#232F3E] text-white rounded-[2rem] px-6 py-4 active:scale-95 transition-all shadow-sm">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-black tracking-tight text-[#FF9900]">amazon</span>
+                  <div>
+                    <p className="text-xs font-black">Amazonで検索する</p>
+                    <p className="text-[10px] text-white/50">価格・在庫をAmazonで確認</p>
+                  </div>
+                </div>
+                <ExternalLink className="w-4 h-4 text-white/60" />
+              </a>
             </section>
 
             {/* ＝＝＝＝＝ 口コミセクション (ネイティブ＆SNS統合) ＝＝＝＝＝ */}
@@ -2531,7 +2530,9 @@ ${userText}
                   <h4 className="font-black text-[#5A4C4C]">アフィリエイトプログラムについて</h4>
                 </div>
                 <p className="text-xs text-[#8E8282] leading-relaxed">
-                  Honest Babyは、Amazon.co.jp、楽天市場、Yahoo!ショッピング、その他各公式ストア等を宣伝しリンクすることによって紹介料を獲得できるアフィリエイトプログラムの参加者です。ユーザーの皆様には追加の費用は一切かかりません。
+                  Honest Babyは、Amazon.co.jp、楽天市場、Yahoo!ショッピング、その他各公式ストア等を宣伝しリンクすることによって紹介料を獲得できるアフィリエイトプログラムの参加者です。
+                  <br /><br />
+                  Amazon.co.jpのアソシエイトとして、Honest Babyは適格販売により収入を得ています。
                 </p>
               </div>
             )}
