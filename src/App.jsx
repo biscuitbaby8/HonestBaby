@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+// FORCE REBUILD FOR EXTREME IMAGE QUALITY AND PERFORMANCE - 2026-05-11
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Heart, ExternalLink, X, Star, MessageCircle,
