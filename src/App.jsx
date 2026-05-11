@@ -180,16 +180,16 @@ const toVCUrl = (url) => {
 const getHighResImage = (url) => {
   if (!url) return "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby";
   try {
-    // 楽天: 128px〜400pxなどの制限を 1000px(最大級) に強制変換
-    if (url.includes('rakuten.co.jp')) {
-      return url.replace(/_ex=\d+x\d+/, '_ex=1000x1000');
+    // 楽天
+    if (url.indexOf('rakuten.co.jp') !== -1) {
+      return url.split('?_ex=')[0] + '?_ex=1000x1000';
     }
-    // Yahoo: medium/large を original(g) 等の最高画質へ
-    if (url.includes('shopping.yahoo.co.jp')) {
-      return url.replace('item/shp_thumb/', 'item/shp_main/').replace('/medium/', '/large/').replace('_m.jpg', '_l.jpg');
+    // Yahoo
+    if (url.indexOf('shopping.yahoo.co.jp') !== -1) {
+      return url.replace('/medium/', '/large/').replace('_m.jpg', '_l.jpg');
     }
     return url;
-  } catch {
+  } catch (e) {
     return url;
   }
 };
@@ -1426,7 +1426,9 @@ ${userText}
 
     // 2. 口コミデータなどはバックグラウンドで非同期に取得
     try {
-      const query = product.name.split(/[\s　]+/).filter(s => s.length > 1).slice(0, 2).join(' ');
+      // シンプルなクエリに変更
+      const nameParts = product.name.split(/[\s　]+/);
+      const query = nameParts[0];
       const { data } = await supabase
         .from('products')
         .select('*, honestReviews:reviews(*), snsReviews:sns_reviews(*)')
@@ -2481,7 +2483,7 @@ AI分析: ${selectedProduct.aiAnalysis}
                         ))}
                       </div>
                     )}
-                    <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.1.0</p>
+                    <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.0</p>
               </div>
                 ))}
               </div>
