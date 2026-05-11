@@ -596,6 +596,28 @@ const App = () => {
         };
         const priceInRange = (p) => origPrice === 0 || (p >= priceMin && p <= priceMax);
 
+        // --- 口コミ・SNSレビューの最新データをDBから取得 ---
+        const fetchReviewsFromDb = async () => {
+          const { data: dbProd } = await supabase
+            .from('products')
+            .select('id, reviews(*), sns_reviews(*)')
+            .or(`id.eq.${selectedProduct.id},rakuten_item_code.eq.${selectedProduct.id}`)
+            .single();
+          
+          if (dbProd) {
+            setSelectedProduct(prev => {
+              if (!prev || (prev.id !== selectedProduct.id && prev.rakuten_item_code !== selectedProduct.id)) return prev;
+              return {
+                ...prev,
+                id: dbProd.id, // UUIDがあればそれに差し替え
+                honestReviews: (dbProd.reviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
+                snsReviews: dbProd.sns_reviews || []
+              };
+            });
+          }
+        };
+        fetchReviewsFromDb();
+
         const [rakutenResult, yahooResult] = await Promise.allSettled([
           fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1`).then(r => r.json()),
           fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}&noFilter=1`).then(r => r.json())
@@ -1271,45 +1293,77 @@ ${userText}
       return;
     }
     setIsSubmittingReview(true);
-    const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'ユーザー';
-
-    // SupabaseにINSERT（RLSポリシーで許可済）
-    const { data, error } = await supabase
-       .from('reviews')
-       .insert([{
-         product_id: selectedProduct.id,
-         rating: reviewForm.rating,
-         content: reviewForm.content,
-         user_name: displayName
-       }])
-       .select();
-
-    if (error) {
-      console.error("レビュー投稿エラー:", error);
-      alert("通信エラーが発生しました。");
-    } else if (data && data.length > 0) {
-      // フロントエンドの表示用に整形
-      const newReview = {
-        ...data[0],
-        user: data[0].user_name,
-        date: new Date(data[0].created_at).toLocaleDateString()
-      };
-      
-      // 画面上のリストを即座に更新する
-      const updatedProduct = {
-        ...selectedProduct,
-        honestReviews: [newReview, ...selectedProduct.honestReviews]
-      };
-      
-      setSelectedProduct(updatedProduct);
-      setDbProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-
-      setIsReviewFormOpen(false);
-      setReviewForm({ rating: 5, content: "" });
-      alert("口コミを投稿しました！");
-    }
     
-    setIsSubmittingReview(false);
+    try {
+      let productId = selectedProduct.id;
+
+      // もしIDがUUIDでない（API取得直後のデータなど）場合、まずDBに保存してUUIDを取得する
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
+      
+      if (!isUuid) {
+        // DB保存ロジック（sync-products.jsの簡易版をフロントでも実行）
+        const { data: saved, error: saveErr } = await supabase
+          .from('products')
+          .upsert({
+            name: selectedProduct.name,
+            category: selectedProduct.category,
+            sub_category: selectedProduct.subCategory,
+            brand: selectedProduct.brand,
+            image_url: selectedProduct.image,
+            rating: selectedProduct.rating || 0,
+            reviews_count: selectedProduct.reviewsCount || 0,
+            rakuten_item_code: selectedProduct.id,
+            is_market_wide: true,
+            last_synced_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (saveErr) throw saveErr;
+        productId = saved.id;
+      }
+
+      const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'ユーザー';
+
+      // SupabaseにINSERT
+      const { data, error } = await supabase
+         .from('reviews')
+         .insert([{
+           product_id: productId,
+           rating: reviewForm.rating,
+           content: reviewForm.content,
+           user_name: displayName
+         }])
+         .select();
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const newReview = {
+          ...data[0],
+          user: data[0].user_name,
+          date: new Date(data[0].created_at).toLocaleDateString()
+        };
+        
+        const updatedProduct = {
+          ...selectedProduct,
+          id: productId, // UUIDに更新
+          honestReviews: [newReview, ...(selectedProduct.honestReviews || [])]
+        };
+        
+        setSelectedProduct(updatedProduct);
+        setDbProducts(prev => prev.map(p => p.id === updatedProduct.id || p.id === selectedProduct.id ? updatedProduct : p));
+
+        setIsReviewFormOpen(false);
+        setReviewForm({ rating: 5, content: "" });
+        alert("口コミを投稿しました！ありがとうございます。");
+      }
+    } catch (e) {
+      console.error("レビュー投稿エラー:", e);
+      alert("投稿に失敗しました。時間をおいて再度お試しください。");
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   // --- 共通コンポーネント ---
