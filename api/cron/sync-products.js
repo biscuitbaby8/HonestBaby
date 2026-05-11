@@ -366,9 +366,11 @@ async function syncCategory(cat, log) {
   const { data: blocklist } = await supabase.from('product_blocklist').select('item_code');
   const blockedCodes = new Set((blocklist || []).map(b => b.item_code));
 
-  // タイムアウト回避のため、上位150件に限定
-  const productsToProcess = deduplicated.slice(0, 150);
-  log.push(`  ⏱ 市場網羅のため、上位 ${productsToProcess.length}件を一気に登録します`);
+  // タイムアウト回避（手動実行時は10秒制限を考慮して控えめに、自動実行時は150件フルで処理）
+  const isManual = log.some(l => l.includes('🎯 フィルタ適用')); 
+  const limitCount = isManual ? 40 : 150;
+  const productsToProcess = deduplicated.slice(0, limitCount);
+  log.push(`  ⏱ 市場網羅のため、上位 ${productsToProcess.length}件を処理します`);
 
   for (let i = 0; i < productsToProcess.length; i++) {
     const product = productsToProcess[i];
