@@ -450,7 +450,17 @@ export default async function handler(req, res) {
 
   let totalSaved = 0;
 
-  for (const cat of CATEGORIES) {
+  let targetCategories = CATEGORIES;
+  const filterCat = req.query.category;
+  if (filterCat) {
+    targetCategories = CATEGORIES.filter(c => c.name === filterCat);
+    if (targetCategories.length === 0) {
+      return res.status(400).json({ error: `Category "${filterCat}" not found` });
+    }
+    log.push(`🎯 フィルタ適用: カテゴリ「${filterCat}」のみ同期します`);
+  }
+
+  for (const cat of targetCategories) {
     try {
       const count = await syncCategory(cat, log);
       totalSaved += count;
