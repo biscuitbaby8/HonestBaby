@@ -176,6 +176,23 @@ const toVCUrl = (url) => {
   }
 };
 
+const getHighResImage = (url) => {
+  if (!url) return "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby";
+  try {
+    // 楽天: 128px〜400pxなどの制限を 1000px(最大級) に強制変換
+    if (url.includes('rakuten.co.jp')) {
+      return url.replace(/_ex=\d+x\d+/, '_ex=1000x1000');
+    }
+    // Yahoo: medium/large を original(g) 等の最高画質へ
+    if (url.includes('shopping.yahoo.co.jp')) {
+      return url.replace('item/shp_thumb/', 'item/shp_main/').replace('/medium/', '/large/').replace('_m.jpg', '_l.jpg');
+    }
+    return url;
+  } catch {
+    return url;
+  }
+};
+
 const getAmazonUrl = (keyword) => {
   return `https://www.amazon.co.jp/s?k=${encodeURIComponent(keyword)}&tag=${AMAZON_TAG}`;
 };
@@ -214,8 +231,14 @@ const App = () => {
   const [giftBudgetFilter, setGiftBudgetFilter] = useState("すべて");
   const [giftSceneFilter, setGiftSceneFilter] = useState("すべて");
 
-  // 管理モード: URLに ?admin=1 を付けている間だけ有効（永続化しない）
-  const isAdminMode = location.search.includes('admin=1');
+  // 管理モード: URLに ?admin=1 が付いているか、セッション中に有効化した場合はON
+  const isAdminMode = (() => {
+    if (location.search.includes('admin=1')) {
+      try { sessionStorage.setItem('honestBabyAdminSession', '1'); } catch { }
+      return true;
+    }
+    try { return sessionStorage.getItem('honestBabyAdminSession') === '1'; } catch { return false; }
+  })();
 
   // ブロックリスト（非表示商品）
   const [blocklist, setBlocklist] = useState(new Set());
@@ -423,7 +446,7 @@ const App = () => {
     rating: Number(p.rating),
     subCategory: p.sub_category,
     reviewsCount: p.reviews_count,
-    image: p.image_url,
+    image: getHighResImage(p.image_url),
     aiAnalysis: p.ai_analysis,
     giftTags: p.gift_tags || [],
     usedPrice: p.used_price_estimate,
@@ -1462,7 +1485,7 @@ ${userText}
     >
       <div className="relative aspect-square bg-[#F9F6F3] p-4">
         <img
-          src={product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"}
+          src={getHighResImage(product.image)}
           onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }}
           className="w-full h-full object-cover rounded-[1.5rem]"
           alt={product.name}
@@ -2291,7 +2314,7 @@ ${userText}
           </div>
           <div className="flex-1 overflow-y-auto px-6 pb-32">
             <div className="bg-[#F9F6F3] rounded-[3rem] p-6 my-6">
-              <img src={selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
+              <img src={getHighResImage(selectedProduct.image)} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
             </div>
 
             <div className="flex justify-between items-start mb-8 px-1">
