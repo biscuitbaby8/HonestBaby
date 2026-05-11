@@ -180,11 +180,16 @@ const toVCUrl = (url) => {
 const getHighResImage = (url) => {
   if (!url) return "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby";
   try {
-    // 楽天
+    // 楽天: ?_ex=NxN を 800x800 に上書き
     if (url.indexOf('rakuten.co.jp') !== -1) {
-      return url.split('?_ex=')[0] + '?_ex=1000x1000';
+      return url.split('?_ex=')[0] + '?_ex=800x800';
     }
-    // Yahoo
+    // Yahoo!ショッピング: c.yimg.jp の画像パスを大きいサイズに置換
+    // 例: /i/n/seller/item.jpg → /i/g/seller/item.jpg
+    if (url.indexOf('yimg.jp') !== -1) {
+      return url.replace('/i/n/', '/i/g/').replace('/i/j/', '/i/g/');
+    }
+    // 旧Yahoo URLパターン（後方互換）
     if (url.indexOf('shopping.yahoo.co.jp') !== -1) {
       return url.replace('/medium/', '/large/').replace('_m.jpg', '_l.jpg');
     }
@@ -580,9 +585,22 @@ const App = () => {
   // 商品を非表示にする（管理者モード専用）
   const blockProduct = async (product) => {
     const code = product.id.replace(/^(ranking|product)-/, '');
-    await supabase.from('product_blocklist').upsert({ item_code: code });
     setBlocklist(prev => new Set([...prev, code]));
+    // 全ての商品ソースから即座に除去
     setRemoteProducts(prev => prev.filter(p => p.id !== product.id));
+    setDbProducts(prev => prev.filter(p => p.id !== product.id));
+    setCachedProducts(prev => {
+      const updated = { ...prev };
+      for (const cat of Object.keys(updated)) {
+        updated[cat] = (updated[cat] || []).filter(p => p.id !== product.id);
+      }
+      return updated;
+    });
+    try {
+      await supabase.from('product_blocklist').upsert({ item_code: code });
+    } catch (e) {
+      console.error('Block sync to DB failed:', e);
+    }
   };
 
   // 初回ロード: DBに事前保存されたデータを表示（Cronバッチで毎晩自動更新）
@@ -1283,9 +1301,10 @@ ${userText}`;
         prompt = `あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
 
 【絶対ルール】
-- 必ず以下の【商品リスト】にある番号と商品名だけを使ってください
-- リストに存在しない商品名（例：マグネタック、マリオバティ等）は絶対に作ってはいけません
-- 2〜3個の商品を選び、各商品を「■ X番：おすすめ理由（1〜2文）」の形式で答えてください
+- 必ず以下の【商品リスト】にある商品名だけを使ってください
+- リストに存在しない商品名は絶対に作ってはいけません
+- 2〜3個の商品を選び、各商品を「■ 商品名：おすすめ理由（1〜2文）」の形式で答えてください
+- 「1番」「2番」のような番号参照は使わず、必ず商品名そのものを書いてください
 - 絵文字は使わず、簡潔に友人のように温かく答えてください
 
 【商品リスト】
@@ -1297,8 +1316,8 @@ ${userText}
 【回答例】
 お探しですね。おすすめはこちらです。
 
-■ 1番：〇〇という理由でとても人気です。
-■ 3番：コスパが良く〜な方にぴったりです。
+■ ベビーカー〇〇：軽量で扱いやすく、人気の一台です。
+■ 抱っこ紐△△：コスパが良く初心者にもおすすめです。
 
 上記フォーマットで答えてください。リスト外の商品名は絶対に使わないでください。`;
       } else {
@@ -1478,13 +1497,16 @@ ${userText}
     setExpandedMall(null);
     setReviewTab('honest');
     try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
-    navigate(-1);
+    navigate('/', { replace: true });
   };
 
   const ProductCard = ({ product, localRank = null }) => (
     <div
       className="bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full relative active:scale-95 transition-all cursor-pointer border border-[#F4EFEB]"
-      onClick={() => openProduct(product)}
+      onClick={(e) => {
+        if (e.target.closest('[data-no-open]')) return;
+        openProduct(product);
+      }}
     >
       <div className="relative aspect-square bg-[#F9F6F3] p-4">
         <img
@@ -1501,9 +1523,12 @@ ${userText}
         </button>
         {isAdminMode && (
           <button
+            data-no-open
+            onPointerDown={(e) => { e.stopPropagation(); }}
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); blockProduct(product); }}
             title="この商品を非表示にする"
-            className="absolute top-4 left-4 bg-red-500 text-white w-10 h-10 rounded-full text-xl font-black shadow-2xl z-[999] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-4 border-white pointer-events-auto"
+            style={{ touchAction: 'manipulation' }}
+            className="absolute top-2 left-2 bg-red-500 text-white w-14 h-14 rounded-full text-2xl font-black shadow-2xl z-[999] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-4 border-white pointer-events-auto"
           >×</button>
         )}
         <div className="pointer-events-none">
@@ -1942,7 +1967,7 @@ ${userText}
                 <div key={p.id} onClick={() => { const full = [...remoteProducts, ...dbProducts].find(r => r.id === p.id) || p; openProduct(full); }}
                   className="flex-shrink-0 w-28 cursor-pointer active:scale-95 transition-transform">
                   <div className="w-28 h-28 rounded-[1.5rem] overflow-hidden bg-[#F9F6F3] mb-2">
-                    {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#A5A19E]"><Package className="w-8 h-8" /></div>}
+                    {p.image ? <img src={getHighResImage(p.image)} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#A5A19E]"><Package className="w-8 h-8" /></div>}
                   </div>
                   <p className="text-[10px] font-bold text-[#5A4C4C] leading-tight line-clamp-2">{p.name}</p>
                   {p.price && <p className="text-[10px] text-[#F2ABAC] font-black mt-0.5">¥{p.price.toLocaleString()}</p>}
@@ -1976,7 +2001,7 @@ ${userText}
               {priceAlerts.map(alert => (
                 <div key={alert.id} className="bg-white border border-[#F4EFEB] p-4 rounded-[1.5rem] shadow-sm flex items-center gap-3">
                   <div className="w-14 h-14 rounded-[1rem] overflow-hidden bg-[#F9F6F3] flex-shrink-0">
-                    {alert.image ? <img src={alert.image} alt={alert.name} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-[#A5A19E] m-auto mt-4" />}
+                    {alert.image ? <img src={getHighResImage(alert.image)} alt={alert.name} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-[#A5A19E] m-auto mt-4" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-black text-[#5A4C4C] leading-tight line-clamp-1">{alert.name}</p>
@@ -2235,7 +2260,7 @@ ${userText}
                     <div key={p.id} className="bg-white rounded-[2rem] border border-[#F4EFEB] shadow-sm overflow-hidden flex gap-4 p-4 active:scale-[0.98] transition-transform cursor-pointer"
                       onClick={() => openProduct(p)}>
                       <div className="w-20 h-20 rounded-[1.25rem] overflow-hidden bg-[#F9F6F3] flex-shrink-0">
-                        {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-[#A5A19E] m-auto mt-6" />}
+                        {p.image ? <img src={getHighResImage(p.image)} alt={p.name} className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-[#A5A19E] m-auto mt-6" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-black text-[#5A4C4C] leading-tight line-clamp-2 mb-1">{p.name}</p>
@@ -2284,7 +2309,7 @@ ${userText}
                     <div className="mt-2 space-y-2 w-[85%]">
                       {msg.products.map(p => (
                         <button key={p.id} onClick={() => setSelectedProduct(p)} className="w-full flex items-center gap-3 bg-white rounded-2xl p-3 text-left border border-[#F4EFEB] shadow-sm active:scale-[0.98] transition-transform">
-                          <img src={p.image} onError={e => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/80x80.png?text=Baby"; }} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" alt={p.name} />
+                          <img src={getHighResImage(p.image)} onError={e => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/80x80.png?text=Baby"; }} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" alt={p.name} />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-black text-[#5A4C4C] line-clamp-2 leading-snug">{p.name}</p>
                             <p className="text-xs text-[#7B8E76] font-bold mt-1">¥{(p.shops?.[0]?.lowest_price ?? p.price)?.toLocaleString()}</p>
@@ -2342,19 +2367,23 @@ ${userText}
             <section className="mb-10 bg-[#FFF5F5] border border-[#FFEBEB] p-8 rounded-[2.5rem] relative overflow-hidden">
               <div className="flex items-center gap-2 mb-4 relative z-10"><Sparkles className="w-5 h-5 text-[#F2ABAC]" /><h3 className="font-black text-[#5A4C4C] text-lg">AIによる分析</h3></div>
               <p className="text-sm text-[#8E8282] leading-relaxed font-medium mb-8 relative z-10">{selectedProduct.aiAnalysis}</p>
-              <button onClick={() => { 
-                setActiveTab('ai'); 
-                const shopInfo = (selectedProduct.shops || []).map(s => `${s.name}: ¥${s.lowestPrice.toLocaleString()}`).join(', ');
+              <button onClick={() => {
+                setActiveTab('ai');
+                const shopInfo = (selectedProduct.shops || []).map(s => {
+                  const price = s.lowestPrice || s.lowest_price || s.price;
+                  const name = s.name || s.shop_name || 'ショップ';
+                  return `${name}: ¥${price ? price.toLocaleString() : '不明'}`;
+                }).join(', ');
                 const context = `[商品詳細データ]
 名前: ${selectedProduct.name}
 ブランド: ${selectedProduct.brand}
-価格帯: ${selectedProduct.price?.toLocaleString()}円
+価格帯: ${selectedProduct.price ? selectedProduct.price.toLocaleString() + '円' : '不明'}
 ショップ状況: ${shopInfo}
-AI分析: ${selectedProduct.aiAnalysis}
+AI分析: ${selectedProduct.aiAnalysis || ''}
 
 この商品について、他と比較したメリット・デメリットや、今の買い得度を詳しく教えてください。`;
-                setUserInput(context); 
-                setSelectedProduct(null); 
+                setUserInput(context);
+                setSelectedProduct(null);
               }} className="w-full py-4 bg-white border border-[#F2ABAC] text-[#F2ABAC] rounded-full text-xs font-black shadow-sm active:scale-95 transition-transform relative z-10">AIコンサルタントにさらに聞く</button>
               <button onClick={() => { setAlertTargetPrice(''); setShowPriceAlertModal(true); }} className="w-full mt-3 py-4 bg-[#FFF9E6] border border-[#F9DC5C]/40 text-[#B8860B] rounded-full text-xs font-black shadow-sm active:scale-95 transition-transform relative z-10 flex items-center justify-center gap-2">
                 <BellRing className="w-4 h-4" /> 価格アラートを設定する
@@ -2510,7 +2539,7 @@ AI分析: ${selectedProduct.aiAnalysis}
                 >
                   SNSでの評判
                 </button>
-                <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-out ${reviewTab === 'sns' ? 'translate-x-full' : 'translate-x-0'}`}></div>
+                <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-out pointer-events-none ${reviewTab === 'sns' ? 'translate-x-full' : 'translate-x-0'}`}></div>
               </div>
 
               {/* Honest レビュー (ネイティブ) */}
@@ -2617,7 +2646,7 @@ AI分析: ${selectedProduct.aiAnalysis}
             </div>
 
             <div className="flex items-center gap-3 mb-6 bg-[#F9F6F3] p-3 rounded-[1.5rem]">
-              <img src={selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
+              <img src={getHighResImage(selectedProduct.image) || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
               <p className="text-xs font-black text-[#5A4C4C] line-clamp-1 flex-1">{selectedProduct.name}</p>
             </div>
 
@@ -2792,7 +2821,7 @@ AI分析: ${selectedProduct.aiAnalysis}
               <button onClick={() => setShowPriceAlertModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex items-center gap-3 mb-6 p-4 bg-[#F9F6F3] rounded-[1.5rem]">
-              {selectedProduct.image && <img src={selectedProduct.image} alt="" className="w-14 h-14 rounded-[1rem] object-cover" />}
+              {selectedProduct.image && <img src={getHighResImage(selectedProduct.image)} alt="" className="w-14 h-14 rounded-[1rem] object-cover" />}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black text-[#5A4C4C] leading-tight line-clamp-2">{selectedProduct.name}</p>
                 <p className="text-xs text-[#A5A19E] font-bold mt-1">現在 ¥{selectedProduct.price?.toLocaleString()}</p>
