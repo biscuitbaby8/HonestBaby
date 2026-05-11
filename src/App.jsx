@@ -1426,9 +1426,9 @@ ${userText}
 
     // 2. 口コミデータなどはバックグラウンドで非同期に取得
     try {
-      // シンプルなクエリに変更
+      // 2単語でより正確に検索
       const nameParts = product.name.split(/[\s　]+/);
-      const query = nameParts[0];
+      const query = nameParts.length > 1 ? `${nameParts[0]} ${nameParts[1]}` : nameParts[0];
       const { data } = await supabase
         .from('products')
         .select('*, honestReviews:reviews(*), snsReviews:sns_reviews(*)')
@@ -2483,7 +2483,7 @@ AI分析: ${selectedProduct.aiAnalysis}
                         ))}
                       </div>
                     )}
-                    <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.0</p>
+                    <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.1</p>
               </div>
                 ))}
               </div>
