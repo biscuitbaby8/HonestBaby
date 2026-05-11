@@ -130,15 +130,24 @@ async function fetchRakutenRanking(genreId) {
 // --- Yahoo API呼び出し（フォールバック用） ---
 async function fetchYahooSearchFallback(keyword, category) {
   if (!YAHOO_CLIENT_ID) return [];
-  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=30&sort=-review_count`;
+  
+  let allHits = [];
   try {
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
+    // 2ページ分（最大200件）取得して網羅性を高める
+    for (let page = 1; page <= 2; page++) {
+      const start = (page - 1) * 100;
+      const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=100&start=${start}&sort=-review_count`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        allHits = [...allHits, ...(data.hits || [])];
+      }
+      await new Promise(r => setTimeout(r, 500)); // 連続アクセス防止
+    }
     
     const requiredKws = REQUIRED_KEYWORDS[category] || [];
     
-    return (data.hits || [])
+    return allHits
       .filter(item => !NG_KEYWORDS.some(kw => item.name.includes(kw)))
       .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.name.includes(kw)))
       .map(item => {
@@ -159,7 +168,7 @@ async function fetchYahooSearchFallback(keyword, category) {
           image_url: item.image?.medium || '',
           rating: parseFloat(item.review?.rate) || 0,
           reviews_count: parseInt(item.review?.count) || 0,
-          rakuten_item_code: `yahoo-${item.code}`, // 一意なIDとして代用
+          rakuten_item_code: `yahoo-${item.code}`, 
           is_market_wide: true,
           unit_count: unitCount,
           unit_name: unitCount ? '枚' : null,
