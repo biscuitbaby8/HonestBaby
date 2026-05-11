@@ -180,11 +180,16 @@ const toVCUrl = (url) => {
 const getHighResImage = (url) => {
   if (!url) return "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby";
   try {
-    // 楽天
+    // 楽天: ?_ex=NxN を 800x800 に上書き
     if (url.indexOf('rakuten.co.jp') !== -1) {
-      return url.split('?_ex=')[0] + '?_ex=1000x1000';
+      return url.split('?_ex=')[0] + '?_ex=800x800';
     }
-    // Yahoo
+    // Yahoo!ショッピング: c.yimg.jp の画像パスを大きいサイズに置換
+    // 例: /i/n/seller/item.jpg → /i/g/seller/item.jpg
+    if (url.indexOf('yimg.jp') !== -1) {
+      return url.replace('/i/n/', '/i/g/').replace('/i/j/', '/i/g/');
+    }
+    // 旧Yahoo URLパターン（後方互換）
     if (url.indexOf('shopping.yahoo.co.jp') !== -1) {
       return url.replace('/medium/', '/large/').replace('_m.jpg', '_l.jpg');
     }
@@ -580,9 +585,15 @@ const App = () => {
   // 商品を非表示にする（管理者モード専用）
   const blockProduct = async (product) => {
     const code = product.id.replace(/^(ranking|product)-/, '');
-    await supabase.from('product_blocklist').upsert({ item_code: code });
+    // ローカル状態を先に更新（即座に画面から消える）
     setBlocklist(prev => new Set([...prev, code]));
     setRemoteProducts(prev => prev.filter(p => p.id !== product.id));
+    // DB同期はバックグラウンドで（失敗してもUIには影響なし）
+    try {
+      await supabase.from('product_blocklist').upsert({ item_code: code });
+    } catch (e) {
+      console.error('Block sync to DB failed:', e);
+    }
   };
 
   // 初回ロード: DBに事前保存されたデータを表示（Cronバッチで毎晩自動更新）
@@ -1506,9 +1517,11 @@ ${userText}
         {isAdminMode && (
           <button
             data-no-open
+            onPointerDown={(e) => { e.stopPropagation(); }}
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); blockProduct(product); }}
             title="この商品を非表示にする"
-            className="absolute top-3 left-3 bg-red-500 text-white w-12 h-12 rounded-full text-xl font-black shadow-2xl z-[999] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-4 border-white pointer-events-auto"
+            style={{ touchAction: 'manipulation' }}
+            className="absolute top-2 left-2 bg-red-500 text-white w-14 h-14 rounded-full text-2xl font-black shadow-2xl z-[999] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-4 border-white pointer-events-auto"
           >×</button>
         )}
         <div className="pointer-events-none">
