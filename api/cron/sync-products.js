@@ -166,8 +166,8 @@ async function fetchYahooSearchFallback(keyword, category) {
   
   let allHits = [];
   try {
-    // 2ページ分（最大200件）取得して網羅性を高める
-    for (let page = 1; page <= 2; page++) {
+    // 3ページ分（最大300件）取得して網羅性を極限まで高める
+    for (let page = 1; page <= 3; page++) {
       const start = (page - 1) * 100;
       const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=100&start=${start}&sort=-review_count`;
       const res = await fetch(url);
@@ -175,14 +175,12 @@ async function fetchYahooSearchFallback(keyword, category) {
         const data = await res.json();
         allHits = [...allHits, ...(data.hits || [])];
       }
-      await new Promise(r => setTimeout(r, 500)); // 連続アクセス防止
+      await new Promise(r => setTimeout(r, 300));
     }
-    
-    const requiredKws = REQUIRED_KEYWORDS[category] || [];
     
     return allHits
       .filter(item => !NG_KEYWORDS.some(kw => item.name.includes(kw)))
-      .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.name.includes(kw)))
+      // あまりに厳しいフィルタは網羅性を損なうため削除
       .map(item => {
         const rawName = item.name;
         const name = cleanName(rawName);
@@ -368,9 +366,9 @@ async function syncCategory(cat, log) {
   const { data: blocklist } = await supabase.from('product_blocklist').select('item_code');
   const blockedCodes = new Set((blocklist || []).map(b => b.item_code));
 
-  // タイムアウト回避のため、上位100件に限定
-  const productsToProcess = deduplicated.slice(0, 100);
-  log.push(`  ⏱ 網羅性向上のため、上位 ${productsToProcess.length}件を処理します`);
+  // タイムアウト回避のため、上位150件に限定
+  const productsToProcess = deduplicated.slice(0, 150);
+  log.push(`  ⏱ 市場網羅のため、上位 ${productsToProcess.length}件を一気に登録します`);
 
   for (let i = 0; i < productsToProcess.length; i++) {
     const product = productsToProcess[i];

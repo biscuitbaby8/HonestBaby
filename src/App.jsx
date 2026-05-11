@@ -566,16 +566,23 @@ const App = () => {
   // 商品詳細を開いたとき楽天＋Yahoo を並列検索してクロスプラットフォーム価格比較
   useEffect(() => {
     if (!selectedProduct) { setCrossPlatformShops([]); return; }
+    
+    // --- 高速化の鍵: まずDBに保存されている既知の価格をセットする ---
+    const cachedShops = normalizeShops(selectedProduct.shops || []);
+    setCrossPlatformShops(cachedShops);
+
     const fetchCross = async () => {
-      setIsCrossLoading(true);
+      // 保存済みデータがある場合は、Loadingを表示せずに裏で更新する
+      if (cachedShops.length === 0) setIsCrossLoading(true);
+
       try {
         const keyword = selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ');
         const origPrice = selectedProduct.price || getLowestPrice(selectedProduct.shops) || 0;
-        const priceMin = origPrice > 0 ? origPrice * 0.25 : 0;
-        const priceMax = origPrice > 0 ? origPrice * 4 : Infinity;
+        const priceMin = origPrice > 0 ? origPrice * 0.2 : 0;
+        const priceMax = origPrice > 0 ? origPrice * 5 : Infinity;
         const selectedWords = keyword.split(' ').filter(w => w.length >= 2).map(w => w.toLowerCase());
-        // 型番（数字を含む語）が一致する場合はそれを必須条件にし、別モデルの混入を防ぐ
         const modelWords = selectedWords.filter(w => /[0-9０-９]/.test(w));
+        
         const nameMatches = (itemName) => {
           const lower = (itemName || '').toLowerCase().replace(/[\s　]/g, '');
           if (modelWords.length > 0) return modelWords.every(w => lower.includes(w));
@@ -587,42 +594,35 @@ const App = () => {
           fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1`).then(r => r.json()),
           fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}&noFilter=1`).then(r => r.json())
         ]);
-        const shops = [];
-        if (rakutenResult.status === 'fulfilled') {
-          const items = (rakutenResult.value.products || [])
-            .filter(item => nameMatches(item.name) && priceInRange(item.price));
-          const byShop = {};
-          for (const item of items) {
-            const shopName = item.brand || '楽天市場';
-            if (!byShop[shopName] || item.price < byShop[shopName].price) byShop[shopName] = item;
+
+        const newShops = [...cachedShops];
+        
+        if (rakutenResult.status === 'fulfilled' && rakutenResult.value.products) {
+          const items = rakutenResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          if (items.length > 0) {
+            const best = items.sort((a, b) => a.price - b.price)[0];
+            const shopName = best.brand || '楽天市場';
+            // 既存の楽天データがあれば更新、なければ追加
+            const idx = newShops.findIndex(s => s.source === 'rakuten');
+            const shopData = { name: shopName, type: 'mall', lowestPrice: best.price, source: 'rakuten',
+              sellers: [{ name: shopName, price: best.price, shipping: 0, points: 0, url: best.url, note: '' }] };
+            if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
           }
-          Object.values(byShop)
-            .sort((a, b) => a.price - b.price)
-            .slice(0, 5)
-            .forEach(item => {
-              const sName = item.brand || '楽天市場';
-              shops.push({ name: sName, type: 'mall', lowestPrice: item.price,
-                sellers: [{ name: sName, price: item.price, shipping: 0, points: 0, url: item.url, note: '' }] });
-            });
         }
-        if (yahooResult.status === 'fulfilled') {
-          const items = (yahooResult.value.products || [])
-            .filter(item => nameMatches(item.name) && priceInRange(item.price));
-          const byShop = {};
-          for (const item of items) {
-            const shopName = item.brand || 'Yahoo!ショッピング';
-            if (!byShop[shopName] || item.price < byShop[shopName].price) byShop[shopName] = item;
+
+        if (yahooResult.status === 'fulfilled' && yahooResult.value.products) {
+          const items = yahooResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          if (items.length > 0) {
+            const best = items.sort((a, b) => a.price - b.price)[0];
+            const shopName = best.brand || 'Yahoo!ショッピング';
+            const idx = newShops.findIndex(s => s.source === 'yahoo');
+            const shopData = { name: shopName, type: 'mall', lowestPrice: best.price, source: 'yahoo',
+              sellers: [{ name: shopName, price: best.price, shipping: 0, points: 0, url: best.url, note: '' }] };
+            if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
           }
-          Object.values(byShop)
-            .sort((a, b) => a.price - b.price)
-            .slice(0, 3)
-            .forEach(item => {
-              const sName = item.brand || 'Yahoo!ショッピング';
-              shops.push({ name: sName, type: 'mall', lowestPrice: item.price,
-                sellers: [{ name: sName, price: item.price, shipping: 0, points: 0, url: item.url, note: '' }] });
-            });
         }
-        setCrossPlatformShops(shops);
+        
+        setCrossPlatformShops(newShops);
       } catch (e) {
         console.warn('Cross-platform fetch failed:', e);
       } finally {
