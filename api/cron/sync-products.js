@@ -105,9 +105,9 @@ function extractSubCategory(category, itemName) {
       { match: /おしりふき/, sub: "おしりふき" },
     ],
     "ベビーカー": [
+      { match: /AB型|ＡＢ型/, sub: "AB型" },
       { match: /[AＡ]型/, sub: "A型" },
       { match: /[BＢ]型/, sub: "B型" },
-      { match: /AB型/, sub: "AB型" },
       { match: /バギー/, sub: "バギー" },
     ],
     "抱っこ紐": [
@@ -368,9 +368,9 @@ async function syncCategory(cat, log) {
   const { data: blocklist } = await supabase.from('product_blocklist').select('item_code');
   const blockedCodes = new Set((blocklist || []).map(b => b.item_code));
 
-  // タイムアウト回避のため、上位40件に限定
-  const productsToProcess = deduplicated.slice(0, 40);
-  log.push(`  ⏱ タイムアウト防止のため、上位 ${productsToProcess.length}件を処理します`);
+  // タイムアウト回避のため、上位100件に限定
+  const productsToProcess = deduplicated.slice(0, 100);
+  log.push(`  ⏱ 網羅性向上のため、上位 ${productsToProcess.length}件を処理します`);
 
   for (let i = 0; i < productsToProcess.length; i++) {
     const product = productsToProcess[i];
