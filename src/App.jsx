@@ -585,10 +585,17 @@ const App = () => {
   // 商品を非表示にする（管理者モード専用）
   const blockProduct = async (product) => {
     const code = product.id.replace(/^(ranking|product)-/, '');
-    // ローカル状態を先に更新（即座に画面から消える）
     setBlocklist(prev => new Set([...prev, code]));
+    // 全ての商品ソースから即座に除去
     setRemoteProducts(prev => prev.filter(p => p.id !== product.id));
-    // DB同期はバックグラウンドで（失敗してもUIには影響なし）
+    setDbProducts(prev => prev.filter(p => p.id !== product.id));
+    setCachedProducts(prev => {
+      const updated = { ...prev };
+      for (const cat of Object.keys(updated)) {
+        updated[cat] = (updated[cat] || []).filter(p => p.id !== product.id);
+      }
+      return updated;
+    });
     try {
       await supabase.from('product_blocklist').upsert({ item_code: code });
     } catch (e) {
@@ -1490,7 +1497,7 @@ ${userText}
     setExpandedMall(null);
     setReviewTab('honest');
     try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
-    navigate(-1);
+    navigate('/', { replace: true });
   };
 
   const ProductCard = ({ product, localRank = null }) => (
@@ -2532,7 +2539,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                 >
                   SNSでの評判
                 </button>
-                <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-out ${reviewTab === 'sns' ? 'translate-x-full' : 'translate-x-0'}`}></div>
+                <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-out pointer-events-none ${reviewTab === 'sns' ? 'translate-x-full' : 'translate-x-0'}`}></div>
               </div>
 
               {/* Honest レビュー (ネイティブ) */}
