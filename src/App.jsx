@@ -2373,22 +2373,6 @@ AI分析: ${selectedProduct.aiAnalysis}
 
               <div className="space-y-4">
                 {(() => {
-                  const existingShops = normalizeShops(selectedProduct.shops);
-                  // ショップ名 or 遷移先URL のホスト名で重複判定
-                  const shopKey = (s) => {
-                    const nameKey = (s.name || '').replace(/[\s!！?？]/g, '').toLowerCase();
-                    const firstUrl = s.sellers?.[0]?.url;
-                    let urlKey = '';
-                    try {
-                      if (firstUrl) {
-                        const u = new URL(firstUrl.startsWith('//') ? 'https:' + firstUrl : firstUrl);
-                        urlKey = u.hostname + u.pathname.split('/').slice(0, 3).join('/');
-                      }
-                    } catch { }
-                    return urlKey || nameKey;
-                  };
-              <div className="space-y-4">
-                {(() => {
                   const existingShops = selectedProduct.shops || [];
                   const crossPlatformShops = (selectedProduct.crossPlatformPrices || []).map(p => ({
                     name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング',
@@ -2403,6 +2387,7 @@ AI分析: ${selectedProduct.aiAnalysis}
                   
                   for (const s of [...existingShops, ...crossPlatformShops]) {
                     const key = shopKey(s);
+                    if (!key) continue;
                     const cur = shopByKey.get(key);
                     if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
                       shopByKey.set(key, s);
