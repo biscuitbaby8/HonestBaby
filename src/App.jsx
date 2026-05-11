@@ -214,14 +214,8 @@ const App = () => {
   const [giftBudgetFilter, setGiftBudgetFilter] = useState("すべて");
   const [giftSceneFilter, setGiftSceneFilter] = useState("すべて");
 
-  // 管理モード: URLに ?admin=1 を付けると ON（localStorage で保持）
-  const [isAdminMode, setIsAdminMode] = useState(() => {
-    if (new URLSearchParams(window.location.search).get('admin') === '1') {
-      localStorage.setItem('honestBabyAdmin', '1');
-      return true;
-    }
-    return localStorage.getItem('honestBabyAdmin') === '1';
-  });
+  // 管理モード: URLに ?admin=1 を付けている間だけ有効（永続化しない）
+  const isAdminMode = location.search.includes('admin=1');
 
   // ブロックリスト（非表示商品）
   const [blocklist, setBlocklist] = useState(new Set());
@@ -405,7 +399,7 @@ const App = () => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) migrateLocalFavoritesToDB(u.id);
-      if (event === 'SIGNED_IN') setActiveTab('user');
+      // 自動移動を廃止
     });
 
     // 既存セッションの復元（ページリロード時など）
@@ -1398,41 +1392,34 @@ ${userText}
   // --- 共通コンポーネント ---
 
   const openProduct = async (product) => {
-    // 既存の基本情報でまず開く
+    // 既存情報でサクッと開く（速度優先）
     setSelectedProduct(product);
     
-    // 背景で最新の口コミ情報を取得してマージする
+    // 背景で非同期に口コミと詳細ショップ情報を取得
     try {
+      // 部分一致検索で、より多くの情報をヒットさせる
+      const query = product.name.split(' ').filter(s => s.length > 1).slice(0, 2).join(' ');
       const { data } = await supabase
         .from('products')
         .select('*, honestReviews:reviews(*), snsReviews:sns_reviews(*)')
-        .eq('name', product.name) // 名前でマッチさせる（外部API商品も考慮）
+        .ilike('name', `%${query}%`)
+        .limit(1)
         .single();
       
       if (data) {
-        setSelectedProduct(prev => ({
+        setSelectedProduct(prev => prev?.id === product.id ? ({
           ...prev,
           honestReviews: (data.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
           snsReviews: data.snsReviews || []
-        }));
+        }) : prev);
       }
-    } catch (e) {
-      console.warn('Review fetch failed:', e);
-    }
+    } catch (e) { console.warn('Detail fetch error:', e); }
 
     setRecentlyViewed(prev => {
       const filtered = prev.filter(p => p.id !== product.id);
       return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
     });
-    try { sessionStorage.setItem('honestBabyOpenProduct', JSON.stringify(product)); } catch { }
-    try {
-      const cache = JSON.parse(localStorage.getItem('honestBabyProductCache') || '{}');
-      cache[product.id] = product;
-      const keys = Object.keys(cache);
-      if (keys.length > 100) delete cache[keys[0]];
-      localStorage.setItem('honestBabyProductCache', JSON.stringify(cache));
-    } catch { }
-    navigate(`/product/${encodeURIComponent(product.id)}`);
+    navigate(`/product/${encodeURIComponent(product.id)}`, { replace: true });
   };
 
   // --- 新機能: URL共有ハンドラ ---
@@ -1485,29 +1472,31 @@ ${userText}
         </button>
         {isAdminMode && (
           <button
-            onClick={(e) => { e.stopPropagation(); blockProduct(product); }}
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); blockProduct(product); }}
             title="この商品を非表示にする"
-            className="absolute top-4 left-4 bg-red-500 text-white w-9 h-9 rounded-full text-lg font-black shadow-xl z-[40] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-2 border-white"
+            className="absolute top-4 left-4 bg-red-500 text-white w-10 h-10 rounded-full text-xl font-black shadow-2xl z-[999] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-4 border-white pointer-events-auto"
           >×</button>
         )}
-        {localRank && (
-          <div className="absolute top-6 left-6 bg-[#F9DC5C] text-[#5A4C4C] w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-md border-2 border-white">
-            {localRank}
-          </div>
-        )}
-        {/* 動的なおすすめバッジ */}
-        {product.isBestSeller && (
-          <div className="absolute top-6 left-6 bg-[#F2ABAC] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
-            <Award className="w-3.5 h-3.5" />
-            <span>BEST SELLER</span>
-          </div>
-        )}
-        {!product.isBestSeller && product.isTopRated && (
-          <div className="absolute top-6 left-6 bg-[#7B8E76] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>TOP RATED</span>
-          </div>
-        )}
+        <div className="pointer-events-none">
+          {localRank && (
+            <div className="absolute top-6 left-6 bg-[#F9DC5C] text-[#5A4C4C] w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-md border-2 border-white">
+              {localRank}
+            </div>
+          )}
+          {/* 動的なおすすめバッジ */}
+          {product.isBestSeller && (
+            <div className="absolute top-6 left-6 bg-[#F2ABAC] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
+              <Award className="w-3.5 h-3.5" />
+              <span>BEST SELLER</span>
+            </div>
+          )}
+          {!product.isBestSeller && product.isTopRated && (
+            <div className="absolute top-6 left-6 bg-[#7B8E76] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>TOP RATED</span>
+            </div>
+          )}
+        </div>
         <div className={`absolute bottom-6 left-6 px-2.5 py-1 rounded-full text-[9px] font-bold tracking-wider ${product.subCategory === '周辺グッズ' ? 'bg-[#FFE8D6] text-[#A67B5B]' : 'bg-[#7B8E76] text-white'}`}>
           {product.subCategory}
         </div>
