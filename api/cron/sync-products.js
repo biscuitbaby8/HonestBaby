@@ -97,21 +97,24 @@ function parseDiaperCount(name) {
 }
 
 // --- 楽天API呼び出し（リトライ付き） ---
-async function fetchWithRetry(url, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
+async function fetchWithRetry(url, maxRetries = 1) {
+  for (let i = 0; i <= maxRetries; i++) {
     const res = await fetch(url, {
       headers: { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' }
     });
     if (res.ok) return res.json();
-    if (res.status === 429 || res.status === 403) {
-      // 403も一時的なWAF遮断の可能性があるためリトライ対象に含める
-      const waitTime = (i + 1) * 3000; // 3s, 6s, 9s
-      await new Promise(r => setTimeout(r, waitTime));
+    
+    // 403 (Invalid Key) の場合は即座にエラーにしてリトライしない（Vercelの60秒タイムアウト防止）
+    if (res.status === 403) {
+      throw new Error(`API Error 403: Forbidden or Invalid Key`);
+    }
+
+    if (res.status === 429 && i < maxRetries) {
+      await new Promise(r => setTimeout(r, 1000));
       continue;
     }
     throw new Error(`API Error ${res.status}`);
   }
-  throw new Error(`Max retries reached`);
 }
 
 async function fetchRakutenSearch(keyword, genreId, page = 1) {
@@ -271,7 +274,6 @@ async function syncCategory(cat, log) {
   try {
     // 検索API（レビュー数順、2ページ分）
     const res1 = await fetchRakutenSearch(cat.keyword, cat.genreId, 1);
-    await new Promise(r => setTimeout(r, 2000)); // 2秒待機
     const res2 = await fetchRakutenSearch(cat.keyword, cat.genreId, 2);
     
     allItems = [
@@ -282,8 +284,6 @@ async function syncCategory(cat, log) {
     log.push(`  ⚠️ 楽天検索API失敗: ${e.message}`);
     rakutenFailed = true;
   }
-
-  await new Promise(r => setTimeout(r, 2000));
 
   // ランキングAPIも追加取得
   try {
@@ -454,9 +454,6 @@ export default async function handler(req, res) {
     try {
       const count = await syncCategory(cat, log);
       totalSaved += count;
-
-      // カテゴリ間のレート制限
-      await new Promise(r => setTimeout(r, 1000));
     } catch (e) {
       log.push(`❌ カテゴリ「${cat.name}」で致命的エラー: ${e.message}`);
     }
