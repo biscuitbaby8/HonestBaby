@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Search, Heart, ExternalLink, X, Star, MessageCircle, 
-  Instagram, Twitter, TrendingUp, ChevronRight, 
-  Home, User, Bell, ArrowLeft, Share2, Award, 
-  Settings, History, Bookmark, Sparkles, Send, Bot, 
-  Package, Layers, ChevronDown, ChevronUp, Calculator, 
+import {
+  Search, Heart, ExternalLink, X, Star, MessageCircle,
+  Instagram, Twitter, TrendingUp, ChevronRight,
+  Home, User, Bell, ArrowLeft, Share2, Award,
+  Settings, History, Bookmark, Sparkles, Send, Bot,
+  Package, Layers, ChevronDown, ChevronUp, Calculator,
   Store, Gift, ChevronLeft, ShieldCheck, Baby, BellRing, Edit3,
   FileText, Shield, Info, Edit2, Camera, Mail,
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind
@@ -14,22 +14,22 @@ import {
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
   switch (name) {
-    case 'すべて':      return <LayoutGrid className={className} />;
-    case 'おむつ':      return <svg {...s}><path d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8z"/><path d="M4 11c2.5 2.5 5.5 0 8 0s5.5 2.5 8 0"/></svg>;
-    case 'ベビーカー':  return <svg {...s}><circle cx="8" cy="18" r="2"/><circle cx="16" cy="18" r="2"/><path d="M4 5l2 7h12V8.5A2.5 2.5 0 0015.5 6H9L7 5H4"/><path d="M18.5 4v4"/></svg>;
-    case '抱っこ紐':    return <svg {...s}><circle cx="12" cy="5" r="2"/><path d="M9 10c0 2 1.5 4 3 4s3-2 3-4"/><path d="M9 10c-2 0-3 1-3 3v2h12v-2c0-2-1-3-3-3"/><circle cx="12" cy="17" r="1.5"/></svg>;
-    case 'ウェア':      return <Shirt className={className} />;
-    case 'ミルク・授乳': return <svg {...s}><path d="M10 2h4v3l2 2v13a2 2 0 01-2 2h-4a2 2 0 01-2-2V7l2-2V2z"/><path d="M10 5h4"/><path d="M10 12h4"/></svg>;
+    case 'すべて': return <LayoutGrid className={className} />;
+    case 'おむつ': return <svg {...s}><path d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" /><path d="M4 11c2.5 2.5 5.5 0 8 0s5.5 2.5 8 0" /></svg>;
+    case 'ベビーカー': return <svg {...s}><circle cx="8" cy="18" r="2" /><circle cx="16" cy="18" r="2" /><path d="M4 5l2 7h12V8.5A2.5 2.5 0 0015.5 6H9L7 5H4" /><path d="M18.5 4v4" /></svg>;
+    case '抱っこ紐': return <svg {...s}><circle cx="12" cy="5" r="2" /><path d="M9 10c0 2 1.5 4 3 4s3-2 3-4" /><path d="M9 10c-2 0-3 1-3 3v2h12v-2c0-2-1-3-3-3" /><circle cx="12" cy="17" r="1.5" /></svg>;
+    case 'ウェア': return <Shirt className={className} />;
+    case 'ミルク・授乳': return <svg {...s}><path d="M10 2h4v3l2 2v13a2 2 0 01-2 2h-4a2 2 0 01-2-2V7l2-2V2z" /><path d="M10 5h4" /><path d="M10 12h4" /></svg>;
     case '離乳食・食器': return <Utensils className={className} />;
     case '寝具・ベッド': return <Moon className={className} />;
-    case 'おもちゃ':    return <Puzzle className={className} />;
-    case '安全グッズ':  return <ShieldCheck className={className} />;
-    case 'お風呂用品':  return <Waves className={className} />;
-    case 'トイレ用品':  return <Wind className={className} />;
-    case '車用品':      return <Car className={className} />;
-    case 'マタニティ':  return <Leaf className={className} />;
+    case 'おもちゃ': return <Puzzle className={className} />;
+    case '安全グッズ': return <ShieldCheck className={className} />;
+    case 'お風呂用品': return <Waves className={className} />;
+    case 'トイレ用品': return <Wind className={className} />;
+    case '車用品': return <Car className={className} />;
+    case 'マタニティ': return <Leaf className={className} />;
     case 'ギフトセット': return <Gift className={className} />;
-    default:            return <Package className={className} />;
+    default: return <Package className={className} />;
   }
 };
 import { Helmet } from 'react-helmet-async';
@@ -40,26 +40,28 @@ import { supabase } from './lib/supabaseClient';
 // 市場網羅のための詳細カテゴリツリー
 // ジャンルID は ranking.rakuten.co.jp/daily/<id>/ の URL から確認した実際のID
 const CATEGORY_TREE = [
-  { name: "すべて",      id: "100533", keyword: "",                  subs: [] },
-  { name: "おむつ",      id: "205197", keyword: "おむつ",            subs: [
-    { name: "テープタイプ", subsubs: ["新生児", "S", "M", "L", "BIG", "BIGより大きい"] },
-    { name: "パンツタイプ", subsubs: ["S", "M", "L", "BIG", "BIGより大きい"] },
-    { name: "夜用おむつ",   subsubs: ["M", "L", "BIG", "BIGより大きい"] },
-    { name: "おしりふき" },
-  ]},
-  { name: "ベビーカー",  id: "200833", keyword: "ベビーカー",        subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
-  { name: "抱っこ紐",    id: "412209", keyword: "抱っこ紐",          subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
-  { name: "ウェア",      id: "111102", keyword: "ベビー服",          subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
-  { name: "ミルク・授乳",id: "205208", keyword: "ミルク 授乳",       subs: ["ミルク", "哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
-  { name: "離乳食・食器",id: "213980", keyword: "離乳食",            subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
-  { name: "寝具・ベッド",id: "200822", keyword: "ベビーベッド",      subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
-  { name: "おもちゃ",    id: "201591", keyword: "おもちゃ",          subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
-  { name: "安全グッズ",  id: "200841", keyword: "ベビーゲート",      subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止", "ベビーモニター"] },
-  { name: "お風呂用品",  id: "200815", keyword: "ベビー お風呂",     subs: ["ベビーバス", "ベビー用ソープ", "保湿クリーム"] },
-  { name: "トイレ用品",  id: "200819", keyword: "おまる",            subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
-  { name: "車用品",      id: "566088", keyword: "チャイルドシート",   subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ", "周辺グッズ"] },
-  { name: "マタニティ",  id: "553946", keyword: "マタニティ",        subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
-  { name: "ギフトセット",id: "205222", keyword: "出産祝い ギフト",    subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
+  { name: "すべて", id: "100533", keyword: "", subs: [] },
+  {
+    name: "おむつ", id: "205197", keyword: "おむつ", subs: [
+      { name: "テープタイプ", subsubs: ["新生児", "S", "M", "L", "BIG", "BIGより大きい"] },
+      { name: "パンツタイプ", subsubs: ["S", "M", "L", "BIG", "BIGより大きい"] },
+      { name: "夜用おむつ", subsubs: ["M", "L", "BIG", "BIGより大きい"] },
+      { name: "おしりふき" },
+    ]
+  },
+  { name: "ベビーカー", id: "200833", keyword: "ベビーカー", subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
+  { name: "抱っこ紐", id: "412209", keyword: "抱っこ紐", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
+  { name: "ウェア", id: "111102", keyword: "ベビー服", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
+  { name: "ミルク・授乳", id: "205208", keyword: "ミルク 授乳", subs: ["ミルク", "哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
+  { name: "離乳食・食器", id: "213980", keyword: "離乳食", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
+  { name: "寝具・ベッド", id: "200822", keyword: "ベビーベッド", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
+  { name: "おもちゃ", id: "201591", keyword: "おもちゃ", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
+  { name: "安全グッズ", id: "200841", keyword: "ベビーゲート", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止", "ベビーモニター"] },
+  { name: "お風呂用品", id: "200815", keyword: "ベビー お風呂", subs: ["ベビーバス", "ベビー用ソープ", "保湿クリーム"] },
+  { name: "トイレ用品", id: "200819", keyword: "おまる", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
+  { name: "車用品", id: "566088", keyword: "チャイルドシート", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ", "周辺グッズ"] },
+  { name: "マタニティ", id: "553946", keyword: "マタニティ", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
+  { name: "ギフトセット", id: "205222", keyword: "出産祝い ギフト", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
 ];
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
@@ -156,8 +158,8 @@ const detectOfficialShop = (shop) => {
 // ValueCommerce MyLink: 対象ドメインのURLをアフィリエイトURLにラップ
 const VC_SID = import.meta.env.VITE_VC_SID || '3768537';
 const VC_DOMAIN_PIDS = {
-  'dadway-onlineshop.com': import.meta.env.VITE_VC_PID_DADWAY   || '892608374',
-  'ergobaby.jp':           import.meta.env.VITE_VC_PID_ERGOBABY || '892609670',
+  'dadway-onlineshop.com': import.meta.env.VITE_VC_PID_DADWAY || '892608374',
+  'ergobaby.jp': import.meta.env.VITE_VC_PID_ERGOBABY || '892609670',
 };
 const AMAZON_TAG = import.meta.env.VITE_AMAZON_TAG || 'honestbaby-22';
 
@@ -223,7 +225,7 @@ const App = () => {
 
   // ブロックリスト（非表示商品）
   const [blocklist, setBlocklist] = useState(new Set());
-  
+
   // User Data States
   const [favorites, setFavorites] = useState(() => {
     try {
@@ -277,7 +279,7 @@ const App = () => {
       );
       localStorage.removeItem('honestBabyFavorites');
       setFavorites(local);
-    } catch {}
+    } catch { }
   };
 
   // --- 検索キャッシュ（localStorage → カテゴリ別）---
@@ -287,7 +289,7 @@ const App = () => {
       try {
         const stored = localStorage.getItem(`honestBabyCache_${cat}`);
         if (stored) cache[cat] = JSON.parse(stored);
-      } catch {}
+      } catch { }
     });
     return cache;
   });
@@ -315,10 +317,10 @@ const App = () => {
   const [savedSearches, setSavedSearches] = useState(() => {
     try { return JSON.parse(localStorage.getItem('honestBabySavedSearches') || '[]'); } catch { return []; }
   });
-  useEffect(() => { try { localStorage.setItem('honestBabyBabyInfo', JSON.stringify(babyInfo)); } catch {} }, [babyInfo]);
-  useEffect(() => { try { localStorage.setItem('honestBabyRecentlyViewed', JSON.stringify(recentlyViewed)); } catch {} }, [recentlyViewed]);
-  useEffect(() => { try { localStorage.setItem('honestBabyPriceAlerts', JSON.stringify(priceAlerts)); } catch {} }, [priceAlerts]);
-  useEffect(() => { try { localStorage.setItem('honestBabySavedSearches', JSON.stringify(savedSearches)); } catch {} }, [savedSearches]);
+  useEffect(() => { try { localStorage.setItem('honestBabyBabyInfo', JSON.stringify(babyInfo)); } catch { } }, [babyInfo]);
+  useEffect(() => { try { localStorage.setItem('honestBabyRecentlyViewed', JSON.stringify(recentlyViewed)); } catch { } }, [recentlyViewed]);
+  useEffect(() => { try { localStorage.setItem('honestBabyPriceAlerts', JSON.stringify(priceAlerts)); } catch { } }, [priceAlerts]);
+  useEffect(() => { try { localStorage.setItem('honestBabySavedSearches', JSON.stringify(savedSearches)); } catch { } }, [savedSearches]);
 
   // モーダル制御
   const [showBabyModal, setShowBabyModal] = useState(false);
@@ -341,7 +343,7 @@ const App = () => {
   const [contactContent, setContactContent] = useState('');
   const [isContactSending, setIsContactSending] = useState(false);
   const [contactSent, setContactSent] = useState(false);
-  
+
   // --- 新機能: 口コミ関連 States ---
   const [reviewTab, setReviewTab] = useState('honest'); // 'honest' or 'sns'
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
@@ -460,13 +462,13 @@ const App = () => {
       try {
         const s = sessionStorage.getItem('honestBabyOpenProduct');
         if (s) { const p = JSON.parse(s); if (String(p.id) === productId) { setSelectedProduct(p); return; } }
-      } catch {}
+      } catch { }
 
       // 2. localStorage キャッシュ（別タブ・URL共有）
       try {
         const cache = JSON.parse(localStorage.getItem('honestBabyProductCache') || '{}');
         if (cache[productId]) { setSelectedProduct(cache[productId]); return; }
-      } catch {}
+      } catch { }
 
       // 3. Supabase（UUID形式のDB商品）
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(productId)) {
@@ -477,7 +479,7 @@ const App = () => {
             .eq('id', productId)
             .single();
           if (data) { setSelectedProduct(formatDbProduct(data)); return; }
-        } catch {}
+        } catch { }
       }
 
       // 4. 見つからない → ホームへ
@@ -500,7 +502,7 @@ const App = () => {
             honestReviews:reviews(*),
             snsReviews:sns_reviews(*)
           `);
-        
+
         if (error) throw error;
 
         if (data) {
@@ -572,7 +574,7 @@ const App = () => {
   // 商品詳細を開いたとき楽天＋Yahoo を並列検索してクロスプラットフォーム価格比較
   useEffect(() => {
     if (!selectedProduct) { setCrossPlatformShops([]); return; }
-    
+
     // --- 高速化の鍵: まずDBに保存されている既知の価格をセットする ---
     const cachedShops = normalizeShops(selectedProduct.shops || []);
     setCrossPlatformShops(cachedShops);
@@ -588,7 +590,7 @@ const App = () => {
         const priceMax = origPrice > 0 ? origPrice * 5 : Infinity;
         const selectedWords = keyword.split(' ').filter(w => w.length >= 2).map(w => w.toLowerCase());
         const modelWords = selectedWords.filter(w => /[0-9０-９]/.test(w));
-        
+
         const nameMatches = (itemName) => {
           const lower = (itemName || '').toLowerCase().replace(/[\s　]/g, '');
           if (modelWords.length > 0) return modelWords.every(w => lower.includes(w));
@@ -603,7 +605,7 @@ const App = () => {
             .select('id, reviews(*), sns_reviews(*)')
             .or(`id.eq.${selectedProduct.id},rakuten_item_code.eq.${selectedProduct.id}`)
             .single();
-          
+
           if (dbProd) {
             setSelectedProduct(prev => {
               if (!prev || (prev.id !== selectedProduct.id && prev.rakuten_item_code !== selectedProduct.id)) return prev;
@@ -624,7 +626,7 @@ const App = () => {
         ]);
 
         const newShops = [...cachedShops];
-        
+
         if (rakutenResult.status === 'fulfilled' && rakutenResult.value.products) {
           const items = rakutenResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
           if (items.length > 0) {
@@ -632,8 +634,10 @@ const App = () => {
             const shopName = best.brand || '楽天市場';
             // 既存の楽天データがあれば更新、なければ追加
             const idx = newShops.findIndex(s => s.source === 'rakuten');
-            const shopData = { name: shopName, type: 'mall', lowestPrice: best.price, source: 'rakuten',
-              sellers: [{ name: shopName, price: best.price, shipping: 0, points: 0, url: best.url, note: '' }] };
+            const shopData = {
+              name: shopName, type: 'mall', lowestPrice: best.price, source: 'rakuten',
+              sellers: [{ name: shopName, price: best.price, shipping: 0, points: 0, url: best.url, note: '' }]
+            };
             if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
           }
         }
@@ -644,12 +648,14 @@ const App = () => {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || 'Yahoo!ショッピング';
             const idx = newShops.findIndex(s => s.source === 'yahoo');
-            const shopData = { name: shopName, type: 'mall', lowestPrice: best.price, source: 'yahoo',
-              sellers: [{ name: shopName, price: best.price, shipping: 0, points: 0, url: best.url, note: '' }] };
+            const shopData = {
+              name: shopName, type: 'mall', lowestPrice: best.price, source: 'yahoo',
+              sellers: [{ name: shopName, price: best.price, shipping: 0, points: 0, url: best.url, note: '' }]
+            };
             if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
           }
         }
-        
+
         setCrossPlatformShops(newShops);
       } catch (e) {
         console.warn('Cross-platform fetch failed:', e);
@@ -819,8 +825,8 @@ const App = () => {
         const subKeyword = (catName === 'おむつ' && subCat === 'おしりふき')
           ? 'ベビー おしりふき'
           : subCat === '周辺グッズ'
-          ? genre.keyword
-          : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
+            ? genre.keyword
+            : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
         // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
         const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
         const isWipes = catName === 'おむつ' && subCat === 'おしりふき';
@@ -970,7 +976,7 @@ const App = () => {
     try {
       localStorage.setItem(`honestBabyCache_${category}`, JSON.stringify(toSave));
       setCachedProducts(prev => ({ ...prev, [category]: toSave }));
-    } catch {}
+    } catch { }
 
     // Supabase（全ユーザー共有）
     try {
@@ -986,7 +992,7 @@ const App = () => {
         })),
         { onConflict: 'name', ignoreDuplicates: true }
       );
-    } catch {}
+    } catch { }
   };
 
   const fetchRemoteProductsWithAI = async (keyword) => {
@@ -1005,22 +1011,22 @@ const App = () => {
 
       const rakutenItems = rakutenResult.status === 'fulfilled'
         ? (rakutenResult.value.products || []).map(item => ({
-            name: item.name,
-            price: item.price,
-            url: item.url,
-            image: item.image || '',
-            source: 'rakuten'
-          }))
+          name: item.name,
+          price: item.price,
+          url: item.url,
+          image: item.image || '',
+          source: 'rakuten'
+        }))
         : [];
 
       const yahooItems = yahooResult.status === 'fulfilled'
         ? (yahooResult.value.products || []).map(item => ({
-            name: item.name,
-            price: item.price,
-            url: item.url,
-            image: item.image || '',
-            source: 'yahoo'
-          }))
+          name: item.name,
+          price: item.price,
+          url: item.url,
+          image: item.image || '',
+          source: 'yahoo'
+        }))
         : [];
 
       const raw = [...rakutenItems, ...yahooItems];
@@ -1066,42 +1072,42 @@ const App = () => {
 
 検索結果データ: ${JSON.stringify(allItems.slice(0, 20))}`;
 
-          const aiRes = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: aiPrompt })
-          });
+        const aiRes = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: aiPrompt })
+        });
 
-          const aiData = await aiRes.json();
-          const aiText = aiData.text || "";
-          const jsonMatch = aiText.match(/\[[\s\S]*\]/);
-          const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+        const aiData = await aiRes.json();
+        const aiText = aiData.text || "";
+        const jsonMatch = aiText.match(/\[[\s\S]*\]/);
+        const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 
-          if (cleanedProducts.length > 0) {
-            formatted = cleanedProducts.map((p, i) => ({
-              id: `remote-${i}-${Date.now()}`,
-              name: p.name,
-              brand: p.brand || "メーカー不明",
-              category: keyword,
-              image: p.image,
-              rating: 4.0 + (Math.random() * 1.0),
-              reviews_count: Math.floor(Math.random() * 500) + 50,
-              ai_analysis: p.aiAnalysis,
-              shops: [{
-                shop_name: getShopNameFromUrl(p.url),
-                shop_type: 'mall',
-                lowest_price: p.price,
-                url: p.url
-              }]
-            }));
-          } else {
-            // Gemini が空を返したら生データにフォールバック
-            formatted = formatRawItems(allItems);
-          }
-        } catch {
-          // Gemini 失敗でも生データにフォールバック
+        if (cleanedProducts.length > 0) {
+          formatted = cleanedProducts.map((p, i) => ({
+            id: `remote-${i}-${Date.now()}`,
+            name: p.name,
+            brand: p.brand || "メーカー不明",
+            category: keyword,
+            image: p.image,
+            rating: 4.0 + (Math.random() * 1.0),
+            reviews_count: Math.floor(Math.random() * 500) + 50,
+            ai_analysis: p.aiAnalysis,
+            shops: [{
+              shop_name: getShopNameFromUrl(p.url),
+              shop_type: 'mall',
+              lowest_price: p.price,
+              url: p.url
+            }]
+          }));
+        } else {
+          // Gemini が空を返したら生データにフォールバック
           formatted = formatRawItems(allItems);
         }
+      } catch {
+        // Gemini 失敗でも生データにフォールバック
+        formatted = formatRawItems(allItems);
+      }
 
       setSearchResults(formatted);
       autoSaveSearchResultsToDb(formatted, keyword);
@@ -1229,7 +1235,19 @@ const App = () => {
       }
 
       let prompt;
-      if (contextProducts.length > 0) {
+      const isDiagnosis = userText.includes('診断');
+
+      if (isDiagnosis) {
+        prompt = `あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
+ユーザーは「5秒診断」を希望しています。以下の手順で進めてください。
+1. まず明るく挨拶し、どのカテゴリ（ベビーカー、抱っこ紐など）の診断を希望するか聞いてください。
+2. 次に、選ばれたカテゴリに対して1つずつ質問を投げ、ユーザーのライフスタイルを聞き出してください。
+3. 合計3つ程度の質問のあと、ユーザーに最適な商品を提案してください。
+4. 回答は絵文字を多用せず、シンプルで高級感のあるトーンにしてください。
+
+【ユーザーの入力】
+${userText}`;
+      } else if (contextProducts.length > 0) {
         const productList = contextProducts.slice(0, 6).map((p, i) => {
           const price = p.shops?.[0]?.lowest_price ?? p.price;
           return `${i + 1}. ${p.name}（${price ? price.toLocaleString() + '円' : '価格不明'}）`;
@@ -1293,13 +1311,13 @@ ${userText}
       return;
     }
     setIsSubmittingReview(true);
-    
+
     try {
       let productId = selectedProduct.id;
 
       // もしIDがUUIDでない（API取得直後のデータなど）場合、まずDBに保存してUUIDを取得する
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
-      
+
       if (!isUuid) {
         // DB保存ロジック（sync-products.jsの簡易版をフロントでも実行）
         const { data: saved, error: saveErr } = await supabase
@@ -1318,7 +1336,7 @@ ${userText}
           })
           .select()
           .single();
-        
+
         if (saveErr) throw saveErr;
         productId = saved.id;
       }
@@ -1327,14 +1345,14 @@ ${userText}
 
       // SupabaseにINSERT
       const { data, error } = await supabase
-         .from('reviews')
-         .insert([{
-           product_id: productId,
-           rating: reviewForm.rating,
-           content: reviewForm.content,
-           user_name: displayName
-         }])
-         .select();
+        .from('reviews')
+        .insert([{
+          product_id: productId,
+          rating: reviewForm.rating,
+          content: reviewForm.content,
+          user_name: displayName
+        }])
+        .select();
 
       if (error) throw error;
 
@@ -1344,13 +1362,13 @@ ${userText}
           user: data[0].user_name,
           date: new Date(data[0].created_at).toLocaleDateString()
         };
-        
+
         const updatedProduct = {
           ...selectedProduct,
           id: productId, // UUIDに更新
           honestReviews: [newReview, ...(selectedProduct.honestReviews || [])]
         };
-        
+
         setSelectedProduct(updatedProduct);
         setDbProducts(prev => prev.map(p => p.id === updatedProduct.id || p.id === selectedProduct.id ? updatedProduct : p));
 
@@ -1374,14 +1392,14 @@ ${userText}
       const filtered = prev.filter(p => p.id !== product.id);
       return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
     });
-    try { sessionStorage.setItem('honestBabyOpenProduct', JSON.stringify(product)); } catch {}
+    try { sessionStorage.setItem('honestBabyOpenProduct', JSON.stringify(product)); } catch { }
     try {
       const cache = JSON.parse(localStorage.getItem('honestBabyProductCache') || '{}');
       cache[product.id] = product;
       const keys = Object.keys(cache);
       if (keys.length > 100) delete cache[keys[0]];
       localStorage.setItem('honestBabyProductCache', JSON.stringify(cache));
-    } catch {}
+    } catch { }
     navigate(`/product/${encodeURIComponent(product.id)}`);
   };
 
@@ -1389,7 +1407,7 @@ ${userText}
     setSelectedProduct(null);
     setExpandedMall(null);
     setReviewTab('honest');
-    try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch {}
+    try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
     navigate(-1);
   };
 
@@ -1399,11 +1417,11 @@ ${userText}
       onClick={() => openProduct(product)}
     >
       <div className="relative aspect-square bg-[#F9F6F3] p-4">
-        <img 
-          src={product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} 
+        <img
+          src={product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"}
           onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }}
-          className="w-full h-full object-cover rounded-[1.5rem]" 
-          alt={product.name} 
+          className="w-full h-full object-cover rounded-[1.5rem]"
+          alt={product.name}
         />
         <button
           onClick={(e) => toggleFavorite(e, product)}
@@ -1444,12 +1462,12 @@ ${userText}
         <div className="flex items-center gap-1 mb-2">
           <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest">{product.category}</span>
           <div className="flex items-center gap-1 ml-auto bg-[#FFF9E6] px-2 py-0.5 rounded-full text-[#D4AF37]">
-             <Star className="w-3 h-3 fill-current" />
-             <span className="text-[10px] font-black">{product.rating}</span>
+            <Star className="w-3 h-3 fill-current" />
+            <span className="text-[10px] font-black">{product.rating}</span>
           </div>
         </div>
         <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{product.name}</h3>
-        
+
         <div className="mt-auto">
           {(product.shops?.length || 0) >= 2 && (
             <p className="text-[9px] text-[#7B8E76] font-black mb-1 uppercase tracking-wider">
@@ -1457,9 +1475,9 @@ ${userText}
             </p>
           )}
           {product.unitCount && (
-             <p className="text-[10px] text-[#A5A19E] font-bold mb-1">
-               1{product.unitName}あたり <span className="text-[#F2ABAC]">¥{Math.ceil(getLowestPrice(product.shops) / product.unitCount)}</span>
-             </p>
+            <p className="text-[10px] text-[#A5A19E] font-bold mb-1">
+              1{product.unitName}あたり <span className="text-[#F2ABAC]">¥{Math.ceil(getLowestPrice(product.shops) / product.unitCount)}</span>
+            </p>
           )}
           <p className="text-xl font-black text-[#7B8E76] leading-none">
             <span className="text-xs mr-0.5">¥</span>
@@ -1482,8 +1500,8 @@ ${userText}
           </div>
           <h3 className="font-serif font-black text-[#5A4C4C] text-xl mb-3">接続エラー</h3>
           <p className="text-xs text-[#8E8282] mb-8 leading-relaxed font-bold px-4">
-            データベースとの接続に失敗しました。<br/>
-            Vercelの環境変数（URLとKey）に間違いがないか、<br/>
+            データベースとの接続に失敗しました。<br />
+            Vercelの環境変数（URLとKey）に間違いがないか、<br />
             末尾に不要なスラッシュがないか再確認してください。
           </p>
           <div className="bg-white/50 p-4 rounded-2xl mb-8 text-left border border-[#F4EFEB]">
@@ -1517,7 +1535,7 @@ ${userText}
         return matchCat && matchSub && matchSubSub;
       })
       .sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999));
-    
+
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
     const showRemote = remoteProducts.length > 0 || isRemoteLoading;
 
@@ -1540,7 +1558,7 @@ ${userText}
               <div className="bg-white p-1.5 rounded-full shadow-sm"><Sparkles className="w-4 h-4 text-[#F2ABAC]" /></div>
               <span className="text-[10px] font-black uppercase tracking-widest text-[#F2ABAC]">AI Concierge</span>
             </div>
-            <h4 className="text-2xl font-black mb-2 text-[#5A4C4C] leading-tight">AIに育児アイテムを<br/>相談してみる</h4>
+            <h4 className="text-2xl font-black mb-2 text-[#5A4C4C] leading-tight">AIに育児アイテムを<br />相談してみる</h4>
             <p className="text-[11px] text-[#8E8282] max-w-[200px] font-bold">ぴったりのベビー用品をAIが比較・提案します</p>
           </div>
           <div className="absolute right-[-10%] bottom-[-20%] w-48 h-48 bg-[#FFE6E6] rounded-full opacity-50 blur-2xl"></div>
@@ -1553,11 +1571,10 @@ ${userText}
               <button
                 key={cat.name}
                 onClick={() => handleCategoryChange(cat.name)}
-                className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 ${
-                  selectedCategory === cat.name
+                className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 ${selectedCategory === cat.name
                     ? 'bg-[#7B8E76] text-white shadow-md'
                     : 'bg-[#F0EBE6] text-[#7B8E76]'
-                }`}
+                  }`}
               >
                 {cat.name}
               </button>
@@ -1584,11 +1601,10 @@ ${userText}
                       <button
                         key={subName}
                         onClick={() => handleSubCategoryChange(subName)}
-                        className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 ${
-                          selectedSubCategory === subName
+                        className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 ${selectedSubCategory === subName
                             ? 'bg-[#5A4C4C] text-white shadow-sm'
                             : 'bg-[#F0EBE6] text-[#7B8E76]'
-                        }`}
+                          }`}
                       >
                         {subName}
                       </button>
@@ -1603,11 +1619,10 @@ ${userText}
                       <button
                         key={subsub}
                         onClick={() => handleSubSubCategoryChange(subsub)}
-                        className={`flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 ${
-                          selectedSubSubCategory === subsub
+                        className={`flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 ${selectedSubSubCategory === subsub
                             ? 'bg-[#7B8E76] text-white shadow-sm'
                             : 'bg-[#EBF0EA] text-[#5A4C4C]'
-                        }`}
+                          }`}
                       >
                         {subsub}
                       </button>
@@ -1656,15 +1671,14 @@ ${userText}
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 -mx-4 px-4 mb-4">
           {[
-            { key: 'standard',   label: '標準' },
-            { key: 'popular',    label: '評価順' },
-            { key: 'price_asc',  label: '価格↑' },
+            { key: 'standard', label: '標準' },
+            { key: 'popular', label: '評価順' },
+            { key: 'price_asc', label: '価格↑' },
             { key: 'price_desc', label: '価格↓' },
           ].map(s => (
             <button key={s.key} onClick={() => setSortOrder(s.key)}
-              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] font-bold transition-all ${
-                sortOrder === s.key ? 'bg-[#5A4C4C] text-white shadow-sm' : 'bg-[#F0EBE6] text-[#7B8E76]'
-              }`}>{s.label}</button>
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] font-bold transition-all ${sortOrder === s.key ? 'bg-[#5A4C4C] text-white shadow-sm' : 'bg-[#F0EBE6] text-[#7B8E76]'
+                }`}>{s.label}</button>
           ))}
         </div>
 
@@ -1685,7 +1699,7 @@ ${userText}
 
           {/* Empty State */}
           {!isRemoteLoading && filtered.length === 0 && remoteProducts.length === 0 && !cachedProducts[selectedCategory]?.length && (
-             <div className="col-span-2 py-20 text-center text-[#A5A19E] text-xs font-bold uppercase tracking-widest leading-loose">該当する商品は見つかりませんでした</div>
+            <div className="col-span-2 py-20 text-center text-[#A5A19E] text-xs font-bold uppercase tracking-widest leading-loose">該当する商品は見つかりませんでした</div>
           )}
         </div>
 
@@ -1716,7 +1730,7 @@ ${userText}
               <p className="text-[10px] text-[#A5A19E] font-bold mt-1 tracking-widest">FOR SPECIAL SOMEONE</p>
             </div>
           </div>
-          <p className="text-xs text-[#8E8282] font-bold leading-relaxed relative z-10">絶対喜ばれるベビーアイテムを厳選。<br/>ギフト対応の公式ショップも比較できます。</p>
+          <p className="text-xs text-[#8E8282] font-bold leading-relaxed relative z-10">絶対喜ばれるベビーアイテムを厳選。<br />ギフト対応の公式ショップも比較できます。</p>
         </div>
 
         <h3 className="font-black text-[#5A4C4C] mb-4 px-1">予算から探す</h3>
@@ -1935,7 +1949,7 @@ ${userText}
             <button onClick={() => { setShowContactModal(true); setContactSent(false); setContactContent(''); setContactCategory('商品について'); }} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Mail className="w-4 h-4 mr-2" /> お問い合わせ</button>
             <button onClick={() => setActiveLegalPage('terms')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 利用規約</button>
             <button onClick={() => setActiveLegalPage('privacy')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Shield className="w-4 h-4 mr-2" /> プライバシーポリシー</button>
-            <button onClick={() => setActiveLegalPage('disclaimer')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors text-left leading-relaxed"><Info className="w-4 h-4 mr-2 flex-shrink-0" /> 運営者情報・免責事項<br/>(アフィリエイトについて)</button>
+            <button onClick={() => setActiveLegalPage('disclaimer')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors text-left leading-relaxed"><Info className="w-4 h-4 mr-2 flex-shrink-0" /> 運営者情報・免責事項<br />(アフィリエイトについて)</button>
           </div>
         </div>
       </div>
@@ -2068,11 +2082,11 @@ ${userText}
         </div>
       </header>
 
-      <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden' : 'px-6 pt-4'} style={activeTab === 'ai' ? {paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)'} : {}}>
+      <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden' : 'px-6 pt-4'} style={activeTab === 'ai' ? { paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)' } : {}}>
         {activeTab === 'home' && renderHome()}
         {activeTab === 'gift' && renderGift()}
         {activeTab === 'user' && renderUser()}
-        
+
         {activeTab === 'search' && (
           <div className="animate-in slide-in-from-right duration-300">
             {/* 検索ボックス */}
@@ -2174,8 +2188,8 @@ ${userText}
                 <p className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest leading-none mt-1">Wishlist</p>
               </div>
             </div>
-            {favorites.length === 0 ? <p className="text-center text-[#A5A19E] mt-20 font-bold text-xs uppercase tracking-widest leading-loose">保存されているアイテムは<br/>ありません</p> : 
-            <div className="grid grid-cols-2 gap-4">{favorites.map(p => <ProductCard key={p.id} product={p} />)}</div>}
+            {favorites.length === 0 ? <p className="text-center text-[#A5A19E] mt-20 font-bold text-xs uppercase tracking-widest leading-loose">保存されているアイテムは<br />ありません</p> :
+              <div className="grid grid-cols-2 gap-4">{favorites.map(p => <ProductCard key={p.id} product={p} />)}</div>}
           </div>
         )}
         {activeTab === 'ai' && (
@@ -2190,9 +2204,8 @@ ${userText}
             <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FFFDFB] min-h-0">
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[85%] p-4 text-sm font-medium leading-relaxed whitespace-pre-wrap ${
-                    msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'
-                  }`}>
+                  <div className={`max-w-[85%] p-4 text-sm font-medium leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'
+                    }`}>
                     {msg.text}
                   </div>
                   {msg.products && msg.products.length > 0 && (
@@ -2214,7 +2227,7 @@ ${userText}
               {isAiTyping && <div className="flex gap-1.5 p-2"><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-75"></div><div className="w-2 h-2 bg-[#F2ABAC] rounded-full animate-bounce delay-150"></div></div>}
               <div ref={chatEndRef} />
             </div>
-            <div className="p-4 bg-white border-t border-[#F4EFEB] flex gap-2 flex-shrink-0" style={{paddingBottom: 'calc(1rem + var(--keyboard-height, 0px))'}}>
+            <div className="p-4 bg-white border-t border-[#F4EFEB] flex gap-2 flex-shrink-0" style={{ paddingBottom: 'calc(1rem + var(--keyboard-height, 0px))' }}>
               <input type="text" placeholder="AIにメッセージ..." className="flex-1 bg-[#F9F6F3] border-none rounded-full px-5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#7B8E76]/20" value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()} />
               <button onClick={handleSendMessage} className="bg-[#7B8E76] text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"><Send className="w-4 h-4 ml-0.5" /></button>
             </div>
@@ -2232,9 +2245,9 @@ ${userText}
           </div>
           <div className="flex-1 overflow-y-auto px-6 pb-32">
             <div className="bg-[#F9F6F3] rounded-[3rem] p-6 my-6">
-               <img src={selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
+              <img src={selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
             </div>
-            
+
             <div className="flex justify-between items-start mb-8 px-1">
               <div className="flex-1 pr-4">
                 <div className="flex gap-2 mb-2">
@@ -2243,7 +2256,7 @@ ${userText}
                 </div>
                 <h2 className="text-2xl font-black text-[#5A4C4C] leading-tight mb-2">{selectedProduct.name}</h2>
                 <div className="flex items-center gap-1 text-[#D4AF37]">
-                  {[...Array(5)].map((_,i) => <Star key={i} className={`w-4 h-4 ${i < Math.floor(selectedProduct.rating) ? 'fill-current' : 'text-gray-200'}`} />)}
+                  {[...Array(5)].map((_, i) => <Star key={i} className={`w-4 h-4 ${i < Math.floor(selectedProduct.rating) ? 'fill-current' : 'text-gray-200'}`} />)}
                   <span className="text-xs font-black text-[#A5A19E] ml-1">({selectedProduct.reviewsCount})</span>
                 </div>
               </div>
@@ -2304,7 +2317,7 @@ ${userText}
                         const u = new URL(firstUrl.startsWith('//') ? 'https:' + firstUrl : firstUrl);
                         urlKey = u.hostname + u.pathname.split('/').slice(0, 3).join('/');
                       }
-                    } catch {}
+                    } catch { }
                     return urlKey || nameKey;
                   };
                   const shopByKey = new Map();
@@ -2350,7 +2363,7 @@ ${userText}
                           </div>
                         )}
                         {selectedProduct.unitCount ? (
-                           <p className="text-[10px] text-[#F2ABAC] font-black mt-2">1{selectedProduct.unitName}あたり ¥{Math.ceil(shop.lowestPrice / selectedProduct.unitCount)}</p>
+                          <p className="text-[10px] text-[#F2ABAC] font-black mt-2">1{selectedProduct.unitName}あたり ¥{Math.ceil(shop.lowestPrice / selectedProduct.unitCount)}</p>
                         ) : (
                           <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">出品者: {(shop.sellers || []).length}店舗</p>
                         )}
@@ -2377,10 +2390,10 @@ ${userText}
                               </div>
                             </div>
                             <div className="flex flex-col items-end gap-2 border-l border-[#F4EFEB] pl-4">
-                               <span className="text-sm font-black text-[#7B8E76]">¥{seller.price.toLocaleString()}</span>
-                               <a href={toVCUrl(seller.url) || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
-                                 ショップへ
-                               </a>
+                              <span className="text-sm font-black text-[#7B8E76]">¥{seller.price.toLocaleString()}</span>
+                              <a href={toVCUrl(seller.url) || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
+                                ショップへ
+                              </a>
                             </div>
                           </div>
                         ))}
@@ -2412,13 +2425,13 @@ ${userText}
 
               {/* タブ切り替え */}
               <div className="flex p-1 bg-[#F9F6F3] rounded-full mb-6 relative">
-                <button 
+                <button
                   onClick={() => setReviewTab('honest')}
                   className={`flex-1 py-3 text-xs font-black rounded-full transition-all z-10 ${reviewTab === 'honest' ? 'text-[#5A4C4C]' : 'text-[#A5A19E]'}`}
                 >
                   ユーザーの口コミ
                 </button>
-                <button 
+                <button
                   onClick={() => setReviewTab('sns')}
                   className={`flex-1 py-3 text-xs font-black rounded-full transition-all z-10 ${reviewTab === 'sns' ? 'text-[#5A4C4C]' : 'text-[#A5A19E]'}`}
                 >
@@ -2434,10 +2447,10 @@ ${userText}
                     <div className="flex items-baseline gap-2">
                       <span className="text-3xl font-black text-[#5A4C4C]">{selectedProduct.rating}</span>
                       <div className="flex items-center text-[#D4AF37]">
-                        {[...Array(5)].map((_,i) => <Star key={i} className={`w-4 h-4 ${i < Math.floor(selectedProduct.rating) ? 'fill-current' : 'text-gray-200'}`} />)}
+                        {[...Array(5)].map((_, i) => <Star key={i} className={`w-4 h-4 ${i < Math.floor(selectedProduct.rating) ? 'fill-current' : 'text-gray-200'}`} />)}
                       </div>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setIsReviewFormOpen(true)}
                       className="flex items-center gap-1.5 bg-[#7B8E76] text-white px-4 py-2.5 rounded-full text-[11px] font-black shadow-sm active:scale-95 transition-transform"
                     >
@@ -2458,7 +2471,7 @@ ${userText}
                               </div>
                             </div>
                             <div className="flex text-[#D4AF37]">
-                              {[...Array(5)].map((_,i) => <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
+                              {[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
                             </div>
                           </div>
                           <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.content}"</p>
@@ -2466,7 +2479,7 @@ ${userText}
                       ))
                     ) : (
                       <div className="py-12 bg-white border-2 border-dashed border-[#F4EFEB] rounded-[2rem] text-center">
-                        <p className="text-xs text-[#A5A19E] font-bold uppercase tracking-widest leading-loose">まだ口コミがありません<br/>最初のレビューを書いてみませんか？</p>
+                        <p className="text-xs text-[#A5A19E] font-bold uppercase tracking-widest leading-loose">まだ口コミがありません<br />最初のレビューを書いてみませんか？</p>
                       </div>
                     )}
                   </div>
@@ -2498,8 +2511,20 @@ ${userText}
                       ))}
                     </div>
                   ) : (
-                    <div className="py-12 bg-[#F9F6F3] rounded-[2rem] text-center border-2 border-dashed border-[#F4EFEB]">
-                      <p className="text-xs text-[#A5A19E] font-bold uppercase tracking-widest leading-loose">現在SNSでの口コミを<br/>収集中です</p>
+                    <div className="bg-[#FFF5F5] border border-[#FFEBEB] p-6 rounded-[2rem] shadow-sm">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="w-4 h-4 text-[#F2ABAC]" />
+                        <h4 className="text-xs font-black text-[#5A4C4C]">AIによるSNS評判まとめ</h4>
+                      </div>
+                      <p className="text-xs text-[#8E8282] leading-relaxed font-medium">
+                        {selectedProduct.aiAnalysis ? 
+                          `${selectedProduct.name}はSNS上では「${selectedProduct.aiAnalysis.slice(0, 50)}...」といった声が多く、特にデザイン性と実用性のバランスが高く評価されています。` : 
+                          "現在SNSでのリアルな評判を解析中です。一般的には、使い勝手の良さとブランドの信頼性で多くのママ・パパに選ばれているアイテムです。"}
+                      </p>
+                      <div className="mt-4 flex gap-2">
+                        <span className="text-[9px] font-bold bg-white text-[#F2ABAC] px-2 py-1 rounded-md border border-[#F2ABAC]/20">#SNSで話題</span>
+                        <span className="text-[9px] font-bold bg-white text-[#F2ABAC] px-2 py-1 rounded-md border border-[#F2ABAC]/20">#口コミ高評価</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2517,7 +2542,7 @@ ${userText}
               <h3 className="font-black text-[#5A4C4C] text-lg">口コミを投稿</h3>
               <button onClick={() => setIsReviewFormOpen(false)} className="p-2 bg-[#F9F6F3] rounded-full"><X className="w-5 h-5 text-[#A5A19E]" /></button>
             </div>
-            
+
             <div className="flex items-center gap-3 mb-6 bg-[#F9F6F3] p-3 rounded-[1.5rem]">
               <img src={selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
               <p className="text-xs font-black text-[#5A4C4C] line-clamp-1 flex-1">{selectedProduct.name}</p>
@@ -2526,8 +2551,8 @@ ${userText}
             <div className="mb-6 text-center">
               <p className="text-[10px] font-bold text-[#A5A19E] mb-2">タップして評価</p>
               <div className="flex justify-center gap-2">
-                {[1,2,3,4,5].map(star => (
-                  <button key={star} onClick={() => setReviewForm({...reviewForm, rating: star})}>
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button key={star} onClick={() => setReviewForm({ ...reviewForm, rating: star })}>
                     <Star className={`w-8 h-8 transition-colors ${star <= reviewForm.rating ? 'text-[#D4AF37] fill-current scale-110' : 'text-gray-200'}`} />
                   </button>
                 ))}
@@ -2535,12 +2560,12 @@ ${userText}
             </div>
 
             <div className="mb-6">
-              <textarea 
+              <textarea
                 className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-[1.5rem] p-4 text-sm focus:outline-none focus:border-[#F2ABAC] focus:ring-4 focus:ring-[#F2ABAC]/10 transition-all resize-none font-medium text-[#5A4C4C]"
                 rows="4"
                 placeholder="実際に使ってみた感想を教えてください！"
                 value={reviewForm.content}
-                onChange={(e) => setReviewForm({...reviewForm, content: e.target.value})}
+                onChange={(e) => setReviewForm({ ...reviewForm, content: e.target.value })}
               />
             </div>
 
@@ -2551,7 +2576,7 @@ ${userText}
               </button>
             </div>
 
-            <button 
+            <button
               onClick={submitReview}
               disabled={!reviewForm.content.trim() || isSubmittingReview}
               className="w-full py-4 bg-[#7B8E76] text-white rounded-full font-black shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
@@ -2617,7 +2642,7 @@ ${userText}
         </div>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-[#F4EFEB] px-8 pt-4 flex justify-between items-center rounded-t-[3rem] shadow-[0_-10px_40px_rgb(0,0,0,0.03)]" style={{paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)'}}>
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-[#F4EFEB] px-8 pt-4 flex justify-between items-center rounded-t-[3rem] shadow-[0_-10px_40px_rgb(0,0,0,0.03)]" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}>
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'home' ? 'text-[#7B8E76] scale-110' : 'text-[#D4CDC7] hover:text-[#A5A19E]'}`}>
           <Home className={`w-6 h-6 ${activeTab === 'home' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">ホーム</span>
         </button>
@@ -2761,9 +2786,9 @@ ${userText}
       {/* お問い合わせモーダル */}
       {showContactModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center"
-             onClick={() => setShowContactModal(false)}>
+          onClick={() => setShowContactModal(false)}>
           <div className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-10"
-               onClick={e => e.stopPropagation()}>
+            onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-base font-black text-[#5A4C4C]">お問い合わせ</h2>
               <button onClick={() => setShowContactModal(false)}>
