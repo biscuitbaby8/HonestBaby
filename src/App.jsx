@@ -2448,17 +2448,21 @@ AI分析: ${selectedProduct.aiAnalysis}
                   </div>
                 ))}
               </div>
-              {/* Amazonで検索リンク */}
+              {/* Amazonで検索リンク (他ショップとデザインを統一) */}
               <a href={getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' '))} target="_blank" rel="noopener noreferrer"
-                className="mt-4 flex items-center justify-between bg-[#232F3E] text-white rounded-[2rem] px-6 py-4 active:scale-95 transition-all shadow-sm">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg font-black tracking-tight text-[#FF9900]">amazon</span>
-                  <div>
-                    <p className="text-xs font-black">Amazonで検索する</p>
-                    <p className="text-[10px] text-white/50">価格・在庫をAmazonで確認</p>
+                className="mt-6 flex items-center justify-between bg-white border border-[#F4EFEB] rounded-[2rem] p-6 shadow-sm active:scale-[0.98] transition-transform">
+                <div className="flex-1 pr-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon" className="h-4 opacity-70" />
+                    <span className="text-sm font-black text-[#5A4C4C]">Amazon.co.jp</span>
                   </div>
+                  <p className="text-[10px] text-[#A5A19E] font-bold">Amazonの最新価格・在庫状況を確認</p>
                 </div>
-                <ExternalLink className="w-4 h-4 text-white/60" />
+                <div className="flex flex-col items-end gap-2">
+                   <div className="bg-[#7B8E76] text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm">
+                     Amazonで探す
+                   </div>
+                </div>
               </a>
             </section>
 
