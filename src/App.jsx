@@ -399,7 +399,6 @@ const App = () => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) migrateLocalFavoritesToDB(u.id);
-      // 自動移動を廃止
     });
 
     // 既存セッションの復元（ページリロード時など）
@@ -1392,13 +1391,18 @@ ${userText}
   // --- 共通コンポーネント ---
 
   const openProduct = async (product) => {
-    // 既存情報でサクッと開く（速度優先）
+    // 1. 画面遷移を最優先で実行（もっさり感を解消）
     setSelectedProduct(product);
-    
-    // 背景で非同期に口コミと詳細ショップ情報を取得
+    navigate(`/product/${encodeURIComponent(product.id)}`, { replace: true });
+
+    setRecentlyViewed(prev => {
+      const filtered = prev.filter(p => p.id !== product.id);
+      return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
+    });
+
+    // 2. 口コミデータなどはバックグラウンドで非同期に取得
     try {
-      // 部分一致検索で、より多くの情報をヒットさせる
-      const query = product.name.split(' ').filter(s => s.length > 1).slice(0, 2).join(' ');
+      const query = product.name.split(/[\s　]+/).filter(s => s.length > 1).slice(0, 2).join(' ');
       const { data } = await supabase
         .from('products')
         .select('*, honestReviews:reviews(*), snsReviews:sns_reviews(*)')
@@ -1407,19 +1411,18 @@ ${userText}
         .single();
       
       if (data) {
-        setSelectedProduct(prev => prev?.id === product.id ? ({
-          ...prev,
-          honestReviews: (data.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
-          snsReviews: data.snsReviews || []
-        }) : prev);
+        setSelectedProduct(prev => {
+          if (!prev || prev.id !== product.id) return prev;
+          return {
+            ...prev,
+            honestReviews: (data.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
+            snsReviews: data.snsReviews || []
+          };
+        });
       }
-    } catch (e) { console.warn('Detail fetch error:', e); }
-
-    setRecentlyViewed(prev => {
-      const filtered = prev.filter(p => p.id !== product.id);
-      return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
-    });
-    navigate(`/product/${encodeURIComponent(product.id)}`, { replace: true });
+    } catch (e) {
+      console.warn('Background fetch error:', e);
+    }
   };
 
   // --- 新機能: URL共有ハンドラ ---
@@ -2424,7 +2427,7 @@ AI分析: ${selectedProduct.aiAnalysis}
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <span className="text-2xl font-black text-[#7B8E76]">
-                          {shop.lowestPrice > 0 ? `¥${shop.lowestPrice.toLocaleString()}` : '価格確認'}
+                          {shop.lowestPrice > 0 ? `¥${shop.lowestPrice.toLocaleString()}` : '最安値をチェック'}
                         </span>
                         <div className="text-[#A5A19E] bg-white p-1 rounded-full shadow-sm">
                           {shop.sellers?.length > 0 ? (expandedMall === (shop.name || shop.shop_name) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />) : <ExternalLink className="w-4 h-4 opacity-30" />}
