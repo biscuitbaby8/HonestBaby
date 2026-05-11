@@ -1414,6 +1414,28 @@ ${userText}
     navigate(`/product/${encodeURIComponent(product.id)}`);
   };
 
+  // --- 新機能: URL共有ハンドラ ---
+  const handleShare = async () => {
+    if (!selectedProduct) return;
+    const shareUrl = window.location.href;
+    const shareData = {
+      title: `Honest Baby | ${selectedProduct.name}`,
+      text: `${selectedProduct.name}をHonest Babyでチェック！`,
+      url: shareUrl
+    };
+
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch (e) { console.warn('Share failed:', e); }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('リンクをコピーしました！');
+      } catch (e) {
+        alert('共有に失敗しました。');
+      }
+    }
+  };
+
   const closeProduct = () => {
     setSelectedProduct(null);
     setExpandedMall(null);
@@ -2252,7 +2274,7 @@ ${userText}
           <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
             <button onClick={closeProduct} className="p-2 -ml-2 bg-[#F9F6F3] rounded-full text-[#5A4C4C]"><ChevronLeft className="w-6 h-6" /></button>
             <span className="text-sm font-black text-[#5A4C4C]">商品詳細</span>
-            <button className="p-2 -mr-2 text-[#A5A19E]"><Share2 className="w-5 h-5" /></button>
+            <button onClick={handleShare} className="p-2 -mr-2 text-[#A5A19E] active:scale-90 transition-transform"><Share2 className="w-5 h-5" /></button>
           </div>
           <div className="flex-1 overflow-y-auto px-6 pb-32">
             <div className="bg-[#F9F6F3] rounded-[3rem] p-6 my-6">
