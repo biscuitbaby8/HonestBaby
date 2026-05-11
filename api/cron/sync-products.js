@@ -331,17 +331,19 @@ async function syncCategory(cat, log) {
   const { data: blocklist } = await supabase.from('product_blocklist').select('item_code');
   const blockedCodes = new Set((blocklist || []).map(b => b.item_code));
 
-  for (let i = 0; i < deduplicated.length; i++) {
-    const product = deduplicated[i];
+  // タイムアウト回避のため、上位40件に限定
+  const productsToProcess = deduplicated.slice(0, 40);
+  log.push(`  ⏱ タイムアウト防止のため、上位 ${productsToProcess.length}件を処理します`);
+
+  for (let i = 0; i < productsToProcess.length; i++) {
+    const product = productsToProcess[i];
+    product.popularity_rank = i + 1;
 
     // ブロックリストチェック
     if (blockedCodes.has(product.rakuten_item_code)) continue;
 
     const shopInfo = product._rakuten_shop;
     delete product._rakuten_shop;
-
-    // popularity_rank をセット
-    product.popularity_rank = i + 1;
 
     try {
       // 既存商品をrakuten_item_codeで検索
@@ -400,30 +402,32 @@ async function syncCategory(cat, log) {
           }])
         }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
 
-      // --- Yahoo価格を取得して保存 ---
-      const searchKeyword = product.name.split(/[\s　]+/).slice(0, 3).join(' ');
-      const yahooResults = await fetchYahooPrice(searchKeyword);
+      // --- Yahoo価格を取得（上位10件のみ詳細調査、それ以外はスキップして高速化） ---
+      if (i < 10) {
+        const searchKeyword = product.name.split(/[\s　]+/).slice(0, 3).join(' ');
+        const yahooResults = await fetchYahooPrice(searchKeyword);
 
-      if (yahooResults.length > 0) {
-        // 最安値のものを選択
-        const best = yahooResults.sort((a, b) => a.price - b.price)[0];
-        await supabase
-          .from('shops_prices')
-          .upsert([{
-            product_id: productId,
-            shop_name: best.name || 'Yahoo!ショッピング',
-            shop_type: 'mall',
-            lowest_price: best.price,
-            source: 'yahoo',
-            sellers: JSON.stringify([{
-              name: best.name || 'Yahoo!ショッピング',
-              price: best.price,
-              shipping: 0,
-              points: 0,
-              url: best.url,
-              note: ''
-            }])
-          }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+        if (yahooResults.length > 0) {
+          // 最安値のものを選択
+          const best = yahooResults.sort((a, b) => a.price - b.price)[0];
+          await supabase
+            .from('shops_prices')
+            .upsert([{
+              product_id: productId,
+              shop_name: best.name || 'Yahoo!ショッピング',
+              shop_type: 'mall',
+              lowest_price: best.price,
+              source: 'yahoo',
+              sellers: JSON.stringify([{
+                name: best.name || 'Yahoo!ショッピング',
+                price: best.price,
+                shipping: 0,
+                points: 0,
+                url: best.url,
+                note: ''
+              }])
+            }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+        }
       }
 
       savedCount++;
