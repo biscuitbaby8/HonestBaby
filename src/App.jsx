@@ -1466,7 +1466,7 @@ ${userText}
           <button
             onClick={(e) => { e.stopPropagation(); blockProduct(product); }}
             title="この商品を非表示にする"
-            className="absolute top-6 left-6 bg-red-500 text-white w-7 h-7 rounded-full text-sm font-black shadow-md z-30 flex items-center justify-center hover:bg-red-600"
+            className="absolute top-4 left-4 bg-red-500 text-white w-9 h-9 rounded-full text-lg font-black shadow-xl z-[40] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-2 border-white"
           >×</button>
         )}
         {localRank && (
@@ -2366,64 +2366,79 @@ AI分析: ${selectedProduct.aiAnalysis}
                     } catch { }
                     return urlKey || nameKey;
                   };
+              <div className="space-y-4">
+                {(() => {
+                  const existingShops = selectedProduct.shops || [];
+                  const crossPlatformShops = (selectedProduct.crossPlatformPrices || []).map(p => ({
+                    name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング',
+                    type: 'mall',
+                    lowestPrice: p.price,
+                    url: p.url,
+                    sellers: [{ name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング', price: p.price, url: p.url, shipping: 0, points: 0 }]
+                  }));
+                  
                   const shopByKey = new Map();
-                  for (const s of existingShops) {
+                  const shopKey = (s) => (s.name || s.shop_name || '').toLowerCase();
+                  
+                  for (const s of [...existingShops, ...crossPlatformShops]) {
                     const key = shopKey(s);
                     const cur = shopByKey.get(key);
                     if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
                       shopByKey.set(key, s);
                     }
                   }
-                  const dedupedExisting = Array.from(shopByKey.values()).filter(s => s.sellers && s.sellers.length > 0);
-                  const existingKeys = new Set(dedupedExisting.map(shopKey));
-                  const mergedShops = [
-                    ...dedupedExisting,
-                    ...crossPlatformShops.filter(s => !existingKeys.has(shopKey(s))),
-                  ];
-                  return mergedShops;
+                  
+                  // Amazonを統合
+                  if (!shopByKey.has('amazon.co.jp') && !shopByKey.has('amazon')) {
+                    shopByKey.set('amazon', {
+                      name: 'Amazon.co.jp',
+                      type: 'mall',
+                      lowestPrice: 0,
+                      url: getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ')),
+                      sellers: []
+                    });
+                  }
+
+                  return Array.from(shopByKey.values()).sort((a, b) => {
+                    if (a.lowestPrice === 0) return 1;
+                    if (b.lowestPrice === 0) return -1;
+                    return (a.lowestPrice || a.price) - (b.lowestPrice || b.price);
+                  });
                 })().map((shop, idx) => (
                   <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
-                    <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`} onClick={() => setExpandedMall(expandedMall === shop.name ? null : shop.name)}>
+                    <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`} 
+                      onClick={() => shop.sellers?.length > 0 ? setExpandedMall(expandedMall === (shop.name || shop.shop_name) ? null : (shop.name || shop.shop_name)) : window.open(shop.url, '_blank')}>
                       <div className="flex-1 pr-4">
                         <div className="flex items-center flex-wrap gap-2 mb-1.5">
-                          <p className="text-base font-black text-[#5A4C4C]">{shop.name}</p>
+                          <div className="w-5 h-5 rounded-md flex items-center justify-center overflow-hidden border border-[#F4EFEB] bg-white">
+                            {(shop.name || shop.shop_name).includes('楽天') ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> : 
+                             (shop.name || shop.shop_name).includes('Yahoo') ? <img src="https://shopping.yahoo.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
+                             (shop.name || shop.shop_name).toLowerCase().includes('amazon') ? <img src="https://www.amazon.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
+                             <Store className="w-3.5 h-3.5 text-[#A5A19E]" />}
+                          </div>
+                          <p className="text-base font-black text-[#5A4C4C]">{shop.name || shop.shop_name}</p>
                           {shop.type === 'official' && (
                             <span className="bg-gradient-to-r from-[#F2ABAC] to-[#F78CA0] text-white text-[9px] font-black px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
-                              <ShieldCheck className="w-2.5 h-2.5" /> 正規販売店・公式
-                            </span>
-                          )}
-                          {shop.type === 'specialty' && (
-                            <span className="bg-[#7B8E76] text-white text-[9px] font-black px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
-                              <Store className="w-2.5 h-2.5" /> 専門ショップ・量販店
-                            </span>
-                          )}
-                          {shop.name.includes('百貨店') && (
-                            <span className="bg-[#5A4C4C] text-[#F9DC5C] text-[9px] font-black px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
-                              <Award className="w-2.5 h-2.5" /> プレミアム百貨店
+                              <ShieldCheck className="w-2.5 h-2.5" /> 公式
                             </span>
                           )}
                         </div>
-                        {shop.benefits && (
-                          <div className="flex flex-wrap gap-1.5 mt-2 mb-1">
-                            {shop.benefits.map((b, i) => <span key={i} className="text-[9px] text-[#F2ABAC] font-bold bg-white border border-[#F2ABAC]/30 px-1.5 py-0.5 rounded">✓ {b}</span>)}
-                          </div>
-                        )}
-                        {selectedProduct.unitCount ? (
-                          <p className="text-[10px] text-[#F2ABAC] font-black mt-2">1{selectedProduct.unitName}あたり ¥{Math.ceil(shop.lowestPrice / selectedProduct.unitCount)}</p>
-                        ) : (
-                          <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">出品者: {(shop.sellers || []).length}店舗</p>
-                        )}
+                        <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">
+                          {shop.lowestPrice > 0 ? `出品者: ${Math.max(1, (shop.sellers || []).length)}店舗` : "最新の価格・在庫をチェック"}
+                        </p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
-                        <span className="text-2xl font-black text-[#7B8E76]">¥{shop.lowestPrice.toLocaleString()}</span>
+                        <span className="text-2xl font-black text-[#7B8E76]">
+                          {shop.lowestPrice > 0 ? `¥${shop.lowestPrice.toLocaleString()}` : '価格確認'}
+                        </span>
                         <div className="text-[#A5A19E] bg-white p-1 rounded-full shadow-sm">
-                          {expandedMall === shop.name ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          {shop.sellers?.length > 0 ? (expandedMall === (shop.name || shop.shop_name) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />) : <ExternalLink className="w-4 h-4 opacity-30" />}
                         </div>
                       </div>
                     </div>
 
                     {/* 出品者アコーディオン */}
-                    {expandedMall === shop.name && (
+                    {expandedMall === (shop.name || shop.shop_name) && shop.sellers?.length > 0 && (
                       <div className="bg-[#F9F6F3] border-t border-[#F4EFEB] p-4 space-y-3">
                         {shop.sellers.map((seller, sIdx) => (
                           <div key={sIdx} className="bg-white p-5 rounded-[1.5rem] flex items-center justify-between shadow-sm">
@@ -2432,7 +2447,6 @@ AI分析: ${selectedProduct.aiAnalysis}
                               <div className="flex flex-wrap gap-2 mt-2 text-[9px] font-bold">
                                 {seller.shipping === 0 ? <span className="text-[#7B8E76] bg-[#7B8E76]/10 px-2 py-0.5 rounded">送料無料</span> : <span className="text-[#8E8282]">送料 {seller.shipping}円</span>}
                                 {seller.points > 0 && <span className="text-[#D4AF37] bg-[#FFF9E6] px-2 py-0.5 rounded">{seller.points}pt還元</span>}
-                                {seller.note && <span className="text-[#F2ABAC] bg-[#FFF5F5] px-2 py-0.5 rounded">{seller.note}</span>}
                               </div>
                             </div>
                             <div className="flex flex-col items-end gap-2 border-l border-[#F4EFEB] pl-4">
@@ -2448,22 +2462,6 @@ AI分析: ${selectedProduct.aiAnalysis}
                   </div>
                 ))}
               </div>
-              {/* Amazonで検索リンク (他ショップとデザインを統一) */}
-              <a href={getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' '))} target="_blank" rel="noopener noreferrer"
-                className="mt-6 flex items-center justify-between bg-white border border-[#F4EFEB] rounded-[2rem] p-6 shadow-sm active:scale-[0.98] transition-transform">
-                <div className="flex-1 pr-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon" className="h-4 opacity-70" />
-                    <span className="text-sm font-black text-[#5A4C4C]">Amazon.co.jp</span>
-                  </div>
-                  <p className="text-[10px] text-[#A5A19E] font-bold">Amazonの最新価格・在庫状況を確認</p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                   <div className="bg-[#7B8E76] text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm">
-                     Amazonで探す
-                   </div>
-                </div>
-              </a>
             </section>
 
             {/* ＝＝＝＝＝ 口コミセクション (ネイティブ＆SNS統合) ＝＝＝＝＝ */}
