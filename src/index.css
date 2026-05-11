@@ -43,6 +43,11 @@ body {
   to { transform: translateX(0); }
 }
 
+/* iOS 300msタッチ遅延を解消（iOS 13以降 user-scalable=no が効かないため） */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
 /* スクロールバー非表示 */
 @utility scrollbar-hide {
   -ms-overflow-style: none;

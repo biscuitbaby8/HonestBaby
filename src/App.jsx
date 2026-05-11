@@ -184,10 +184,9 @@ const getHighResImage = (url) => {
     if (url.indexOf('rakuten.co.jp') !== -1) {
       return url.split('?_ex=')[0] + '?_ex=800x800';
     }
-    // Yahoo!ショッピング: c.yimg.jp の画像パスを大きいサイズに置換
-    // 例: /i/n/seller/item.jpg → /i/g/seller/item.jpg
+    // Yahoo!ショッピング: c.yimg.jp の /i/j/ がフルサイズ
     if (url.indexOf('yimg.jp') !== -1) {
-      return url.replace('/i/n/', '/i/g/').replace('/i/j/', '/i/g/');
+      return url.replace('/i/n/', '/i/j/').replace('/i/l/', '/i/j/');
     }
     // 旧Yahoo URLパターン（後方互換）
     if (url.indexOf('shopping.yahoo.co.jp') !== -1) {
@@ -1626,6 +1625,8 @@ ${userText}
 
     let filtered = dbProducts
       .filter(p => {
+        const code = p.id.replace(/^(ranking|product)-/, '');
+        if (blocklist.has(code)) return false;
         const matchCat = selectedCategory === "すべて" || p.category === selectedCategory;
         const matchSub = selectedSubCategory === "すべて" || p.subCategory === selectedSubCategory;
         const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
