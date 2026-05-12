@@ -673,16 +673,23 @@ const App = () => {
           setDbProducts(formatted);
 
           // プレースホルダー画像の商品に対してRakutenから実際の画像をバックグラウンド取得
+          // 厳格な名前マッチング: DB商品名の全キーワードがAPI結果の名前に含まれる場合のみ更新
           const placeholders = formatted.filter(p => p.image?.includes('placehold.jp'));
           if (placeholders.length > 0) {
             (async () => {
               for (const product of placeholders.slice(0, 8)) {
                 try {
-                  await new Promise(r => setTimeout(r, 300));
-                  const res = await fetch(`/api/rakuten?query=${encodeURIComponent(product.name)}&noFilter=1`);
+                  await new Promise(r => setTimeout(r, 400));
+                  const res = await fetch(`/api/rakuten?query=${encodeURIComponent(product.name)}`);
                   if (!res.ok) continue;
                   const { products: results } = await res.json();
-                  const match = results?.find(r => r.image && !r.image.includes('placehold'));
+                  // DB商品名を2文字以上のキーワードに分割し、全て一致するAPI結果のみ採用
+                  const dbWords = product.name.split(/[\s　]+/).filter(w => w.length >= 2);
+                  const match = results?.find(r => {
+                    if (!r.image || r.image.includes('placehold')) return false;
+                    const apiName = r.name.toLowerCase();
+                    return dbWords.every(w => apiName.includes(w.toLowerCase()));
+                  });
                   if (!match?.image) continue;
                   const realImage = getHighResImage(match.image);
                   await supabase.from('products').update({ image_url: match.image }).eq('id', product.id);
@@ -1059,7 +1066,7 @@ const App = () => {
                   unitCount: catName === "おむつ" ? parseDiaperCount(p.name) : null,
                   unitName: catName === "おむつ" ? "枚" : null,
                 })).filter(p => {
-                  const code = p.id.replace('product-', '');
+                  const code = p.id.replace(/^(ranking|product)-/, '');
                   return !blocklist.has(code);
                 });
             }
@@ -1818,12 +1825,16 @@ ${userText}
           ))}
 
           {/* DB商品がないカテゴリではリモート検索結果をフォールバック表示 */}
-          {filtered.length === 0 && remoteProducts.length > 0 && applySortOrder(remoteProducts).map((p) => (
+          {filtered.length === 0 && remoteProducts.length > 0 && applySortOrder(
+            remoteProducts.filter(p => !blocklist.has(p.id.replace(/^(ranking|product)-/, '')))
+          ).map((p) => (
             <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
           ))}
 
           {filtered.length === 0 && remoteProducts.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
-            applySortOrder(cachedProducts[selectedCategory]).map((p) => <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)
+            applySortOrder(
+              cachedProducts[selectedCategory].filter(p => !blocklist.has(p.id.replace(/^(ranking|product)-/, '')))
+            ).map((p) => <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)
           )}
 
           {/* Empty State */}
