@@ -671,6 +671,26 @@ const App = () => {
             }))
           }));
           setDbProducts(formatted);
+
+          // プレースホルダー画像の商品に対してRakutenから実際の画像をバックグラウンド取得
+          const placeholders = formatted.filter(p => p.image?.includes('placehold.jp'));
+          if (placeholders.length > 0) {
+            (async () => {
+              for (const product of placeholders.slice(0, 8)) {
+                try {
+                  await new Promise(r => setTimeout(r, 300));
+                  const res = await fetch(`/api/rakuten?query=${encodeURIComponent(product.name)}&noFilter=1`);
+                  if (!res.ok) continue;
+                  const { products: results } = await res.json();
+                  const match = results?.find(r => r.image && !r.image.includes('placehold'));
+                  if (!match?.image) continue;
+                  const realImage = getHighResImage(match.image);
+                  await supabase.from('products').update({ image_url: match.image }).eq('id', product.id);
+                  setDbProducts(prev => prev.map(p => p.id === product.id ? { ...p, image: realImage } : p));
+                } catch { }
+              }
+            })();
+          }
         }
       } catch (err) {
         console.error("Error fetching products from Supabase:", err);

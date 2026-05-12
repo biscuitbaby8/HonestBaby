@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'favicon.png', 'logo.png', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'favicon.png', 'favicon-32.png', 'logo.png', 'apple-touch-icon.png'],
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
@@ -25,7 +25,7 @@ export default defineConfig({
         icons: [
           {
             src: '/favicon.png',
-            sizes: 'any',
+            sizes: '512x512',
             type: 'image/png',
           },
           {
