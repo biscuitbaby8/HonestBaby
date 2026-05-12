@@ -37,20 +37,20 @@ const CATEGORIES = [
 
 // カテゴリ別のキーワードフィルタ（本体のみ残す）
 const REQUIRED_KEYWORDS = {
-  "おむつ":       ["おむつ", "オムツ"],
+  "おむつ":       ["おむつ", "オムツ", "おしりふき"],
   "ベビーカー":   ["ベビーカー", "バギー", "ストローラー"],
   "抱っこ紐":     ["抱っこ紐", "だっこひも", "スリング", "ヒップシート", "キャリア"],
-  "ウェア":       ["ロンパース", "カバーオール", "肌着", "コンビ"],
-  "ミルク・授乳": ["哺乳瓶", "搾乳", "授乳クッション", "母乳"],
-  "離乳食・食器": ["離乳食", "ベビーフード", "ベビーチェア"],
-  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー"],
-  "おもちゃ":     ["おもちゃ", "知育", "ガラガラ", "メリー"],
-  "安全グッズ":   ["ゲート", "コーナーガード", "ドアロック", "転倒防止"],
-  "お風呂用品":   ["沐浴", "ベビーバス", "体温計", "保湿"],
-  "トイレ用品":   ["おまる", "補助便座", "トイトレ"],
-  "車用品":       ["チャイルドシート"],
-  "マタニティ":   ["マタニティ", "妊娠", "授乳ブラ", "葉酸"],
-  "ギフトセット": ["ギフト", "出産祝い"],
+  "ウェア":       ["ロンパース", "カバーオール", "肌着"],
+  "ミルク・授乳": ["哺乳瓶", "搾乳", "授乳クッション", "母乳", "哺乳"],
+  "離乳食・食器": ["離乳食", "ベビーフード", "ベビーチェア", "ベビー食器"],
+  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー", "ベビー布団"],
+  "おもちゃ":     ["おもちゃ", "知育", "ガラガラ", "メリー", "プレイマット"],
+  "安全グッズ":   ["ゲート", "コーナーガード", "ドアロック", "転倒防止", "ベビーガード"],
+  "お風呂用品":   ["沐浴", "ベビーバス", "体温計", "保湿", "ベビーソープ"],
+  "トイレ用品":   ["おまる", "補助便座", "トイトレ", "おしりふき"],
+  "車用品":       ["チャイルドシート", "ジュニアシート"],
+  "マタニティ":   ["マタニティ", "妊娠", "授乳ブラ", "葉酸", "産前"],
+  "ギフトセット": ["ギフト", "出産祝い", "プレゼント"],
 };
 
 // 除外キーワード
@@ -259,7 +259,8 @@ function normalizeRakutenItems(items, category) {
       const brand = extractBrand(rawName);
       const subCategory = extractSubCategory(category, rawName);
       const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
-      const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || '';
+      const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl
+        || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
 
       return {
         name,
@@ -362,9 +363,12 @@ async function syncCategory(cat, log) {
 
   let savedCount = 0;
 
-  // ブロックリスト取得
-  const { data: blocklist } = await supabase.from('product_blocklist').select('item_code');
-  const blockedCodes = new Set((blocklist || []).map(b => b.item_code));
+  // ブロック済み商品コードを取得（is_blocked=true の rakuten_item_code）
+  const { data: blocklist } = await supabase
+    .from('products')
+    .select('rakuten_item_code')
+    .eq('is_blocked', true);
+  const blockedCodes = new Set((blocklist || []).map(b => b.rakuten_item_code).filter(Boolean));
 
   // タイムアウト回避（手動実行時は10秒制限を考慮して控えめに、自動実行時は150件フルで処理）
   const isManual = log.some(l => l.includes('🎯 フィルタ適用')); 

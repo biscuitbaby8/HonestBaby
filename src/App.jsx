@@ -631,7 +631,8 @@ const App = () => {
             shops:shops_prices(*),
             honestReviews:reviews(*),
             snsReviews:sns_reviews(*)
-          `);
+          `)
+          .or('is_blocked.is.null,is_blocked.eq.false');
 
         if (error) throw error;
 
@@ -683,21 +684,12 @@ const App = () => {
     fetchProducts();
   }, []);
 
-  // ブロックリストを起動時に読み込む（localStorage優先、Supabaseとマージ）
+  // ブロックリストを起動時に読み込む（localStorage のみ。DB ブロックは fetchProducts の is_blocked フィルタで処理）
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('honestBabyBlocklist') || '[]');
       if (stored.length > 0) setBlocklist(new Set(stored));
     } catch { }
-    supabase.from('product_blocklist').select('item_code').then(({ data }) => {
-      if (data && data.length > 0) {
-        setBlocklist(prev => {
-          const merged = new Set([...prev, ...data.map(r => r.item_code)]);
-          try { localStorage.setItem('honestBabyBlocklist', JSON.stringify([...merged])); } catch { }
-          return merged;
-        });
-      }
-    });
   }, []);
 
   // 商品を非表示にする（管理者モード専用）
@@ -717,13 +709,13 @@ const App = () => {
       }
       return updated;
     });
-    // supabase v2 はエラーを throw しない。{ error } を必ず確認する
+    // products テーブルの is_blocked フラグを立てる（DB から永続的に除外される）
     const { error } = await supabase
-      .from('product_blocklist')
-      .insert({ item_code: code });
-    // 23505 = unique violation（既にブロック済み）は無視してよい
-    if (error && error.code !== '23505') {
-      console.error('Block sync to DB failed:', error.message, error.code);
+      .from('products')
+      .update({ is_blocked: true })
+      .eq('id', product.id);
+    if (error) {
+      console.error('Block sync to DB failed:', error.message);
     }
   };
 
@@ -918,7 +910,8 @@ const App = () => {
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
       .map(item => {
         const name = cleanName(item.Item.itemName);
-        const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || "";
+        const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl
+          || item.Item.mediumImageUrls?.[0]?.imageUrl || "";
         const unitCount = cat === "おむつ" ? parseDiaperCount(item.Item.itemName) : null;
         return {
           id: `ranking-${item.Item.itemCode}`,
@@ -1093,8 +1086,13 @@ const App = () => {
         if (accessoryFiltered.length > 0) rawItems = accessoryFiltered;
       }
 
-      // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
-      const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
+      // Step 1: 生データをすぐに表示（ブロック済みは除外）
+      const immediateProducts = rawItems
+        .filter(i => {
+          const code = String(i.id).replace(/^(ranking|product)-/, '');
+          return !blocklist.has(code);
+        })
+        .map(i => ({ ...i, isMarketWide: true }));
       setRemoteProducts(immediateProducts);
       setIsRemoteLoading(false);
     } catch (e) {
@@ -1797,13 +1795,23 @@ ${userText}
             <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
           ))}
 
-          {/* DB商品がないカテゴリではリモート検索結果をフォールバック表示 */}
-          {filtered.length === 0 && remoteProducts.length > 0 && applySortOrder(remoteProducts).map((p) => (
+          {/* DB商品がないカテゴリではリモート検索結果をフォールバック表示（ブロック済み除外） */}
+          {filtered.length === 0 && remoteProducts.length > 0 && applySortOrder(
+            remoteProducts.filter(p => {
+              const code = String(p.id).replace(/^(ranking|product)-/, '');
+              return !blocklist.has(code);
+            })
+          ).map((p) => (
             <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
           ))}
 
           {filtered.length === 0 && remoteProducts.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
-            applySortOrder(cachedProducts[selectedCategory]).map((p) => <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)
+            applySortOrder(
+              cachedProducts[selectedCategory].filter(p => {
+                const code = String(p.id).replace(/^(ranking|product)-/, '');
+                return !blocklist.has(code);
+              })
+            ).map((p) => <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)
           )}
 
           {/* Empty State */}
