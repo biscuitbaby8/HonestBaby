@@ -180,17 +180,13 @@ const toVCUrl = (url) => {
 const getHighResImage = (url) => {
   if (!url) return "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby";
   try {
-    // 楽天: ?_ex=NxN を 800x800 に上書き
+    // 楽天: ?_ex=NxN を 1000x1000 に上書き（元のサイズより大きくする）
     if (url.indexOf('rakuten.co.jp') !== -1) {
-      return url.split('?_ex=')[0] + '?_ex=800x800';
+      return url.split('?_ex=')[0] + '?_ex=1000x1000';
     }
-    // Yahoo!ショッピング: c.yimg.jp の /i/j/ がフルサイズ
+    // Yahoo yimg.jp: /i/n/ → /i/j/ (フルサイズ)。失敗時はonErrorで元URLに戻す
     if (url.indexOf('yimg.jp') !== -1) {
       return url.replace('/i/n/', '/i/j/').replace('/i/l/', '/i/j/');
-    }
-    // 旧Yahoo URLパターン（後方互換）
-    if (url.indexOf('shopping.yahoo.co.jp') !== -1) {
-      return url.replace('/medium/', '/large/').replace('_m.jpg', '_l.jpg');
     }
     return url;
   } catch (e) {
@@ -583,9 +579,8 @@ const App = () => {
 
   // 商品を非表示にする（管理者モード専用）
   const blockProduct = async (product) => {
-    const code = product.id.replace(/^(ranking|product)-/, '');
+    const code = String(product.id).replace(/^(ranking|product)-/, '');
     setBlocklist(prev => new Set([...prev, code]));
-    // 全ての商品ソースから即座に除去
     setRemoteProducts(prev => prev.filter(p => p.id !== product.id));
     setDbProducts(prev => prev.filter(p => p.id !== product.id));
     setCachedProducts(prev => {
@@ -595,10 +590,13 @@ const App = () => {
       }
       return updated;
     });
-    try {
-      await supabase.from('product_blocklist').upsert({ item_code: code });
-    } catch (e) {
-      console.error('Block sync to DB failed:', e);
+    // supabase v2 はエラーを throw しない。{ error } を必ず確認する
+    const { error } = await supabase
+      .from('product_blocklist')
+      .insert({ item_code: code });
+    // 23505 = unique violation（既にブロック済み）は無視してよい
+    if (error && error.code !== '23505') {
+      console.error('Block sync to DB failed:', error.message, error.code);
     }
   };
 
@@ -1496,7 +1494,7 @@ ${userText}
     setExpandedMall(null);
     setReviewTab('honest');
     try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
-    navigate('/', { replace: true });
+    navigate(-1);
   };
 
   const ProductCard = ({ product, localRank = null }) => (
@@ -1510,7 +1508,7 @@ ${userText}
       <div className="relative aspect-square bg-[#F9F6F3] p-4">
         <img
           src={getHighResImage(product.image)}
-          onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }}
+          onError={(e) => { e.target.onerror = null; e.target.src = product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }}
           className="w-full h-full object-cover rounded-[1.5rem]"
           alt={product.name}
         />
@@ -2343,7 +2341,7 @@ ${userText}
           </div>
           <div className="flex-1 overflow-y-auto px-6 pb-32">
             <div className="bg-[#F9F6F3] rounded-[3rem] p-6 my-6">
-              <img src={getHighResImage(selectedProduct.image)} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
+              <img src={getHighResImage(selectedProduct.image)} onError={(e) => { e.target.onerror = null; e.target.src = selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
             </div>
 
             <div className="flex justify-between items-start mb-8 px-1">
@@ -2647,7 +2645,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
             </div>
 
             <div className="flex items-center gap-3 mb-6 bg-[#F9F6F3] p-3 rounded-[1.5rem]">
-              <img src={getHighResImage(selectedProduct.image) || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
+              <img src={getHighResImage(selectedProduct.image) || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.onerror = null; e.target.src = selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
               <p className="text-xs font-black text-[#5A4C4C] line-clamp-1 flex-1">{selectedProduct.name}</p>
             </div>
 
