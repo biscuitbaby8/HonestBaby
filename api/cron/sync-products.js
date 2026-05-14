@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sendPushNotification, isPushConfigured } from '../lib/web-push.js';
 
 // =============================================
 // 夜間自動同期クローラー (Vercel Cron)
@@ -603,10 +604,83 @@ export default async function handler(req, res) {
 
   log.push(`\n🎉 同期完了: 合計 ${totalSaved}件保存`);
 
+  // 価格アラートのトリガー判定 + Push通知送信
+  try {
+    const notifyResult = await checkAndNotifyPriceAlerts();
+    log.push(`🔔 アラート確認: ${notifyResult.checked}件中 ${notifyResult.triggered}件トリガー、${notifyResult.pushed}件にプッシュ送信`);
+  } catch (e) {
+    log.push(`⚠️ アラート確認失敗: ${e.message}`);
+  }
+
   return res.status(200).json({
     success: true,
     totalSaved,
     log,
     timestamp: new Date().toISOString()
   });
+}
+
+// --- 価格アラートをチェックし、トリガーしたらPush通知を送る ---
+async function checkAndNotifyPriceAlerts() {
+  let checked = 0, triggered = 0, pushed = 0;
+
+  const { data: alerts } = await supabase
+    .from('price_alerts')
+    .select('*')
+    .is('triggered_at', null);
+  if (!alerts || alerts.length === 0) return { checked: 0, triggered: 0, pushed: 0 };
+
+  checked = alerts.length;
+
+  for (const alert of alerts) {
+    // product_code から products.id を解決
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(alert.product_code);
+    const { data: product } = isUuid
+      ? await supabase.from('products').select('id').eq('id', alert.product_code).maybeSingle()
+      : await supabase.from('products').select('id').eq('rakuten_item_code', alert.product_code).maybeSingle();
+    if (!product) continue;
+
+    // 最安値を取得
+    const { data: prices } = await supabase
+      .from('shops_prices')
+      .select('lowest_price')
+      .eq('product_id', product.id);
+    if (!prices || prices.length === 0) continue;
+    const minPrice = Math.min(...prices.map(p => p.lowest_price).filter(p => p > 0));
+    if (!isFinite(minPrice)) continue;
+    if (minPrice > alert.target_price) continue;
+
+    // トリガー！
+    triggered++;
+    await supabase.from('price_alerts')
+      .update({ triggered_at: new Date().toISOString(), current_price: minPrice })
+      .eq('id', alert.id);
+
+    // Push通知送信
+    if (!isPushConfigured()) continue;
+    const { data: subs } = await supabase
+      .from('push_subscriptions')
+      .select('*')
+      .eq('user_id', alert.user_id);
+    if (!subs) continue;
+
+    for (const sub of subs) {
+      const result = await sendPushNotification(sub, {
+        title: '値下がりしました！',
+        body: `${alert.product_name} が ¥${minPrice.toLocaleString()} に（目標 ¥${alert.target_price.toLocaleString()}）`,
+        icon: alert.image_url || '/favicon.png',
+        image: alert.image_url,
+        url: alert.affiliate_url || '/',
+        tag: `price-alert-${alert.id}`,
+      });
+      if (result.ok) {
+        pushed++;
+      } else if (result.statusCode === 410 || result.statusCode === 404) {
+        // 期限切れ購読は削除
+        await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+      }
+    }
+  }
+
+  return { checked, triggered, pushed };
 }
