@@ -2763,26 +2763,47 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       </div>
                     </div>
 
-                    {/* 出品者アコーディオン */}
+                    {/* 出品者アコーディオン（公式/最安値/高評価 をラベル付きで表示） */}
                     {expandedMall === (shop.name || shop.shop_name) && shop.sellers?.length > 0 && (
                       <div className="bg-[#F9F6F3] border-t border-[#F4EFEB] p-4 space-y-3">
-                        {shop.sellers.map((seller, sIdx) => (
-                          <div key={sIdx} className="bg-white p-5 rounded-[1.5rem] flex items-center justify-between shadow-sm">
-                            <div className="flex-1 pr-4">
-                              <p className="text-xs font-black text-[#5A4C4C] line-clamp-1">{seller.name}</p>
-                              <div className="flex flex-wrap gap-2 mt-2 text-[9px] font-bold">
-                                {seller.shipping === 0 ? <span className="text-[#7B8E76] bg-[#7B8E76]/10 px-2 py-0.5 rounded">送料無料</span> : <span className="text-[#8E8282]">送料 {seller.shipping}円</span>}
-                                {seller.points > 0 && <span className="text-[#D4AF37] bg-[#FFF9E6] px-2 py-0.5 rounded">{seller.points}pt還元</span>}
+                        {[...shop.sellers]
+                          .sort((a, b) => {
+                            const order = { official: 0, cheapest: 1, top_rated: 2 };
+                            return (order[a.role] ?? 3) - (order[b.role] ?? 3);
+                          })
+                          .map((seller, sIdx) => {
+                            const roleLabel = seller.role === 'official' ? { text: '公式', bg: 'bg-[#F2ABAC]' }
+                              : seller.role === 'cheapest' ? { text: '最安値', bg: 'bg-[#7B8E76]' }
+                              : seller.role === 'top_rated' ? { text: '高評価', bg: 'bg-[#D4AF37]' }
+                              : null;
+                            return (
+                              <div key={sIdx} className="bg-white p-5 rounded-[1.5rem] flex items-center justify-between shadow-sm">
+                                <div className="flex-1 pr-4">
+                                  {roleLabel && (
+                                    <span className={`inline-block text-white text-[9px] font-black px-2 py-0.5 rounded mb-1.5 ${roleLabel.bg}`}>
+                                      {roleLabel.text}
+                                    </span>
+                                  )}
+                                  <p className="text-xs font-black text-[#5A4C4C] line-clamp-1">{seller.name}</p>
+                                  <div className="flex flex-wrap gap-2 mt-2 text-[9px] font-bold">
+                                    {seller.rating > 0 && (
+                                      <span className="text-[#D4AF37] bg-[#FFF9E6] px-2 py-0.5 rounded">
+                                        ★ {Number(seller.rating).toFixed(1)}{seller.reviews_count > 0 ? ` (${seller.reviews_count}件)` : ''}
+                                      </span>
+                                    )}
+                                    {seller.shipping === 0 ? <span className="text-[#7B8E76] bg-[#7B8E76]/10 px-2 py-0.5 rounded">送料無料</span> : seller.shipping > 0 ? <span className="text-[#8E8282]">送料 {seller.shipping}円</span> : null}
+                                    {seller.points > 0 && <span className="text-[#D4AF37] bg-[#FFF9E6] px-2 py-0.5 rounded">{seller.points}pt還元</span>}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-2 border-l border-[#F4EFEB] pl-4">
+                                  <span className="text-sm font-black text-[#7B8E76]">¥{seller.price.toLocaleString()}</span>
+                                  <a href={toVCUrl(seller.url) || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
+                                    ショップへ
+                                  </a>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2 border-l border-[#F4EFEB] pl-4">
-                              <span className="text-sm font-black text-[#7B8E76]">¥{seller.price.toLocaleString()}</span>
-                              <a href={toVCUrl(seller.url) || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
-                                ショップへ
-                              </a>
-                            </div>
-                          </div>
-                        ))}
+                            );
+                          })}
                       </div>
                     )}
                     <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.1</p>
