@@ -53,11 +53,21 @@ const REQUIRED_KEYWORDS = {
   "ギフトセット": ["ギフト", "出産祝い", "プレゼント"],
 };
 
-// 除外キーワード
+// 除外キーワード（全カテゴリ共通）
 const NG_KEYWORDS = [
   'ふるさと納税', 'ポイント消化', 'クーポン対象', 'お試しセット',
-  '訳あり', 'アウトレット', '中古', 'リユース', 'メール便のみ'
+  '訳あり', 'アウトレット', '中古', 'リユース', 'メール便のみ',
+  // ギフト専用商品（ホームのランキングには不要）
+  'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
 ];
+
+// カテゴリ別追加除外キーワード
+const CATEGORY_NG_KEYWORDS = {
+  "おむつ": [
+    "大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用",
+    "大人", // 「大人のおむつ」等も除外
+  ],
+};
 
 // 商品名クリーニング
 function cleanName(name) {
@@ -105,12 +115,20 @@ function extractSubCategory(category, itemName) {
       { match: /おしりふき/, sub: "おしりふき" },
     ],
     "ベビーカー": [
+      // 周辺グッズを先に判定（本体より優先）
+      { match: /レインカバー|雨カバー|防雨カバー/, sub: "周辺グッズ" },
+      { match: /ドリンクホルダー|カップホルダー|スマホホルダー|スマートフォンホルダー/, sub: "周辺グッズ" },
+      { match: /フットマフ|ハンドルカバー|バンパーバー|サンキャノピー|サンシェード/, sub: "周辺グッズ" },
+      { match: /フック|収納ポーチ|サイドバッグ|アームバー/, sub: "周辺グッズ" },
+      { match: /よだれカバー|防寒ケープ|ベビーカーシート|シートカバー/, sub: "周辺グッズ" },
       { match: /AB型|ＡＢ型/, sub: "AB型" },
       { match: /[AＡ]型/, sub: "A型" },
       { match: /[BＢ]型/, sub: "B型" },
       { match: /バギー/, sub: "バギー" },
     ],
     "抱っこ紐": [
+      // 周辺グッズを先に判定
+      { match: /よだれパッド|ケープ|抱っこ紐カバー|防寒カバー/, sub: "周辺グッズ" },
       { match: /スリング/, sub: "スリング" },
       { match: /ヒップシート/, sub: "ヒップシート" },
     ],
@@ -249,9 +267,11 @@ async function fetchYahooPrice(keyword) {
 // --- 楽天の検索結果を正規化 ---
 function normalizeRakutenItems(items, category) {
   const requiredKws = REQUIRED_KEYWORDS[category] || [];
+  const extraNG = CATEGORY_NG_KEYWORDS[category] || [];
 
   return items
     .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+    .filter(item => extraNG.length === 0 || !extraNG.some(kw => item.Item.itemName.includes(kw)))
     .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.Item.itemName.includes(kw)))
     .map((item, idx) => {
       const rawName = item.Item.itemName;

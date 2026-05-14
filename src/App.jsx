@@ -904,10 +904,18 @@ const App = () => {
 
     const NG_KEYWORDS = [
       'ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍',
-      'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース'
+      'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース',
+      'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
     ];
+    const CATEGORY_NG = {
+      "おむつ": ["大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用"],
+    };
     const mapItems = (items, cat) => items
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+      .filter(item => {
+        const ng = CATEGORY_NG[cat] || [];
+        return ng.length === 0 || !ng.some(kw => item.Item.itemName.includes(kw));
+      })
       .map(item => {
         const name = cleanName(item.Item.itemName);
         const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl
