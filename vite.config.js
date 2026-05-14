@@ -10,11 +10,13 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'favicon.png', 'favicon-32.png', 'logo.png', 'apple-touch-icon.png'],
-      workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
+      strategies: 'injectManifest',
+      srcDir: 'public',
+      filename: 'sw.js',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
       },
+      includeAssets: ['favicon.svg', 'favicon.png', 'favicon-32.png', 'logo.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'HonestBaby',
         short_name: 'HonestBaby',

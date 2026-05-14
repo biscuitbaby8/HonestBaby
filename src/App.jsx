@@ -277,6 +277,16 @@ const VC_DOMAIN_PIDS = {
 };
 const AMAZON_TAG = import.meta.env.VITE_AMAZON_TAG || 'honestbaby-22';
 
+// VAPID公開鍵をUint8Arrayに変換（Web Push API用）
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const output = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) output[i] = rawData.charCodeAt(i);
+  return output;
+}
+
 const toVCUrl = (url) => {
   if (!url || url === '#') return url;
   try {
@@ -471,6 +481,40 @@ const App = () => {
         affiliate_url: alert.url || null,
       }, { onConflict: 'user_id,product_code' });
     } catch { }
+  };
+
+  // --- Web Push 通知購読 ---
+  const subscribeToPushNotifications = async (userId) => {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) return false;
+
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return false;
+
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        });
+      }
+
+      const subJson = subscription.toJSON();
+      await supabase.from('push_subscriptions').upsert({
+        user_id: userId,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys.p256dh,
+        auth: subJson.keys.auth,
+        user_agent: navigator.userAgent,
+      }, { onConflict: 'endpoint' });
+      return true;
+    } catch (e) {
+      console.warn('Push subscription failed:', e);
+      return false;
+    }
   };
 
   const deletePriceAlertFromDB = async (userId, productCode) => {
@@ -2725,24 +2769,48 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   <div className="space-y-4">
                     {selectedProduct.honestReviews && selectedProduct.honestReviews.length > 0 ? (
                       selectedProduct.honestReviews.map(review => (
-                        <div key={review.id} className="bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[#E5DACE] flex items-center justify-center text-white"><User className="w-4 h-4" /></div>
-                              <div>
-                                <p className="text-xs font-black text-[#5A4C4C]">{review.user}</p>
-                                <p className="text-[9px] font-bold text-[#A5A19E]">{review.date}</p>
+                        review.image_url ? (
+                          // Instagram風: 画像中心レイアウト
+                          <div key={review.id} className="bg-white border border-[#F4EFEB] rounded-[2rem] overflow-hidden shadow-sm">
+                            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#F2ABAC] to-[#E5DACE] flex items-center justify-center text-white shadow-sm"><User className="w-4 h-4" /></div>
+                                <div>
+                                  <p className="text-sm font-black text-[#5A4C4C]">{review.user}</p>
+                                  <p className="text-[10px] font-bold text-[#A5A19E]">{review.date}</p>
+                                </div>
+                              </div>
+                              <div className="flex text-[#D4AF37]">
+                                {[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
                               </div>
                             </div>
-                            <div className="flex text-[#D4AF37]">
-                              {[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
+                            <img src={review.image_url} alt="レビュー写真" className="w-full aspect-square object-cover" />
+                            <div className="px-5 py-4">
+                              <div className="flex items-center gap-2 mb-2 text-[#F2ABAC]">
+                                <Heart className="w-5 h-5 fill-current" />
+                                <span className="text-xs font-black text-[#5A4C4C]">使ってよかった</span>
+                              </div>
+                              <p className="text-sm text-[#5A4C4C] leading-relaxed font-medium">{review.content}</p>
                             </div>
                           </div>
-                          <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.content}"</p>
-                          {review.image_url && (
-                            <img src={review.image_url} alt="レビュー写真" className="mt-3 w-full max-h-48 object-cover rounded-2xl" />
-                          )}
-                        </div>
+                        ) : (
+                          // テキスト中心: 従来の白カード
+                          <div key={review.id} className="bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-[#E5DACE] flex items-center justify-center text-white"><User className="w-4 h-4" /></div>
+                                <div>
+                                  <p className="text-xs font-black text-[#5A4C4C]">{review.user}</p>
+                                  <p className="text-[9px] font-bold text-[#A5A19E]">{review.date}</p>
+                                </div>
+                              </div>
+                              <div className="flex text-[#D4AF37]">
+                                {[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
+                              </div>
+                            </div>
+                            <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.content}"</p>
+                          </div>
+                        )
                       ))
                     ) : (
                       <div className="py-12 bg-white border-2 border-dashed border-[#F4EFEB] rounded-[2rem] text-center">
@@ -3030,7 +3098,10 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                 targetPrice: target, addedAt: new Date().toISOString()
               };
               setPriceAlerts(prev => [...prev.filter(a => a.id !== selectedProduct.id), newAlert]);
-              if (user) savePriceAlertToDB(user.id, newAlert);
+              if (user) {
+                savePriceAlertToDB(user.id, newAlert);
+                subscribeToPushNotifications(user.id);
+              }
               setShowPriceAlertModal(false);
             }} className="w-full py-4 bg-[#D4AF37] text-white rounded-full font-black text-sm active:scale-95 transition-transform">
               アラートを設定する
