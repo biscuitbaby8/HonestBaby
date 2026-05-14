@@ -5,6 +5,7 @@ export default async function handler(req, res) {
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=300');
 
   if (!clientId) {
     return res.status(500).json({ error: 'Missing Yahoo Client ID (YAHOO_CLIENT_ID)' });
