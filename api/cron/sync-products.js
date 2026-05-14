@@ -184,13 +184,62 @@ async function fetchRakutenRanking(genreId) {
   return fetchWithRetry(url);
 }
 
-// --- Yahoo API呼び出し（フォールバック用） ---
+// --- Yahoo商品データを正規化（共通化） ---
+function normalizeYahooItem(item, category) {
+  const rawName = item.name;
+  const name = cleanName(rawName);
+  const brand = extractBrand(rawName);
+  const subCategory = extractSubCategory(category, rawName);
+  const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
+  let rawUrl = item.url || '';
+  if (/yahoo\.co\.jp/.test(rawUrl)) {
+    const sep = rawUrl.includes('?') ? '&' : '?';
+    rawUrl = `${rawUrl}${sep}sc_e=afvc_shp_${VC_SID}`;
+  }
+  return {
+    name,
+    category,
+    sub_category: subCategory,
+    brand,
+    image_url: upgradeYahooImage(item.image?.large || item.image?.medium || ''),
+    rating: parseFloat(item.review?.rate) || 0,
+    reviews_count: parseInt(item.review?.count) || 0,
+    rakuten_item_code: `yahoo-${item.code}`,
+    is_market_wide: true,
+    unit_count: unitCount,
+    unit_name: unitCount ? '枚' : null,
+    last_synced_at: new Date().toISOString(),
+    _rakuten_shop: {
+      shop_name: item.seller?.name || 'Yahoo!ショッピング',
+      price: item.price,
+      url: rawUrl,
+      shipping: item.shipping?.code === 2 ? 0 : null,
+      points: 0,
+    }
+  };
+}
+
+// --- Yahoo常時補完取得（楽天と並行して市場網羅を高める。1ページ50件） ---
+async function fetchYahooSupplement(keyword, category) {
+  if (!YAHOO_CLIENT_ID) return [];
+  try {
+    const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=50&sort=-review_count`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.hits || [])
+      .filter(item => !NG_KEYWORDS.some(kw => (item.name || '').includes(kw)))
+      .map(item => normalizeYahooItem(item, category));
+  } catch {
+    return [];
+  }
+}
+
+// --- Yahoo API呼び出し（楽天全滅時のフォールバック用、3ページ網羅） ---
 async function fetchYahooSearchFallback(keyword, category) {
   if (!YAHOO_CLIENT_ID) return [];
-  
   let allHits = [];
   try {
-    // 3ページ分（最大300件）取得して網羅性を極限まで高める
     for (let page = 1; page <= 3; page++) {
       const start = (page - 1) * 100;
       const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=100&start=${start}&sort=-review_count`;
@@ -201,44 +250,9 @@ async function fetchYahooSearchFallback(keyword, category) {
       }
       await new Promise(r => setTimeout(r, 300));
     }
-    
     return allHits
       .filter(item => !NG_KEYWORDS.some(kw => item.name.includes(kw)))
-      // あまりに厳しいフィルタは網羅性を損なうため削除
-      .map(item => {
-        const rawName = item.name;
-        const name = cleanName(rawName);
-        const brand = extractBrand(rawName);
-        const subCategory = extractSubCategory(category, rawName);
-        const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
-        let rawUrl = item.url || '';
-        if (/yahoo\.co\.jp/.test(rawUrl)) {
-          const sep = rawUrl.includes('?') ? '&' : '?';
-          rawUrl = `${rawUrl}${sep}sc_e=afvc_shp_${VC_SID}`;
-        }
-        
-        return {
-          name,
-          category,
-          sub_category: subCategory,
-          brand,
-          image_url: upgradeYahooImage(item.image?.large || item.image?.medium || ''),
-          rating: parseFloat(item.review?.rate) || 0,
-          reviews_count: parseInt(item.review?.count) || 0,
-          rakuten_item_code: `yahoo-${item.code}`, 
-          is_market_wide: true,
-          unit_count: unitCount,
-          unit_name: unitCount ? '枚' : null,
-          last_synced_at: new Date().toISOString(),
-          _rakuten_shop: {
-            shop_name: item.seller?.name || 'Yahoo!ショッピング',
-            price: item.price,
-            url: rawUrl,
-            shipping: item.shipping?.code === 2 ? 0 : null,
-            points: 0,
-          }
-        };
-      });
+      .map(item => normalizeYahooItem(item, category));
   } catch {
     return [];
   }
@@ -331,23 +345,33 @@ function deduplicateProducts(products) {
   return Array.from(map.values());
 }
 
+// --- 商品名キー化（重複判定用） ---
+function productNameKey(name) {
+  return (name || '').replace(/[\s　]/g, '').toLowerCase().slice(0, 30);
+}
+
 // --- メイン同期処理 ---
-async function syncCategory(cat, log, isManual = false) {
+async function syncCategory(cat, log, opts = {}) {
+  const {
+    limitCount = 30,
+    includeYahooSupplement = true,
+    includeYahooPrice = true,
+  } = opts;
+
   log.push(`📦 カテゴリ「${cat.name}」の同期開始...`);
 
   if (!RAKUTEN_APP_ID) {
     log.push(`  ⚠️ RAKUTEN_APP_IDが設定されていません`);
   }
 
-  let allItems = [];
+  let rakutenItems = [];
   let rakutenFailed = false;
 
   try {
     // 検索API（レビュー数順、2ページ分）
     const res1 = await fetchRakutenSearch(cat.keyword, cat.genreId, 1);
     const res2 = await fetchRakutenSearch(cat.keyword, cat.genreId, 2);
-    
-    allItems = [
+    rakutenItems = [
       ...normalizeRakutenItems(res1.Items || [], cat.name),
       ...normalizeRakutenItems(res2.Items || [], cat.name),
     ];
@@ -360,13 +384,28 @@ async function syncCategory(cat, log, isManual = false) {
   try {
     const rankingData = await fetchRakutenRanking(cat.genreId);
     const rankingItems = normalizeRakutenItems(rankingData.Items || [], cat.name);
-    allItems = [...allItems, ...rankingItems];
+    rakutenItems = [...rakutenItems, ...rankingItems];
   } catch (e) {
     log.push(`  ⚠️ 楽天ランキングAPI失敗: ${e.message}`);
     rakutenFailed = true;
   }
 
-  // 楽天が完全に失敗した場合はYahooから取得（フォールバック）
+  let allItems = [...rakutenItems];
+
+  // Yahoo常時補完（楽天と重複しない商品だけ追加。市場網羅を高める）
+  if (includeYahooSupplement && !rakutenFailed && rakutenItems.length > 0) {
+    try {
+      const yahooSupp = await fetchYahooSupplement(cat.keyword, cat.name);
+      const rakutenKeys = new Set(rakutenItems.map(p => productNameKey(p.name)));
+      const yahooUnique = yahooSupp.filter(p => !rakutenKeys.has(productNameKey(p.name)));
+      log.push(`  🛒 楽天 ${rakutenItems.length}件 + Yahoo独占 ${yahooUnique.length}件（${yahooSupp.length - yahooUnique.length}件は楽天と重複のため除外）`);
+      allItems = [...allItems, ...yahooUnique];
+    } catch (e) {
+      log.push(`  ⚠️ Yahoo補完取得失敗: ${e.message}`);
+    }
+  }
+
+  // 楽天が完全に失敗した場合はYahoo全件フォールバック
   if (allItems.length === 0 && rakutenFailed) {
     log.push(`  🔄 楽天API全滅のため、YahooショッピングAPIから代替取得を試みます...`);
     const yahooItems = await fetchYahooSearchFallback(cat.keyword, cat.name);
@@ -396,10 +435,8 @@ async function syncCategory(cat, log, isManual = false) {
     .eq('is_blocked', true);
   const blockedCodes = new Set((blocklist || []).map(b => b.rakuten_item_code).filter(Boolean));
 
-  // タイムアウト回避（手動実行時は20件に絞る、自動実行時は150件フルで処理）
-  const limitCount = isManual ? 20 : 150;
   const productsToProcess = deduplicated.slice(0, limitCount);
-  log.push(`  ⏱ 市場網羅のため、上位 ${productsToProcess.length}件を処理します`);
+  log.push(`  ⏱ 上位 ${productsToProcess.length}件を保存します`);
 
   for (let i = 0; i < productsToProcess.length; i++) {
     const product = productsToProcess[i];
@@ -469,8 +506,8 @@ async function syncCategory(cat, log, isManual = false) {
           }])
         }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
 
-      // --- Yahoo価格を取得（自動実行時の上位10件のみ、手動実行はスキップして高速化） ---
-      if (!isManual && i < 10) {
+      // --- Yahoo価格を取得（上位5件のみ詳細調査） ---
+      if (includeYahooPrice && i < 5) {
         const searchKeyword = product.name.split(/[\s　]+/).slice(0, 3).join(' ');
         const yahooResults = await fetchYahooPrice(searchKeyword);
 
@@ -499,8 +536,8 @@ async function syncCategory(cat, log, isManual = false) {
 
       savedCount++;
 
-      // APIレート制限対策: 1商品あたり少し待つ
-      if (i % 5 === 4) await new Promise(r => setTimeout(r, 500));
+      // APIレート制限対策: 10商品ごとに少し待つ
+      if (i % 10 === 9) await new Promise(r => setTimeout(r, 300));
 
     } catch (e) {
       log.push(`  ⚠️ ${product.name.slice(0, 20)}... エラー: ${e.message}`);
@@ -532,17 +569,32 @@ export default async function handler(req, res) {
 
   let targetCategories = CATEGORIES;
   const filterCat = req.query.category;
+  const batch = req.query.batch; // '1' or '2'
+
   if (filterCat) {
     targetCategories = CATEGORIES.filter(c => c.name === filterCat);
     if (targetCategories.length === 0) {
       return res.status(400).json({ error: `Category "${filterCat}" not found` });
     }
     log.push(`🎯 フィルタ適用: カテゴリ「${filterCat}」のみ同期します`);
+  } else if (batch === '1') {
+    // 前半7カテゴリ（60秒制限内に確実に収めるため2分割）
+    targetCategories = CATEGORIES.slice(0, 7);
+    log.push(`📦 バッチ1: ${targetCategories.map(c => c.name).join('、')}`);
+  } else if (batch === '2') {
+    targetCategories = CATEGORIES.slice(7);
+    log.push(`📦 バッチ2: ${targetCategories.map(c => c.name).join('、')}`);
   }
+
+  // カテゴリ指定あり = 単発テスト用（軽量処理）、それ以外 = 通常同期（フル処理）
+  const isSingleCategory = !!filterCat;
+  const opts = isSingleCategory
+    ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false }
+    : { limitCount: 25, includeYahooSupplement: true, includeYahooPrice: true };
 
   for (const cat of targetCategories) {
     try {
-      const count = await syncCategory(cat, log, isManual);
+      const count = await syncCategory(cat, log, opts);
       totalSaved += count;
     } catch (e) {
       log.push(`❌ カテゴリ「${cat.name}」で致命的エラー: ${e.message}`);
