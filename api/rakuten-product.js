@@ -1,6 +1,7 @@
 export default async function handler(req, res) {
   const { query, genreId, page = 1 } = req.query;
   const appId = process.env.RAKUTEN_APP_ID || process.env.VITE_RAKUTEN_APP_ID;
+  const accessKey = process.env.RAKUTEN_ACCESS_KEY || process.env.VITE_RAKUTEN_ACCESS_KEY || '';
   const affiliateId = process.env.RAKUTEN_AFFILIATE_ID || process.env.VITE_RAKUTEN_AFFILIATE_ID || '';
 
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,6 +14,7 @@ export default async function handler(req, res) {
   // 楽天 商品価格ナビ 製品検索API — ショップ出品ではなく「製品カタログ」を返す
   const params = new URLSearchParams({
     applicationId: appId,
+    accessKey,
     hits: 30,
     page,
     ...(query && { keyword: query }),
