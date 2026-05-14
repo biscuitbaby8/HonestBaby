@@ -69,10 +69,10 @@ const CATEGORY_NG_KEYWORDS = {
   ],
 };
 
-// Yahoo画像URLを高解像度版に変換（/i/j/ → /i/g/）
+// Yahoo画像URLを標準サイズに正規化（/i/g/はショップ依存で低画質の場合あり）
 function upgradeYahooImage(url) {
   if (!url) return url;
-  return url.replace(/\/i\/[njs]\//, '/i/g/');
+  return url.replace(/\/i\/[ngs]\//, '/i/j/');
 }
 
 // 商品名クリーニング
