@@ -1824,7 +1824,7 @@ ${userText}
         </div>
 
         <div className="relative">
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
             {CATEGORY_TREE.map(cat => (
               <button
                 key={cat.name}
@@ -1852,7 +1852,7 @@ ${userText}
           return (
             <>
               <div className="mb-3 relative">
-                <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
                   {["すべて", ...currentSubs].map(sub => {
                     const subName = getSubName(sub);
                     return (
@@ -1872,7 +1872,7 @@ ${userText}
               </div>
               {currentSubsubs.length > 0 && (
                 <div className="mb-5 relative">
-                  <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
                     {["すべて", ...currentSubsubs].map(subsub => (
                       <button
                         key={subsub}
@@ -1927,7 +1927,7 @@ ${userText}
           </div>
         )}
 
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 -mx-4 px-4 mb-4">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 -mx-4 px-4 mb-4 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
           {[
             { key: 'standard', label: '標準' },
             { key: 'popular', label: '評価順' },
@@ -1940,7 +1940,7 @@ ${userText}
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4 xl:grid-cols-5">
           {/* DB商品を優先表示（Cronバッチで毎晩自動更新） */}
           {filtered.length > 0 && applySortOrder(filtered).map((p) => (
             <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
@@ -2010,7 +2010,7 @@ ${userText}
         </div>
 
         <div className="flex items-center justify-between mb-5 px-1"><h3 className="font-black text-[#5A4C4C] text-xl">おすすめのギフト</h3></div>
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4 xl:grid-cols-5">
           {dbLoading
             ? <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold animate-pulse">ギフト商品を読み込み中...</div>
             : giftProducts.length > 0
@@ -2127,7 +2127,7 @@ ${userText}
           {recentlyViewed.length === 0 ? (
             <p className="text-xs text-[#A5A19E] font-bold text-center py-6 bg-[#F9F6F3] rounded-[2rem]">まだ見ていません</p>
           ) : (
-            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
               {recentlyViewed.map(p => (
                 <div key={p.id} onClick={() => { const full = [...remoteProducts, ...dbProducts].find(r => r.id === p.id) || p; openProduct(full); }}
                   className="flex-shrink-0 w-28 cursor-pointer active:scale-95 transition-transform">
@@ -2143,7 +2143,7 @@ ${userText}
         </div>
 
         {/* クイックアクション */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4 xl:grid-cols-5">
           <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => setActiveTab('heart')}>
             <div className="w-12 h-12 bg-[#FFF5F5] rounded-[1.25rem] flex items-center justify-center text-[#F2ABAC] mb-3"><Heart className="w-6 h-6 fill-current" /></div>
             <p className="text-sm font-black text-[#5A4C4C]">保存リスト</p>
@@ -2237,7 +2237,7 @@ ${userText}
   };
 
   return (
-    <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`}>
+    <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col lg:pl-60' : 'min-h-screen pb-32 lg:pb-0 lg:pl-60'}`}>
       <Helmet>
         <meta name="google-site-verification" content="bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI" />
         {/* タイトル */}
@@ -2342,8 +2342,68 @@ ${userText}
           })}</script>
         )}
       </Helmet>
-      {/* 上部ヘッダー */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
+      {/* ===== PC左サイドバー (lg以上のみ表示) ===== */}
+      <aside className="hidden lg:flex flex-col fixed top-0 left-0 h-screen w-60 bg-white border-r border-[#F4EFEB] z-40">
+        {/* ロゴ */}
+        <div className="px-6 py-6 border-b border-[#F4EFEB]">
+          <h1 className="text-xl font-black text-[#7B8E76] tracking-tight cursor-pointer font-serif" onClick={() => setActiveTab('home')}>
+            Honest Baby<span className="text-[#F2ABAC] text-3xl leading-[0] relative top-1">.</span>
+          </h1>
+          <p className="text-[10px] text-[#A5A19E] font-bold mt-1">忖度なしのベビー用品比較</p>
+        </div>
+
+        {/* タブナビ */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {[
+            { id: 'home',   label: 'ホーム',   icon: <Home className="w-5 h-5" /> },
+            { id: 'search', label: '検索',     icon: <Search className="w-5 h-5" /> },
+            { id: 'ai',     label: 'AIコンサル', icon: <Bot className="w-5 h-5" /> },
+            { id: 'gift',   label: 'ギフト',   icon: <Gift className="w-5 h-5" /> },
+            { id: 'user',   label: 'マイページ', icon: <User className="w-5 h-5" /> },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-black transition-all ${
+                activeTab === tab.id
+                  ? 'bg-[#7B8E76]/10 text-[#7B8E76]'
+                  : 'text-[#A5A19E] hover:bg-[#F9F6F3] hover:text-[#5A4C4C]'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* 下部: お気に入り・ログイン状態 */}
+        <div className="px-4 py-4 border-t border-[#F4EFEB] space-y-2">
+          {user ? (
+            <div className="flex items-center gap-3 px-2 py-2">
+              {user.user_metadata?.avatar_url
+                ? <img src={user.user_metadata.avatar_url} className="w-8 h-8 rounded-full" alt="" />
+                : <div className="w-8 h-8 rounded-full bg-[#F2ABAC]/20 flex items-center justify-center"><User className="w-4 h-4 text-[#F2ABAC]" /></div>
+              }
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-[#5A4C4C] truncate">{user.user_metadata?.full_name || 'ユーザー'}</p>
+                <button onClick={signOut} className="text-[10px] text-[#A5A19E] font-bold hover:text-[#F2ABAC]">ログアウト</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={signInWithGoogle} className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#F2ABAC] text-white rounded-2xl text-xs font-black hover:bg-[#e89899] transition-colors">
+              Googleでログイン
+            </button>
+          )}
+          {favorites.length > 0 && (
+            <button onClick={() => setActiveTab('heart')} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-[#F2ABAC] hover:bg-[#FFF5F5]">
+              <Heart className="w-4 h-4 fill-current" /> {favorites.length}件お気に入り
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* 上部ヘッダー (スマホのみ) */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB] lg:hidden">
         <h1 className="text-2xl font-black text-[#7B8E76] tracking-tight cursor-pointer font-serif" onClick={() => setActiveTab('home')}>
           Honest Baby<span className="text-[#F2ABAC] text-4xl leading-[0] relative top-1">.</span>
         </h1>
@@ -2362,7 +2422,7 @@ ${userText}
         </div>
       </header>
 
-      <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden' : 'px-6 pt-4'} style={activeTab === 'ai' ? { paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)' } : {}}>
+      <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden lg:flex-1 lg:overflow-auto' : 'px-6 pt-4 lg:px-10 lg:pt-8 lg:max-w-7xl lg:mx-auto'} style={activeTab === 'ai' ? { paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)' } : {}}>
         {activeTab === 'home' && renderHome()}
         {activeTab === 'gift' && renderGift()}
         {activeTab === 'user' && renderUser()}
@@ -2469,7 +2529,7 @@ ${userText}
               </div>
             </div>
             {favorites.length === 0 ? <p className="text-center text-[#A5A19E] mt-20 font-bold text-xs uppercase tracking-widest leading-loose">保存されているアイテムは<br />ありません</p> :
-              <div className="grid grid-cols-2 gap-4">{favorites.map(p => <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)}</div>}
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5">{favorites.map(p => <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)}</div>}
           </div>
         )}
         {activeTab === 'ai' && (
@@ -2517,13 +2577,14 @@ ${userText}
 
       {/* ＝＝＝＝＝ 商品詳細モーダル ＝＝＝＝＝ */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-[60] bg-[#FFFDFB] flex flex-col animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 z-[60] bg-[#FFFDFB] flex flex-col animate-in slide-in-from-bottom duration-300 lg:bg-black/50 lg:backdrop-blur-sm lg:items-center lg:justify-center" onClick={(e) => { if (e.target === e.currentTarget) closeProduct(); }}>
+          <div className="flex flex-col w-full h-full lg:max-w-4xl lg:max-h-[90vh] lg:rounded-3xl lg:overflow-hidden lg:shadow-2xl lg:bg-[#FFFDFB] lg:h-auto">
           <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
             <button onClick={closeProduct} className="p-2 -ml-2 bg-[#F9F6F3] rounded-full text-[#5A4C4C]"><ChevronLeft className="w-6 h-6" /></button>
             <span className="text-sm font-black text-[#5A4C4C]">商品詳細</span>
             <button onClick={handleShare} className="p-2 -mr-2 text-[#A5A19E] active:scale-90 transition-transform"><Share2 className="w-5 h-5" /></button>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 pb-32">
+          <div className="flex-1 overflow-y-auto px-6 pb-32 lg:pb-8">
             <div className="bg-[#F9F6F3] rounded-[3rem] p-6 my-6">
               <img src={getHighResImage(selectedProduct.image)} onError={(e) => { e.target.onerror = null; e.target.src = selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
             </div>
@@ -2843,13 +2904,14 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               )}
             </section>
           </div>
+          </div>
         </div>
       )}
 
       {/* ＝＝＝＝＝ 口コミ投稿モーダル ＝＝＝＝＝ */}
       {isReviewFormOpen && selectedProduct && (
         <div className="fixed inset-0 z-[80] bg-black/40 backdrop-blur-sm flex justify-center items-end animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] p-6 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-300">
+          <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] p-6 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-300 lg:rounded-[2rem] lg:pb-8">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-black text-[#5A4C4C] text-lg">口コミを投稿</h3>
               <button onClick={() => setIsReviewFormOpen(false)} className="p-2 bg-[#F9F6F3] rounded-full"><X className="w-5 h-5 text-[#A5A19E]" /></button>
@@ -2973,7 +3035,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
         </div>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-[#F4EFEB] px-8 pt-4 flex justify-between items-center rounded-t-[3rem] shadow-[0_-10px_40px_rgb(0,0,0,0.03)]" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}>
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-[#F4EFEB] px-8 pt-4 flex justify-between items-center rounded-t-[3rem] shadow-[0_-10px_40px_rgb(0,0,0,0.03)] lg:hidden" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}>
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'home' ? 'text-[#7B8E76] scale-110' : 'text-[#D4CDC7] hover:text-[#A5A19E]'}`}>
           <Home className={`w-6 h-6 ${activeTab === 'home' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">ホーム</span>
         </button>
@@ -2995,8 +3057,8 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
 
       {/* ===== モーダル: 赤ちゃん情報 ===== */}
       {showBabyModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowBabyModal(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm lg:items-center" onClick={() => setShowBabyModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300 lg:rounded-[2rem] lg:pb-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><Baby className="w-5 h-5 text-[#F2ABAC]" /> Myベビー情報</h3>
               <button onClick={() => setShowBabyModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
@@ -3043,8 +3105,8 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
 
       {/* ===== モーダル: 価格アラート設定 ===== */}
       {showPriceAlertModal && selectedProduct && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowPriceAlertModal(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 backdrop-blur-sm lg:items-center" onClick={() => setShowPriceAlertModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300 lg:rounded-[2rem] lg:pb-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><BellRing className="w-5 h-5 text-[#D4AF37]" /> 価格アラート</h3>
               <button onClick={() => setShowPriceAlertModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
@@ -3089,8 +3151,8 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
 
       {/* ===== モーダル: 検索条件を保存 ===== */}
       {showSaveSearchModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowSaveSearchModal(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm lg:items-center" onClick={() => setShowSaveSearchModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300 lg:rounded-[2rem] lg:pb-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><Bookmark className="w-5 h-5 text-[#7B8E76]" /> 検索条件を保存</h3>
               <button onClick={() => setShowSaveSearchModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
