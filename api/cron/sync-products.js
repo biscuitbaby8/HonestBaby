@@ -537,9 +537,6 @@ async function syncCategory(cat, log, opts = {}) {
 
       savedCount++;
 
-      // APIレート制限対策: 10商品ごとに少し待つ
-      if (i % 10 === 9) await new Promise(r => setTimeout(r, 300));
-
     } catch (e) {
       log.push(`  ⚠️ ${product.name.slice(0, 20)}... エラー: ${e.message}`);
     }
@@ -591,16 +588,19 @@ export default async function handler(req, res) {
   const isSingleCategory = !!filterCat;
   const opts = isSingleCategory
     ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false }
-    : { limitCount: 10, includeYahooSupplement: false, includeYahooPrice: false };
+    : { limitCount: 25, includeYahooSupplement: true, includeYahooPrice: false };
 
-  for (const cat of targetCategories) {
-    try {
-      const count = await syncCategory(cat, log, opts);
-      totalSaved += count;
-    } catch (e) {
-      log.push(`❌ カテゴリ「${cat.name}」で致命的エラー: ${e.message}`);
+  // カテゴリを並列処理（合計時間を大幅短縮）
+  const results = await Promise.allSettled(
+    targetCategories.map(cat => syncCategory(cat, log, opts))
+  );
+  results.forEach((r, idx) => {
+    if (r.status === 'fulfilled') {
+      totalSaved += r.value || 0;
+    } else {
+      log.push(`❌ カテゴリ「${targetCategories[idx].name}」で致命的エラー: ${r.reason?.message || r.reason}`);
     }
-  }
+  });
 
   log.push(`\n🎉 同期完了: 合計 ${totalSaved}件保存`);
 
