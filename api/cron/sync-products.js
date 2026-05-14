@@ -69,6 +69,12 @@ const CATEGORY_NG_KEYWORDS = {
   ],
 };
 
+// Yahoo画像URLを高解像度版に変換（/i/j/ → /i/g/）
+function upgradeYahooImage(url) {
+  if (!url) return url;
+  return url.replace(/\/i\/[njs]\//, '/i/g/');
+}
+
 // 商品名クリーニング
 function cleanName(name) {
   return name
@@ -216,7 +222,7 @@ async function fetchYahooSearchFallback(keyword, category) {
           category,
           sub_category: subCategory,
           brand,
-          image_url: item.image?.large || item.image?.medium || '',
+          image_url: upgradeYahooImage(item.image?.large || item.image?.medium || ''),
           rating: parseFloat(item.review?.rate) || 0,
           reviews_count: parseInt(item.review?.count) || 0,
           rakuten_item_code: `yahoo-${item.code}`, 
@@ -326,7 +332,7 @@ function deduplicateProducts(products) {
 }
 
 // --- メイン同期処理 ---
-async function syncCategory(cat, log) {
+async function syncCategory(cat, log, isManual = false) {
   log.push(`📦 カテゴリ「${cat.name}」の同期開始...`);
 
   if (!RAKUTEN_APP_ID) {
@@ -390,9 +396,8 @@ async function syncCategory(cat, log) {
     .eq('is_blocked', true);
   const blockedCodes = new Set((blocklist || []).map(b => b.rakuten_item_code).filter(Boolean));
 
-  // タイムアウト回避（手動実行時は10秒制限を考慮して控えめに、自動実行時は150件フルで処理）
-  const isManual = log.some(l => l.includes('🎯 フィルタ適用')); 
-  const limitCount = isManual ? 40 : 150;
+  // タイムアウト回避（手動実行時は20件に絞る、自動実行時は150件フルで処理）
+  const limitCount = isManual ? 20 : 150;
   const productsToProcess = deduplicated.slice(0, limitCount);
   log.push(`  ⏱ 市場網羅のため、上位 ${productsToProcess.length}件を処理します`);
 
@@ -464,8 +469,8 @@ async function syncCategory(cat, log) {
           }])
         }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
 
-      // --- Yahoo価格を取得（上位10件のみ詳細調査、それ以外はスキップして高速化） ---
-      if (i < 10) {
+      // --- Yahoo価格を取得（自動実行時の上位10件のみ、手動実行はスキップして高速化） ---
+      if (!isManual && i < 10) {
         const searchKeyword = product.name.split(/[\s　]+/).slice(0, 3).join(' ');
         const yahooResults = await fetchYahooPrice(searchKeyword);
 
@@ -537,7 +542,7 @@ export default async function handler(req, res) {
 
   for (const cat of targetCategories) {
     try {
-      const count = await syncCategory(cat, log);
+      const count = await syncCategory(cat, log, isManual);
       totalSaved += count;
     } catch (e) {
       log.push(`❌ カテゴリ「${cat.name}」で致命的エラー: ${e.message}`);
