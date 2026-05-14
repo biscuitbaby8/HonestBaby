@@ -69,6 +69,12 @@ const CATEGORY_NG_KEYWORDS = {
   ],
 };
 
+// Yahoo画像URLを高解像度版に変換（/i/j/ → /i/g/）
+function upgradeYahooImage(url) {
+  if (!url) return url;
+  return url.replace(/\/i\/[njs]\//, '/i/g/');
+}
+
 // 商品名クリーニング
 function cleanName(name) {
   return name
@@ -216,7 +222,7 @@ async function fetchYahooSearchFallback(keyword, category) {
           category,
           sub_category: subCategory,
           brand,
-          image_url: item.image?.large || item.image?.medium || '',
+          image_url: upgradeYahooImage(item.image?.large || item.image?.medium || ''),
           rating: parseFloat(item.review?.rate) || 0,
           reviews_count: parseInt(item.review?.count) || 0,
           rakuten_item_code: `yahoo-${item.code}`, 

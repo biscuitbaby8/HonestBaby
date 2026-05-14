@@ -297,9 +297,9 @@ const getHighResImage = (url) => {
     if (url.indexOf('rakuten.co.jp') !== -1) {
       return url.split('?_ex=')[0] + '?_ex=1000x1000';
     }
-    // Yahoo yimg.jp: /i/n/ /i/l/ /i/g/ → /i/j/ (フルサイズ)
+    // Yahoo yimg.jp: /i/n/ /i/j/ /i/s/ → /i/g/ (オリジナル/最大サイズ)
     if (url.indexOf('yimg.jp') !== -1) {
-      return url.replace('/i/n/', '/i/j/').replace('/i/l/', '/i/j/').replace('/i/g/', '/i/j/');
+      return url.replace(/\/i\/[njs]\//, '/i/g/');
     }
     return url;
   } catch (e) {
