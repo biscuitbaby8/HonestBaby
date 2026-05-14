@@ -2149,7 +2149,7 @@ ${userText}
             <p className="text-sm font-black text-[#5A4C4C]">保存リスト</p>
             <p className="text-[10px] text-[#A5A19E] font-bold mt-1">{favorites.length} items</p>
           </div>
-          <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => document.getElementById('price-alert-list')?.scrollIntoView({ behavior: 'smooth' })}>
+          <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => priceAlerts.length > 0 ? document.getElementById('price-alert-list')?.scrollIntoView({ behavior: 'smooth' }) : setActiveTab('home')}>
             <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] mb-3"><BellRing className="w-6 h-6" /></div>
             <p className="text-sm font-black text-[#5A4C4C]">価格アラート</p>
             <p className="text-[10px] text-[#A5A19E] font-bold mt-1">{priceAlerts.length > 0 ? `${priceAlerts.length}件設定中` : '値下がり通知を設定'}</p>
@@ -3043,7 +3043,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
 
       {/* ===== モーダル: 価格アラート設定 ===== */}
       {showPriceAlertModal && selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowPriceAlertModal(false)}>
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowPriceAlertModal(false)}>
           <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><BellRing className="w-5 h-5 text-[#D4AF37]" /> 価格アラート</h3>
