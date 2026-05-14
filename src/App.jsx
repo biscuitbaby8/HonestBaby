@@ -413,6 +413,75 @@ const App = () => {
     } catch { }
   };
 
+  // --- 価格アラート: DBとのsync ---
+  const syncPriceAlertsWithDB = async (userId) => {
+    try {
+      const { data: dbAlerts } = await supabase
+        .from('price_alerts')
+        .select('*')
+        .eq('user_id', userId);
+      if (!dbAlerts) return;
+
+      // localStorageのアラートをDBに保存（未登録のもの）
+      const localAlerts = JSON.parse(localStorage.getItem('honestBabyPriceAlerts') || '[]');
+      const dbCodes = new Set(dbAlerts.map(a => a.product_code));
+      for (const la of localAlerts) {
+        if (!dbCodes.has(String(la.id))) {
+          await supabase.from('price_alerts').insert({
+            user_id: userId,
+            product_code: String(la.id),
+            product_name: la.name,
+            image_url: la.image || null,
+            target_price: la.targetPrice,
+            current_price: la.price || null,
+            affiliate_url: la.url || null,
+          });
+        }
+      }
+
+      // DBのアラートをstateに反映
+      const merged = dbAlerts.map(a => ({
+        id: a.product_code,
+        dbId: a.id,
+        name: a.product_name,
+        image: a.image_url,
+        price: a.current_price,
+        targetPrice: a.target_price,
+        url: a.affiliate_url,
+        addedAt: a.created_at,
+        triggered: !!a.triggered_at,
+      }));
+      setPriceAlerts(merged);
+
+      // トリガー済みアラートを通知
+      const triggered = merged.filter(a => a.triggered);
+      if (triggered.length > 0) setTriggeredAlerts(triggered);
+    } catch { }
+  };
+
+  const savePriceAlertToDB = async (userId, alert) => {
+    try {
+      await supabase.from('price_alerts').upsert({
+        user_id: userId,
+        product_code: String(alert.id),
+        product_name: alert.name,
+        image_url: alert.image || null,
+        target_price: alert.targetPrice,
+        current_price: alert.price || null,
+        affiliate_url: alert.url || null,
+      }, { onConflict: 'user_id,product_code' });
+    } catch { }
+  };
+
+  const deletePriceAlertFromDB = async (userId, productCode) => {
+    try {
+      await supabase.from('price_alerts')
+        .delete()
+        .eq('user_id', userId)
+        .eq('product_code', String(productCode));
+    } catch { }
+  };
+
   // --- 検索キャッシュ（localStorage → カテゴリ別）---
   const [cachedProducts, setCachedProducts] = useState(() => {
     const cache = {};
@@ -479,7 +548,13 @@ const App = () => {
   const [reviewTab, setReviewTab] = useState('honest'); // 'honest' or 'sns'
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [reviewForm, setReviewForm] = useState({ rating: 5, content: "" });
+  const [reviewPhotoFile, setReviewPhotoFile] = useState(null);
+  const [reviewPhotoPreview, setReviewPhotoPreview] = useState(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const reviewPhotoInputRef = useRef(null);
+
+  // --- 価格アラート通知 ---
+  const [triggeredAlerts, setTriggeredAlerts] = useState([]);
 
   // AI Chat States
   const [chatMessages, setChatMessages] = useState([
@@ -535,7 +610,10 @@ const App = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
       setUser(u);
-      if (u) migrateLocalFavoritesToDB(u.id);
+      if (u) {
+        migrateLocalFavoritesToDB(u.id);
+        syncPriceAlertsWithDB(u.id);
+      }
     });
 
     // 既存セッションの復元（ページリロード時など）
@@ -1519,6 +1597,20 @@ ${userText}
 
       const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'ユーザー';
 
+      // 写真アップロード（あれば）
+      let uploadedImageUrl = null;
+      if (reviewPhotoFile) {
+        const ext = reviewPhotoFile.name.split('.').pop();
+        const path = `${user.id}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('review-photos')
+          .upload(path, reviewPhotoFile, { cacheControl: '3600', upsert: false });
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('review-photos').getPublicUrl(path);
+          uploadedImageUrl = urlData.publicUrl;
+        }
+      }
+
       // SupabaseにINSERT
       const { data, error } = await supabase
         .from('reviews')
@@ -1526,7 +1618,8 @@ ${userText}
           product_id: productId,
           rating: reviewForm.rating,
           content: reviewForm.content,
-          user_name: displayName
+          user_name: displayName,
+          image_url: uploadedImageUrl,
         }])
         .select();
 
@@ -1550,6 +1643,8 @@ ${userText}
 
         setIsReviewFormOpen(false);
         setReviewForm({ rating: 5, content: "" });
+        setReviewPhotoFile(null);
+        setReviewPhotoPreview(null);
         alert("口コミを投稿しました！ありがとうございます。");
       }
     } catch (e) {
@@ -2040,6 +2135,24 @@ ${userText}
           </div>
         </div>
 
+        {/* 価格アラート: トリガー済み通知バナー */}
+        {triggeredAlerts.length > 0 && (
+          <div className="mb-6 bg-[#FFF9E6] border border-[#F9DC5C]/40 rounded-[1.5rem] p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <BellRing className="w-4 h-4 text-[#D4AF37]" />
+              <p className="text-xs font-black text-[#B8860B]">価格アラート！{triggeredAlerts.length}件が目標価格に到達しました</p>
+            </div>
+            {triggeredAlerts.map(a => (
+              <div key={a.id} className="flex items-center gap-2 mt-2">
+                {a.image && <img src={a.image} className="w-8 h-8 rounded-lg object-cover" alt="" />}
+                <p className="text-[11px] font-bold text-[#5A4C4C] flex-1 line-clamp-1">{a.name}</p>
+                {a.url && <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-[#D4AF37] underline">確認</a>}
+              </div>
+            ))}
+            <button onClick={() => setTriggeredAlerts([])} className="mt-3 text-[10px] text-[#A5A19E] font-bold">閉じる</button>
+          </div>
+        )}
+
         {/* 価格アラート一覧 */}
         {priceAlerts.length > 0 && (
           <div className="mb-8">
@@ -2059,7 +2172,7 @@ ${userText}
                   </div>
                   <div className="flex flex-col gap-1 flex-shrink-0">
                     <a href={alert.url} target="_blank" rel="noopener noreferrer" className="text-[9px] bg-[#F2ABAC] text-white px-2 py-1 rounded-full font-black text-center">確認</a>
-                    <button onClick={() => setPriceAlerts(prev => prev.filter(a => a.id !== alert.id))} className="text-[9px] bg-[#F9F6F3] text-[#A5A19E] px-2 py-1 rounded-full font-black">削除</button>
+                    <button onClick={() => { setPriceAlerts(prev => prev.filter(a => a.id !== alert.id)); if (user) deletePriceAlertFromDB(user.id, alert.id); }} className="text-[9px] bg-[#F9F6F3] text-[#A5A19E] px-2 py-1 rounded-full font-black">削除</button>
                   </div>
                 </div>
               ))}
@@ -2626,6 +2739,9 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                             </div>
                           </div>
                           <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.content}"</p>
+                          {review.image_url && (
+                            <img src={review.image_url} alt="レビュー写真" className="mt-3 w-full max-h-48 object-cover rounded-2xl" />
+                          )}
                         </div>
                       ))
                     ) : (
@@ -2721,10 +2837,29 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
             </div>
 
             <div className="flex gap-3 mb-8">
-              <button className="flex-1 py-3 border-2 border-dashed border-[#F4EFEB] rounded-2xl flex flex-col items-center justify-center gap-1 text-[#A5A19E] hover:bg-[#F9F6F3] transition-colors">
-                <Camera className="w-5 h-5" />
-                <span className="text-[9px] font-bold">写真を追加</span>
-              </button>
+              <input
+                ref={reviewPhotoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setReviewPhotoFile(file);
+                  setReviewPhotoPreview(URL.createObjectURL(file));
+                }}
+              />
+              {reviewPhotoPreview ? (
+                <div className="relative flex-1">
+                  <img src={reviewPhotoPreview} alt="preview" className="w-full h-24 object-cover rounded-2xl" />
+                  <button onClick={() => { setReviewPhotoFile(null); setReviewPhotoPreview(null); }} className="absolute top-1 right-1 bg-black/50 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">×</button>
+                </div>
+              ) : (
+                <button onClick={() => reviewPhotoInputRef.current?.click()} className="flex-1 py-3 border-2 border-dashed border-[#F4EFEB] rounded-2xl flex flex-col items-center justify-center gap-1 text-[#A5A19E] hover:bg-[#F9F6F3] transition-colors">
+                  <Camera className="w-5 h-5" />
+                  <span className="text-[9px] font-bold">写真を追加</span>
+                </button>
+              )}
             </div>
 
             <button
@@ -2889,11 +3024,13 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
             <button onClick={() => {
               const target = Number(alertTargetPrice) || Math.floor((selectedProduct.price || 0) * 0.9);
               const shop = selectedProduct.shops?.[0];
-              setPriceAlerts(prev => [...prev.filter(a => a.id !== selectedProduct.id), {
+              const newAlert = {
                 id: selectedProduct.id, name: selectedProduct.name, image: selectedProduct.image,
                 price: selectedProduct.price, url: shop?.url || selectedProduct.url || '#',
                 targetPrice: target, addedAt: new Date().toISOString()
-              }]);
+              };
+              setPriceAlerts(prev => [...prev.filter(a => a.id !== selectedProduct.id), newAlert]);
+              if (user) savePriceAlertToDB(user.id, newAlert);
               setShowPriceAlertModal(false);
             }} className="w-full py-4 bg-[#D4AF37] text-white rounded-full font-black text-sm active:scale-95 transition-transform">
               アラートを設定する
