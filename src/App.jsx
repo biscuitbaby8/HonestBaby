@@ -2172,7 +2172,7 @@ ${userText}
             <p className="text-sm font-black text-[#5A4C4C]">保存リスト</p>
             <p className="text-[10px] text-[#A5A19E] font-bold mt-1">{favorites.length} items</p>
           </div>
-          <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => setAlertTargetPrice('') || setShowPriceAlertModal(false)}>
+          <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => document.getElementById('price-alert-list')?.scrollIntoView({ behavior: 'smooth' })}>
             <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] mb-3"><BellRing className="w-6 h-6" /></div>
             <p className="text-sm font-black text-[#5A4C4C]">価格アラート</p>
             <p className="text-[10px] text-[#A5A19E] font-bold mt-1">{priceAlerts.length > 0 ? `${priceAlerts.length}件設定中` : '値下がり通知を設定'}</p>
@@ -2199,7 +2199,7 @@ ${userText}
 
         {/* 価格アラート一覧 */}
         {priceAlerts.length > 0 && (
-          <div className="mb-8">
+          <div id="price-alert-list" className="mb-8">
             <h3 className="font-black text-[#5A4C4C] mb-4 px-1 flex items-center gap-2">
               <BellRing className="w-5 h-5 text-[#D4AF37]" /> 設定中のアラート
             </h3>
