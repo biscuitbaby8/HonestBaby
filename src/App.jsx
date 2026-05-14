@@ -9,7 +9,7 @@ import {
   Package, Layers, ChevronDown, ChevronUp, Calculator,
   Store, Gift, ChevronLeft, ShieldCheck, Baby, BellRing, Edit3,
   FileText, Shield, Info, Edit2, Camera, Mail,
-  LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind
+  LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2
 } from 'lucide-react';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
@@ -29,6 +29,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
     case 'トイレ用品': return <Wind className={className} />;
     case '車用品': return <Car className={className} />;
     case 'マタニティ': return <Leaf className={className} />;
+    case 'ゴミ箱・袋': return <Trash2 className={className} />;
     case 'ギフトセット': return <Gift className={className} />;
     default: return <Package className={className} />;
   }
@@ -50,6 +51,7 @@ const CATEGORY_TREE = [
       { name: "おしりふき" },
     ]
   },
+  { name: "ゴミ箱・袋", id: "101070", keyword: "おむつ ゴミ箱 防臭", subs: ["おむつポット", "防臭袋", "サニタリーボックス"] },
   { name: "ベビーカー", id: "200833", keyword: "ベビーカー", subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
   { name: "抱っこ紐", id: "412209", keyword: "抱っこ紐", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
   { name: "ウェア", id: "111102", keyword: "ベビー服", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
@@ -966,65 +968,40 @@ const App = () => {
     fetchCross();
   }, [selectedProduct]);
 
-  // ギフトタブ: 楽天検索APIから直接取得（VITE_キー使用）
-  const fetchGiftProducts = async (budgetFilter = 'すべて', sceneFilter = 'すべて') => {
-    setIsGiftLoading(true);
-    const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
-    const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
-    const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
-    if (!appId) { setIsGiftLoading(false); return; }
-
-    const sceneKeywordMap = {
-      '出産祝い': '出産祝い ベビーギフト',
-      'ハーフバースデー': 'ハーフバースデー 赤ちゃん ギフト',
-      '友人へ': '出産祝い おしゃれ ギフト',
-      '同僚へ': '出産祝い 実用的 ギフト',
-      '家族・親戚から': '出産祝い セット ギフト',
-    };
-    const baseKeyword = sceneFilter !== 'すべて' ? sceneKeywordMap[sceneFilter] || '出産祝い ベビーギフト' : '出産祝い ベビーギフト セット';
-
-    const priceParams = {
-      '3000円〜': { minPrice: 3000, maxPrice: 4999 },
-      '5000円〜': { minPrice: 5000, maxPrice: 9999 },
-      '10000円〜': { minPrice: 10000, maxPrice: '' },
-    };
-    const price = priceParams[budgetFilter] || {};
-
-    try {
-      const params = new URLSearchParams({
-        applicationId: appId,
-        ...(accessKey && { accessKey }),
-        ...(affiliateId && { affiliateId }),
-        keyword: baseKeyword,
-        sort: '-reviewCount',
-        hits: 30,
-        availability: 1,
-        ...(price.minPrice && { minPrice: price.minPrice }),
-        ...(price.maxPrice && { maxPrice: price.maxPrice }),
-      });
-      const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?${params}`;
-      const data = await fetch(url).then(r => r.json());
-      const products = filterAccessories((data.Items || []).map(item => ({
-        id: `gift-${item.Item.itemCode}`,
-        name: cleanName(item.Item.itemName),
-        price: item.Item.itemPrice,
-        image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=640x640'),
-        url: item.Item.affiliateUrl || item.Item.itemUrl,
-        brand: item.Item.shopName || '楽天市場',
-        rating: parseFloat(item.Item.reviewAverage) || 4.5,
-        category: 'ギフトセット',
-        shops: [{ name: item.Item.shopName || '楽天市場', price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
-      })).filter(validateProduct));
-      setGiftProducts(products);
-    } catch (e) {
-      console.error('Gift fetch error:', e);
-    }
-    setIsGiftLoading(false);
+  // ギフトタブ: DBから取得してフィルタ（クロンが毎朝更新）
+  const sceneKeywords = {
+    '出産祝い': ['出産祝い', 'ギフト', 'プレゼント'],
+    'ハーフバースデー': ['ハーフバースデー', '6ヶ月', '半年'],
+    '友人へ': ['おしゃれ', 'かわいい', 'おしゃれ'],
+    '同僚へ': ['実用', 'セット', '消耗品'],
+    '家族・親戚から': ['セット', '豪華', 'まとめ'],
   };
 
   useEffect(() => {
-    if (activeTab === 'gift') fetchGiftProducts(giftBudgetFilter, giftSceneFilter);
-  }, [activeTab, giftBudgetFilter, giftSceneFilter]);
+    if (activeTab !== 'gift') return;
+    const base = dbProducts.filter(p => p.category === 'ギフトセット');
+
+    const priceRanges = {
+      '3000円〜': [3000, 4999],
+      '5000円〜': [5000, 9999],
+      '10000円〜': [10000, Infinity],
+    };
+    const range = priceRanges[giftBudgetFilter];
+    const kws = sceneKeywords[giftSceneFilter];
+
+    const filtered = base.filter(p => {
+      const price = getLowestPrice(p.shops) || p.price || 0;
+      if (range && (price < range[0] || price > range[1])) return false;
+      if (kws && !kws.some(kw => p.name.includes(kw))) return false;
+      return true;
+    });
+
+    setGiftProducts(filtered.length > 0 ? filtered : base.filter(p => {
+      const price = getLowestPrice(p.shops) || p.price || 0;
+      if (range && (price < range[0] || price > range[1])) return false;
+      return true;
+    }));
+  }, [activeTab, giftBudgetFilter, giftSceneFilter, dbProducts]);
 
   useEffect(() => {
     if (!window.visualViewport) return;
@@ -2034,8 +2011,8 @@ ${userText}
 
         <div className="flex items-center justify-between mb-5 px-1"><h3 className="font-black text-[#5A4C4C] text-xl">おすすめのギフト</h3></div>
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {isGiftLoading
-            ? <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold animate-pulse">ギフト商品を検索中...</div>
+          {dbLoading
+            ? <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold animate-pulse">ギフト商品を読み込み中...</div>
             : giftProducts.length > 0
               ? giftProducts.map((p, i) => <ProductCard key={p.id || i} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)
               : <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold">条件に合うギフトが見つかりません</div>}
