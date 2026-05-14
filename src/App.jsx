@@ -737,13 +737,13 @@ const App = () => {
       return updated;
     });
     // products テーブルの is_blocked フラグを立てる（DB から永続的に除外される）
-    const { error } = await supabase
-      .from('products')
-      .update({ is_blocked: true })
-      .eq('id', product.id);
-    if (error) {
-      console.error('Block sync to DB failed:', error.message);
-    }
+    // DB商品(UUID id)と、rakuten_item_code が一致するリモート商品の両方を対象とする
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(product.id));
+    const updateById = supabase.from('products').update({ is_blocked: true }).eq('id', product.id);
+    const updateByCode = supabase.from('products').update({ is_blocked: true }).eq('rakuten_item_code', code);
+    const [r1, r2] = await Promise.all([isUuid ? updateById : Promise.resolve({}), updateByCode]);
+    if (r1.error) console.error('Block by id failed:', r1.error.message);
+    if (r2.error) console.error('Block by code failed:', r2.error.message);
   };
 
   // 初回ロード: DBに事前保存されたデータを表示（Cronバッチで毎晩自動更新）
