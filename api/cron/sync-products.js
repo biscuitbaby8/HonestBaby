@@ -37,27 +37,37 @@ const CATEGORIES = [
 
 // カテゴリ別のキーワードフィルタ（本体のみ残す）
 const REQUIRED_KEYWORDS = {
-  "おむつ":       ["おむつ", "オムツ"],
+  "おむつ":       ["おむつ", "オムツ", "おしりふき"],
   "ベビーカー":   ["ベビーカー", "バギー", "ストローラー"],
   "抱っこ紐":     ["抱っこ紐", "だっこひも", "スリング", "ヒップシート", "キャリア"],
-  "ウェア":       ["ロンパース", "カバーオール", "肌着", "コンビ"],
-  "ミルク・授乳": ["哺乳瓶", "搾乳", "授乳クッション", "母乳"],
-  "離乳食・食器": ["離乳食", "ベビーフード", "ベビーチェア"],
-  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー"],
-  "おもちゃ":     ["おもちゃ", "知育", "ガラガラ", "メリー"],
-  "安全グッズ":   ["ゲート", "コーナーガード", "ドアロック", "転倒防止"],
-  "お風呂用品":   ["沐浴", "ベビーバス", "体温計", "保湿"],
-  "トイレ用品":   ["おまる", "補助便座", "トイトレ"],
-  "車用品":       ["チャイルドシート"],
-  "マタニティ":   ["マタニティ", "妊娠", "授乳ブラ", "葉酸"],
-  "ギフトセット": ["ギフト", "出産祝い"],
+  "ウェア":       ["ロンパース", "カバーオール", "肌着"],
+  "ミルク・授乳": ["哺乳瓶", "搾乳", "授乳クッション", "母乳", "哺乳"],
+  "離乳食・食器": ["離乳食", "ベビーフード", "ベビーチェア", "ベビー食器"],
+  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー", "ベビー布団"],
+  "おもちゃ":     ["おもちゃ", "知育", "ガラガラ", "メリー", "プレイマット"],
+  "安全グッズ":   ["ゲート", "コーナーガード", "ドアロック", "転倒防止", "ベビーガード"],
+  "お風呂用品":   ["沐浴", "ベビーバス", "体温計", "保湿", "ベビーソープ"],
+  "トイレ用品":   ["おまる", "補助便座", "トイトレ", "おしりふき"],
+  "車用品":       ["チャイルドシート", "ジュニアシート"],
+  "マタニティ":   ["マタニティ", "妊娠", "授乳ブラ", "葉酸", "産前"],
+  "ギフトセット": ["ギフト", "出産祝い", "プレゼント"],
 };
 
-// 除外キーワード
+// 除外キーワード（全カテゴリ共通）
 const NG_KEYWORDS = [
   'ふるさと納税', 'ポイント消化', 'クーポン対象', 'お試しセット',
-  '訳あり', 'アウトレット', '中古', 'リユース', 'メール便のみ'
+  '訳あり', 'アウトレット', '中古', 'リユース', 'メール便のみ',
+  // ギフト専用商品（ホームのランキングには不要）
+  'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
 ];
+
+// カテゴリ別追加除外キーワード
+const CATEGORY_NG_KEYWORDS = {
+  "おむつ": [
+    "大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用",
+    "大人", // 「大人のおむつ」等も除外
+  ],
+};
 
 // 商品名クリーニング
 function cleanName(name) {
@@ -105,12 +115,20 @@ function extractSubCategory(category, itemName) {
       { match: /おしりふき/, sub: "おしりふき" },
     ],
     "ベビーカー": [
+      // 周辺グッズを先に判定（本体より優先）
+      { match: /レインカバー|雨カバー|防雨カバー/, sub: "周辺グッズ" },
+      { match: /ドリンクホルダー|カップホルダー|スマホホルダー|スマートフォンホルダー/, sub: "周辺グッズ" },
+      { match: /フットマフ|ハンドルカバー|バンパーバー|サンキャノピー|サンシェード/, sub: "周辺グッズ" },
+      { match: /フック|収納ポーチ|サイドバッグ|アームバー/, sub: "周辺グッズ" },
+      { match: /よだれカバー|防寒ケープ|ベビーカーシート|シートカバー/, sub: "周辺グッズ" },
       { match: /AB型|ＡＢ型/, sub: "AB型" },
       { match: /[AＡ]型/, sub: "A型" },
       { match: /[BＢ]型/, sub: "B型" },
       { match: /バギー/, sub: "バギー" },
     ],
     "抱っこ紐": [
+      // 周辺グッズを先に判定
+      { match: /よだれパッド|ケープ|抱っこ紐カバー|防寒カバー/, sub: "周辺グッズ" },
       { match: /スリング/, sub: "スリング" },
       { match: /ヒップシート/, sub: "ヒップシート" },
     ],
@@ -249,9 +267,11 @@ async function fetchYahooPrice(keyword) {
 // --- 楽天の検索結果を正規化 ---
 function normalizeRakutenItems(items, category) {
   const requiredKws = REQUIRED_KEYWORDS[category] || [];
+  const extraNG = CATEGORY_NG_KEYWORDS[category] || [];
 
   return items
     .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+    .filter(item => extraNG.length === 0 || !extraNG.some(kw => item.Item.itemName.includes(kw)))
     .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.Item.itemName.includes(kw)))
     .map((item, idx) => {
       const rawName = item.Item.itemName;
@@ -259,7 +279,8 @@ function normalizeRakutenItems(items, category) {
       const brand = extractBrand(rawName);
       const subCategory = extractSubCategory(category, rawName);
       const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
-      const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || '';
+      const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl
+        || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
 
       return {
         name,
@@ -362,9 +383,12 @@ async function syncCategory(cat, log) {
 
   let savedCount = 0;
 
-  // ブロックリスト取得
-  const { data: blocklist } = await supabase.from('product_blocklist').select('item_code');
-  const blockedCodes = new Set((blocklist || []).map(b => b.item_code));
+  // ブロック済み商品コードを取得（is_blocked=true の rakuten_item_code）
+  const { data: blocklist } = await supabase
+    .from('products')
+    .select('rakuten_item_code')
+    .eq('is_blocked', true);
+  const blockedCodes = new Set((blocklist || []).map(b => b.rakuten_item_code).filter(Boolean));
 
   // タイムアウト回避（手動実行時は10秒制限を考慮して控えめに、自動実行時は150件フルで処理）
   const isManual = log.some(l => l.includes('🎯 フィルタ適用')); 

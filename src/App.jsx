@@ -297,9 +297,9 @@ const getHighResImage = (url) => {
     if (url.indexOf('rakuten.co.jp') !== -1) {
       return url.split('?_ex=')[0] + '?_ex=1000x1000';
     }
-    // Yahoo yimg.jp: /i/n/ → /i/j/ (フルサイズ)。失敗時はonErrorで元URLに戻す
+    // Yahoo yimg.jp: /i/n/ /i/l/ /i/g/ → /i/j/ (フルサイズ)
     if (url.indexOf('yimg.jp') !== -1) {
-      return url.replace('/i/n/', '/i/j/').replace('/i/l/', '/i/j/');
+      return url.replace('/i/n/', '/i/j/').replace('/i/l/', '/i/j/').replace('/i/g/', '/i/j/');
     }
     return url;
   } catch (e) {
@@ -631,7 +631,8 @@ const App = () => {
             shops:shops_prices(*),
             honestReviews:reviews(*),
             snsReviews:sns_reviews(*)
-          `);
+          `)
+          .or('is_blocked.is.null,is_blocked.eq.false');
 
         if (error) throw error;
 
@@ -710,21 +711,12 @@ const App = () => {
     fetchProducts();
   }, []);
 
-  // ブロックリストを起動時に読み込む（localStorage優先、Supabaseとマージ）
+  // ブロックリストを起動時に読み込む（localStorage のみ。DB ブロックは fetchProducts の is_blocked フィルタで処理）
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('honestBabyBlocklist') || '[]');
       if (stored.length > 0) setBlocklist(new Set(stored));
     } catch { }
-    supabase.from('product_blocklist').select('item_code').then(({ data }) => {
-      if (data && data.length > 0) {
-        setBlocklist(prev => {
-          const merged = new Set([...prev, ...data.map(r => r.item_code)]);
-          try { localStorage.setItem('honestBabyBlocklist', JSON.stringify([...merged])); } catch { }
-          return merged;
-        });
-      }
-    });
   }, []);
 
   // 商品を非表示にする（管理者モード専用）
@@ -744,13 +736,13 @@ const App = () => {
       }
       return updated;
     });
-    // supabase v2 はエラーを throw しない。{ error } を必ず確認する
+    // products テーブルの is_blocked フラグを立てる（DB から永続的に除外される）
     const { error } = await supabase
-      .from('product_blocklist')
-      .insert({ item_code: code });
-    // 23505 = unique violation（既にブロック済み）は無視してよい
-    if (error && error.code !== '23505') {
-      console.error('Block sync to DB failed:', error.message, error.code);
+      .from('products')
+      .update({ is_blocked: true })
+      .eq('id', product.id);
+    if (error) {
+      console.error('Block sync to DB failed:', error.message);
     }
   };
 
@@ -939,13 +931,22 @@ const App = () => {
 
     const NG_KEYWORDS = [
       'ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍',
-      'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース'
+      'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース',
+      'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
     ];
+    const CATEGORY_NG = {
+      "おむつ": ["大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用"],
+    };
     const mapItems = (items, cat) => items
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+      .filter(item => {
+        const ng = CATEGORY_NG[cat] || [];
+        return ng.length === 0 || !ng.some(kw => item.Item.itemName.includes(kw));
+      })
       .map(item => {
         const name = cleanName(item.Item.itemName);
-        const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || "";
+        const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl
+          || item.Item.mediumImageUrls?.[0]?.imageUrl || "";
         const unitCount = cat === "おむつ" ? parseDiaperCount(item.Item.itemName) : null;
         return {
           id: `ranking-${item.Item.itemCode}`,
@@ -1120,8 +1121,13 @@ const App = () => {
         if (accessoryFiltered.length > 0) rawItems = accessoryFiltered;
       }
 
-      // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
-      const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
+      // Step 1: 生データをすぐに表示（ブロック済みは除外）
+      const immediateProducts = rawItems
+        .filter(i => {
+          const code = String(i.id).replace(/^(ranking|product)-/, '');
+          return !blocklist.has(code);
+        })
+        .map(i => ({ ...i, isMarketWide: true }));
       setRemoteProducts(immediateProducts);
       setIsRemoteLoading(false);
     } catch (e) {
@@ -1824,16 +1830,16 @@ ${userText}
             <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
           ))}
 
-          {/* DB商品がないカテゴリではリモート検索結果をフォールバック表示 */}
+          {/* DB商品がないカテゴリではリモート検索結果をフォールバック表示（ブロック済み除外） */}
           {filtered.length === 0 && remoteProducts.length > 0 && applySortOrder(
-            remoteProducts.filter(p => !blocklist.has(p.id.replace(/^(ranking|product)-/, '')))
+            remoteProducts.filter(p => !blocklist.has(String(p.id).replace(/^(ranking|product)-/, '')))
           ).map((p) => (
             <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
           ))}
 
           {filtered.length === 0 && remoteProducts.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
             applySortOrder(
-              cachedProducts[selectedCategory].filter(p => !blocklist.has(p.id.replace(/^(ranking|product)-/, '')))
+              cachedProducts[selectedCategory].filter(p => !blocklist.has(String(p.id).replace(/^(ranking|product)-/, '')))
             ).map((p) => <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)
           )}
 
