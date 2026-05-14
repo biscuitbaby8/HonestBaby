@@ -263,6 +263,8 @@ function normalizeYahooItem(item, category) {
       url: rawUrl,
       shipping: item.shipping?.code === 2 ? 0 : null,
       points: 0,
+      rating: parseFloat(item.review?.rate) || 0,
+      reviews_count: parseInt(item.review?.count) || 0,
     }
   };
 }
@@ -324,7 +326,9 @@ async function fetchYahooPrice(keyword) {
         name: item.seller?.name || 'Yahoo!ショッピング',
         price: item.price,
         url: rawUrl,
-        source: 'yahoo'
+        source: 'yahoo',
+        rating: parseFloat(item.review?.rate) || 0,
+        reviews_count: parseInt(item.review?.count) || 0,
       };
     });
   } catch {
@@ -370,27 +374,82 @@ function normalizeRakutenItems(items, category) {
           url: item.Item.affiliateUrl || item.Item.itemUrl,
           shipping: item.Item.postageFlag === 1 ? 0 : null,
           points: item.Item.pointRate || 0,
+          rating: parseFloat(item.Item.reviewAverage) || 0,
+          reviews_count: parseInt(item.Item.reviewCount) || 0,
         }
       };
     });
 }
 
-// --- 重複統合（同名商品をマージ）---
+// --- 重複統合（同名商品をマージ。各 _rakuten_shop を _all_sellers に集約）---
 function deduplicateProducts(products) {
   const map = new Map();
   for (const p of products) {
     const key = p.name.replace(/[\s　]/g, '').toLowerCase().slice(0, 30);
     if (!map.has(key)) {
-      map.set(key, p);
+      map.set(key, { ...p, _all_sellers: p._rakuten_shop ? [p._rakuten_shop] : [] });
     } else {
       const existing = map.get(key);
-      // レビュー数が多い方を優先
+      if (p._rakuten_shop) existing._all_sellers.push(p._rakuten_shop);
+      // レビュー数が多い方を代表として採用（sellers は引き継ぐ）
       if (p.reviews_count > existing.reviews_count) {
-        map.set(key, { ...p });
+        map.set(key, { ...p, _all_sellers: existing._all_sellers });
       }
     }
   }
   return Array.from(map.values());
+}
+
+// --- 複数 seller にロール（公式/最安値/高評価）を付与 ---
+function assignRoles(sellers) {
+  if (!sellers || sellers.length === 0) return [];
+  // 同一ショップ名は除去（同じ店が複数入るのを防ぐ）
+  const unique = [];
+  const seen = new Set();
+  for (const s of sellers) {
+    const key = (s.shop_name || s.name || '').trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push({ ...s, isOfficial: /公式|直営|メーカー/.test(key) });
+  }
+
+  const withPrice = unique.filter(s => (s.price || 0) > 0);
+  if (withPrice.length === 0) return unique;
+
+  // 最安値
+  const cheapest = withPrice.reduce((a, b) => (a.price <= b.price ? a : b));
+  cheapest.role = 'cheapest';
+
+  // 高評価（最安値と異なる + レビューあり、評価値→レビュー数 の順で比較）
+  const topRated = withPrice
+    .filter(s => s !== cheapest && (s.reviews_count || 0) > 0)
+    .sort((a, b) => {
+      if ((b.rating || 0) !== (a.rating || 0)) return (b.rating || 0) - (a.rating || 0);
+      return (b.reviews_count || 0) - (a.reviews_count || 0);
+    })[0];
+  if (topRated) topRated.role = 'top_rated';
+
+  // 公式（まだロールが付いてないもの優先）
+  const official = unique.find(s => s.isOfficial && !s.role)
+    || unique.find(s => s.isOfficial);
+  if (official && !official.role) official.role = 'official';
+
+  return unique;
+}
+
+// --- seller オブジェクトを sellers JSONB 用の形式に整形 ---
+function serializeSeller(s) {
+  return {
+    name: s.shop_name || s.name,
+    price: s.price,
+    url: s.url,
+    shipping: s.shipping ?? 0,
+    points: s.points ?? 0,
+    rating: s.rating || 0,
+    reviews_count: s.reviews_count || 0,
+    role: s.role || null,
+    isOfficial: !!s.isOfficial,
+  };
 }
 
 // --- 商品名キー化（重複判定用） ---
@@ -494,7 +553,11 @@ async function syncCategory(cat, log, opts = {}) {
     if (blockedCodes.has(product.rakuten_item_code)) continue;
 
     const shopInfo = product._rakuten_shop;
+    const allRakutenSellers = product._all_sellers && product._all_sellers.length > 0
+      ? product._all_sellers
+      : (shopInfo ? [shopInfo] : []);
     delete product._rakuten_shop;
+    delete product._all_sellers;
 
     try {
       // 既存商品をrakuten_item_codeで検索
@@ -535,49 +598,52 @@ async function syncCategory(cat, log, opts = {}) {
         productId = inserted[0].id;
       }
 
-      // --- 楽天ショップ情報をshops_pricesに保存 ---
+      // --- 楽天ショップ情報をshops_pricesに保存（同一商品の複数seller を集約） ---
+      const rankedRakuten = assignRoles(allRakutenSellers);
+      const rakutenPrices = rankedRakuten.filter(s => (s.price || 0) > 0).map(s => s.price);
+      const rakutenLowest = rakutenPrices.length > 0 ? Math.min(...rakutenPrices) : (shopInfo?.price || 0);
+      const rakutenHasOfficial = rankedRakuten.some(s => s.isOfficial);
+
       await supabase
         .from('shops_prices')
         .upsert([{
           product_id: productId,
-          shop_name: shopInfo.shop_name,
-          shop_type: 'mall',
-          lowest_price: shopInfo.price,
+          shop_name: '楽天市場',
+          shop_type: rakutenHasOfficial ? 'official' : 'mall',
+          lowest_price: rakutenLowest,
           source: 'rakuten',
-          sellers: JSON.stringify([{
-            name: shopInfo.shop_name,
-            price: shopInfo.price,
-            shipping: shopInfo.shipping ?? 0,
-            points: shopInfo.points ?? 0,
-            url: shopInfo.url,
-            note: ''
-          }])
+          sellers: JSON.stringify(rankedRakuten.slice(0, 5).map(serializeSeller))
         }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
 
-      // --- Yahoo価格を取得（上位5件のみ詳細調査） ---
+      // --- Yahoo価格を取得（上位5件のみ詳細調査、複数 seller を集約） ---
       if (includeYahooPrice && i < 5) {
         const searchKeyword = product.name.split(/[\s　]+/).slice(0, 3).join(' ');
         const yahooResults = await fetchYahooPrice(searchKeyword);
 
         if (yahooResults.length > 0) {
-          // 最安値のものを選択
-          const best = yahooResults.sort((a, b) => a.price - b.price)[0];
+          const yahooSellers = yahooResults.map(r => ({
+            shop_name: r.name || 'Yahoo!ショッピング',
+            price: r.price,
+            url: r.url,
+            shipping: 0,
+            points: 0,
+            rating: r.rating || 0,
+            reviews_count: r.reviews_count || 0,
+          }));
+          const rankedYahoo = assignRoles(yahooSellers);
+          const yahooPrices = rankedYahoo.filter(s => (s.price || 0) > 0).map(s => s.price);
+          const yahooLowest = yahooPrices.length > 0 ? Math.min(...yahooPrices) : 0;
+          const yahooHasOfficial = rankedYahoo.some(s => s.isOfficial);
+
           await supabase
             .from('shops_prices')
             .upsert([{
               product_id: productId,
-              shop_name: best.name || 'Yahoo!ショッピング',
-              shop_type: 'mall',
-              lowest_price: best.price,
+              shop_name: 'Yahoo!ショッピング',
+              shop_type: yahooHasOfficial ? 'official' : 'mall',
+              lowest_price: yahooLowest,
               source: 'yahoo',
-              sellers: JSON.stringify([{
-                name: best.name || 'Yahoo!ショッピング',
-                price: best.price,
-                shipping: 0,
-                points: 0,
-                url: best.url,
-                note: ''
-              }])
+              sellers: JSON.stringify(rankedYahoo.slice(0, 5).map(serializeSeller))
             }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
         }
       }
