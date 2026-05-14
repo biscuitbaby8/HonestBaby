@@ -179,6 +179,42 @@ const OFFICIAL_SHOP_RULES = [
   { match: /(公式|official)(ショップ|ストア|店)?/i, brand: null },
 ];
 
+// ベビー専門小売店 公式EC（ASP提携後は affiliateParam を設定）
+const OFFICIAL_RETAILERS = [
+  {
+    name: 'アカチャンホンポ',
+    shortName: 'アカチャン',
+    searchUrl: (kw) => `https://shop.akachan.jp/shop/search/?keyword=${encodeURIComponent(kw)}`,
+    affiliateParam: '',  // バリューコマース提携後に追加
+    color: '#E85298',
+    domain: 'shop.akachan.jp',
+  },
+  {
+    name: '西松屋',
+    shortName: '西松屋',
+    searchUrl: (kw) => `https://www.24028-net.jp/search?keyword=${encodeURIComponent(kw)}`,
+    affiliateParam: '',
+    color: '#00965E',
+    domain: '24028-net.jp',
+  },
+  {
+    name: 'トイザらス・ベビーザらス',
+    shortName: 'ベビザらス',
+    searchUrl: (kw) => `https://www.toysrus.co.jp/search/?q=${encodeURIComponent(kw)}`,
+    affiliateParam: '',  // LinkShare / A8 提携後に追加
+    color: '#E31837',
+    domain: 'toysrus.co.jp',
+  },
+  {
+    name: 'ミキハウス',
+    shortName: 'ミキハウス',
+    searchUrl: (kw) => `https://www.mikihouse.co.jp/search?type=product&q=${encodeURIComponent(kw)}`,
+    affiliateParam: '',  // LinkShare 提携後に追加
+    color: '#2356A5',
+    domain: 'mikihouse.co.jp',
+  },
+];
+
 const detectOfficialShop = (shop) => {
   const target = `${shop?.name || ''} ${shop?.url || ''}`;
   for (const rule of OFFICIAL_SHOP_RULES) {
@@ -2809,6 +2845,44 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.1</p>
               </div>
                 ))}
+              </div>
+            </section>
+
+            {/* ＝＝＝＝＝ ベビー専門店でも探す ＝＝＝＝＝ */}
+            <section className="mb-12">
+              <div className="flex items-center gap-2 mb-4 px-1">
+                <Store className="w-5 h-5 text-[#7B8E76]" />
+                <h3 className="font-black text-[#5A4C4C] text-xl">ベビー専門店でも探す</h3>
+              </div>
+              <p className="text-[10px] text-[#A5A19E] font-bold mb-4 px-1">公式オンラインストアで在庫・セール情報を確認できます</p>
+              <div className="grid grid-cols-2 gap-3">
+                {OFFICIAL_RETAILERS.map(retailer => {
+                  const searchKw = (selectedProduct.name || '').split(/[\s　]+/).slice(0, 3).join(' ');
+                  const url = retailer.searchUrl(searchKw) + retailer.affiliateParam;
+                  return (
+                    <a
+                      key={retailer.domain}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 bg-white border border-[#F4EFEB] rounded-[1.5rem] px-4 py-4 shadow-sm active:scale-95 transition-transform"
+                    >
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-[#F4EFEB]">
+                        <img
+                          src={`https://www.google.com/s2/favicons?domain=${retailer.domain}&sz=32`}
+                          className="w-6 h-6"
+                          onError={e => { e.target.style.display = 'none'; }}
+                          alt={retailer.shortName}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-[#5A4C4C] truncate">{retailer.shortName}</p>
+                        <p className="text-[9px] text-[#A5A19E] font-bold">公式オンラインストア</p>
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-[#A5A19E] ml-auto shrink-0" />
+                    </a>
+                  );
+                })}
               </div>
             </section>
 
