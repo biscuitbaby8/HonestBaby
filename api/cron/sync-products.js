@@ -81,15 +81,57 @@ function upgradeYahooImage(url) {
   return url.replace(/\/i\/[ngs]\//, '/i/j/');
 }
 
-// 商品名クリーニング
+// 先頭ノイズトークンセット（スペース区切りで完全一致するもののみ除去）
+const LEADING_NOISE_SET = new Set([
+  'おもちゃ', '知育玩具', '知育', '玩具', '木のおもちゃ', '積み木',
+  'ベビー用品', 'ベビー', '赤ちゃん', '新生児', '乳幼児', 'キッズ',
+  '子ども', '子供', '幼児', '男の子', '女の子',
+  '誕生日', 'プレゼント', 'ギフト', '贈り物', '出産祝い', 'クリスマス', 'お祝い',
+  'ランキング', '人気', '売れ筋', 'おすすめ',
+  '一歳', '二歳', '三歳', '四歳', '五歳',
+]);
+const TRAILING_NOISE_SET = new Set([
+  '誕生日', 'プレゼント', 'ギフト', '贈り物', '出産祝い', 'クリスマス', 'お祝い',
+  '知育', 'ランキング', '人気', '売れ筋', 'おすすめ', '正規品', '公式', '新品',
+  '一歳', '二歳', '三歳', '四歳', '五歳',
+]);
+const AGE_TOKEN_RE = /^[0-9０-９一二三四五六七八九十]+[歳ヶ月]児?$/;
+
+// 商品名クリーニング（SEOキーワード羅列を除去してシンプルな商品名に）
 function cleanName(name) {
-  return name
+  let s = name
     .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
-    .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
-    .replace(/\s*(送料無料|あす楽|即納|限定|新品|正規品|公式|人気|売れ筋|ランキング1位).*$/g, '')
+    .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯！!✓]+/g, '')
+    .replace(/[\s　]*(送料無料|あす楽|即納|正規品|公式).*$/g, '')
     .replace(/[\s　]+/g, ' ')
-    .trim()
-    .slice(0, 80);
+    .trim();
+
+  const tokens = s.split(' ');
+
+  // 先頭のSEOノイズトークンを除去（最低1トークン残す）
+  let start = 0;
+  while (start < tokens.length - 1) {
+    const t = tokens[start];
+    if (LEADING_NOISE_SET.has(t) || AGE_TOKEN_RE.test(t)) start++;
+    else break;
+  }
+
+  // 末尾のSEOノイズトークンを除去（最低1トークン残す）
+  let end = tokens.length;
+  while (end > start + 1) {
+    const t = tokens[end - 1];
+    if (TRAILING_NOISE_SET.has(t) || AGE_TOKEN_RE.test(t)) end--;
+    else break;
+  }
+
+  s = tokens.slice(start, end).join(' ');
+
+  // 45文字でカット（単語の途中を避ける）
+  if (s.length > 45) {
+    s = s.slice(0, 45).replace(/\s+\S*$/, '').trim();
+  }
+
+  return s || name.slice(0, 30).trim();
 }
 
 // ブランド名推定

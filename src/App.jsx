@@ -113,20 +113,49 @@ const filterAccessories = (items, getNameFn = (p) => p.name || p.itemName || '')
   items.filter(item => !ACCESSORY_EXCLUDE_WORDS.some(w => getNameFn(item).includes(w)));
 
 // 商品名クリーニング: プロモ・ランキング表記・記号・括弧を除去
-const cleanName = (name) => (name || '')
-  .replace(/^[<＜〈]?\s*\d{1,2}[\/／]\d{1,2}\s*[〜～\-―]\s*\d{1,2}[\/／]\d{1,2}[^\s]*\s*[\/／]?\s*/g, '')
-  .replace(/^[\(（]?\s*(ポイント\d+倍|\d+倍ポイント)\s*[\/／\)）]?\s*/g, '')
-  .replace(/^[★☆◆■●▲]*\s*(当選確実|エントリー|抽選|抽選で)\s*[★☆◆■●▲]*\s*/g, '')
-  .replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g, '')
-  .replace(/^(楽天|第)\s*[0-9０-９]+\s*位(受賞)?\s*/g, '')
-  .replace(/^[0-9０-９]+位(受賞)?\s*/g, '')
-  .replace(/^\s*\d+%OFF[^\s\/]*\s*[\/／]\s*/g, '')
-  .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
-  .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
-  .replace(/\s*(送料無料|あす楽|即納|新品未開封|正規品|公式正規品|売れ筋ランキング|ランキング1位)\s*.*$/, '')
-  .replace(/[\s　]+/g, ' ')
-  .trim()
-  .slice(0, 60);
+const CLEAN_LEADING = new Set([
+  'おもちゃ', '知育玩具', '知育', '玩具', '木のおもちゃ', '積み木',
+  'ベビー用品', 'ベビー', '赤ちゃん', '新生児', '乳幼児', 'キッズ',
+  '子ども', '子供', '幼児', '男の子', '女の子',
+  '誕生日', 'プレゼント', 'ギフト', '贈り物', '出産祝い', 'クリスマス', 'お祝い',
+  'ランキング', '人気', '売れ筋', 'おすすめ',
+  '一歳', '二歳', '三歳', '四歳', '五歳',
+]);
+const CLEAN_TRAILING = new Set([
+  '誕生日', 'プレゼント', 'ギフト', '贈り物', '出産祝い', 'クリスマス', 'お祝い',
+  '知育', 'ランキング', '人気', '売れ筋', 'おすすめ', '正規品', '公式', '新品',
+  '一歳', '二歳', '三歳', '四歳', '五歳',
+]);
+const CLEAN_AGE_RE = /^[0-9０-９一二三四五六七八九十]+[歳ヶ月]児?$/;
+
+const cleanName = (name) => {
+  if (!name) return '';
+  let s = name
+    .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
+    .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯！!✓]+/g, '')
+    .replace(/^(楽天|第)?\s*[0-9０-９]+\s*位(受賞)?\s*/g, '')
+    .replace(/[\s　]*(送料無料|あす楽|即納|正規品|公式).*$/g, '')
+    .replace(/[\s　]+/g, ' ')
+    .trim();
+
+  const tokens = s.split(' ');
+  let start = 0;
+  while (start < tokens.length - 1) {
+    const t = tokens[start];
+    if (CLEAN_LEADING.has(t) || CLEAN_AGE_RE.test(t)) start++;
+    else break;
+  }
+  let end = tokens.length;
+  while (end > start + 1) {
+    const t = tokens[end - 1];
+    if (CLEAN_TRAILING.has(t) || CLEAN_AGE_RE.test(t)) end--;
+    else break;
+  }
+  s = tokens.slice(start, end).join(' ');
+
+  if (s.length > 45) s = s.slice(0, 45).replace(/\s+\S*$/, '').trim();
+  return s || name.slice(0, 30).trim();
+};
 
 // 商品の品質バリデーション
 const validateProduct = (p) => {
