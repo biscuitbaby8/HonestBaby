@@ -1626,7 +1626,7 @@ ${userText}
     setExpandedMall(null);
     setReviewTab('honest');
     try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
-    navigate(-1);
+    navigate('/', { replace: true });
   };
 
   // --- 各画面レンダリング ---
