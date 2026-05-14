@@ -591,7 +591,7 @@ export default async function handler(req, res) {
   const isSingleCategory = !!filterCat;
   const opts = isSingleCategory
     ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false }
-    : { limitCount: 15, includeYahooSupplement: true, includeYahooPrice: false };
+    : { limitCount: 10, includeYahooSupplement: false, includeYahooPrice: false };
 
   for (const cat of targetCategories) {
     try {
