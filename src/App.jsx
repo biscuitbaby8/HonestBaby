@@ -1634,7 +1634,16 @@ ${userText}
         return;
       }
       const aiText = data.text || "すみません、一時的にエラーが発生しました。もう一度お試しください。";
-      setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: contextProducts.slice(0, 3) }]);
+
+      // AIテキスト内で実際に言及された商品だけカードに表示する
+      const mentionedProducts = contextProducts.filter(p =>
+        aiText.includes(p.name) || aiText.includes(p.name.slice(0, 15))
+      );
+      const productsToShow = mentionedProducts.length > 0
+        ? mentionedProducts.slice(0, 3)
+        : contextProducts.slice(0, 3);
+
+      setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: productsToShow }]);
     } catch (e) {
       console.error("AI Chat Error:", e);
       setChatMessages([...newMessages, { role: 'assistant', text: `⚠️ ${e.message}` }]);
@@ -2609,9 +2618,27 @@ ${userText}
             <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FFFDFB] min-h-0">
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[85%] p-4 text-sm font-medium leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'
-                    }`}>
-                    {msg.text}
+                  <div className={`max-w-[85%] p-4 text-sm font-medium leading-relaxed ${msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'}`}>
+                    {msg.role === 'assistant' ? (
+                      <div className="space-y-3">
+                        {msg.text.split(/(?=■)/).map((chunk, ci) => {
+                          const trimmed = chunk.trim();
+                          if (!trimmed) return null;
+                          if (trimmed.startsWith('■')) {
+                            const colonIdx = trimmed.indexOf('：');
+                            const title = colonIdx > -1 ? trimmed.slice(1, colonIdx).trim() : trimmed.slice(1).trim();
+                            const body = colonIdx > -1 ? trimmed.slice(colonIdx + 1).trim() : '';
+                            return (
+                              <div key={ci} className="bg-[#F9F6F3] rounded-xl px-3 py-2.5">
+                                <p className="text-xs font-black text-[#5A4C4C] leading-snug mb-1">{title}</p>
+                                {body && <p className="text-[11px] text-[#7A6E6E] leading-relaxed">{body}</p>}
+                              </div>
+                            );
+                          }
+                          return <p key={ci} className="text-sm leading-relaxed whitespace-pre-wrap">{trimmed}</p>;
+                        })}
+                      </div>
+                    ) : msg.text}
                   </div>
                   {msg.products && msg.products.length > 0 && (
                     <div className="mt-2 space-y-2 w-[85%]">
