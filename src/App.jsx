@@ -433,6 +433,9 @@ const App = () => {
 
   // ブロックリスト（非表示商品）
   const [blocklist, setBlocklist] = useState(new Set());
+  // 直前の削除操作（アンドゥ用）
+  const [lastBlocked, setLastBlocked] = useState(null);  // { product, timer }
+  const [showUndoToast, setShowUndoToast] = useState(false);
 
   // User Data States
   const [favorites, setFavorites] = useState(() => {
@@ -925,14 +928,42 @@ const App = () => {
       }
       return updated;
     });
-    // products テーブルの is_blocked フラグを立てる（DB から永続的に除外される）
-    // DB商品(UUID id)と、rakuten_item_code が一致するリモート商品の両方を対象とする
+
+    // アンドゥトーストを表示（5秒間）
+    if (lastBlocked?.timer) clearTimeout(lastBlocked.timer);
+    const timer = setTimeout(() => setShowUndoToast(false), 5000);
+    setLastBlocked({ product, code });
+    setShowUndoToast(true);
+
+    // DB: is_blocked フラグを立てる
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(product.id));
     const updateById = supabase.from('products').update({ is_blocked: true }).eq('id', product.id);
     const updateByCode = supabase.from('products').update({ is_blocked: true }).eq('rakuten_item_code', code);
     const [r1, r2] = await Promise.all([isUuid ? updateById : Promise.resolve({}), updateByCode]);
     if (r1.error) console.error('Block by id failed:', r1.error.message);
     if (r2.error) console.error('Block by code failed:', r2.error.message);
+  };
+
+  // 誤って削除した商品を復元する
+  const unblockProduct = async () => {
+    if (!lastBlocked) return;
+    const { product, code } = lastBlocked;
+    setShowUndoToast(false);
+    setLastBlocked(null);
+
+    // ローカル状態から除去したコードを戻す
+    setBlocklist(prev => {
+      const next = new Set([...prev]);
+      next.delete(code);
+      try { localStorage.setItem('honestBabyBlocklist', JSON.stringify([...next])); } catch { }
+      return next;
+    });
+    // DB に商品を戻す（is_blocked を解除）
+    setDbProducts(prev => [...prev, product].sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999)));
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(product.id));
+    const restoreById = supabase.from('products').update({ is_blocked: false }).eq('id', product.id);
+    const restoreByCode = supabase.from('products').update({ is_blocked: false }).eq('rakuten_item_code', code);
+    await Promise.all([isUuid ? restoreById : Promise.resolve({}), restoreByCode]);
   };
 
   // 初回ロード: DBに事前保存されたデータを表示（Cronバッチで毎晩自動更新）
@@ -1861,6 +1892,8 @@ ${userText}
       .filter(p => {
         const code = p.id.replace(/^(ranking|product)-/, '');
         if (blocklist.has(code)) return false;
+        // ギフトセットはギフトページ専用。「すべて」ホームには表示しない
+        if (selectedCategory === "すべて" && p.category === "ギフトセット") return false;
         const matchCat = selectedCategory === "すべて" || p.category === selectedCategory;
         const matchSub = selectedSubCategory === "すべて" || p.subCategory === selectedSubCategory;
         const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
@@ -2666,6 +2699,17 @@ ${userText}
           </div>
         )}
       </main>
+
+      {/* ＝＝＝＝＝ 管理者: 削除アンドゥトースト ＝＝＝＝＝ */}
+      {showUndoToast && (
+        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 bg-[#5A4C4C] text-white text-sm font-bold px-5 py-3.5 rounded-full shadow-xl animate-in slide-in-from-bottom duration-200">
+          <span>非表示にしました</span>
+          <button
+            onClick={unblockProduct}
+            className="bg-white text-[#5A4C4C] px-3 py-1 rounded-full text-xs font-black active:scale-95 transition-transform"
+          >元に戻す</button>
+        </div>
+      )}
 
       {/* ＝＝＝＝＝ 商品詳細モーダル ＝＝＝＝＝ */}
       {selectedProduct && (
