@@ -3106,7 +3106,9 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               </div>
               <p className="text-[10px] text-[#A5A19E] font-bold mb-4 px-1">公式オンラインストアで在庫・セール情報を確認できます</p>
               <div className="grid grid-cols-2 gap-3">
-                {OFFICIAL_RETAILERS.map(retailer => {
+                {OFFICIAL_RETAILERS.filter(retailer =>
+                  retailer.domain !== 'mikihouse.co.jp' || selectedProduct.category === 'ウェア'
+                ).map(retailer => {
                   const searchKw = (selectedProduct.name || '').split(/[\s　]+/).slice(0, 3).join(' ');
                   const url = retailer.searchUrl(searchKw) + retailer.affiliateParam;
                   return (
