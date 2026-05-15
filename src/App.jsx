@@ -2908,6 +2908,19 @@ ${userText}
               </button>
             </div>
 
+            <div className="flex gap-3 mb-8 px-1">
+              <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(`https://honestbaby-care.com/product/${selectedProduct.id}`)}`}
+                 target="_blank" rel="noopener noreferrer"
+                 className="flex items-center gap-2 bg-[#06C755] text-white rounded-full px-4 py-2.5 text-xs font-black active:scale-95 transition-transform">
+                LINE でシェア
+              </a>
+              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`${selectedProduct.name} | HonestBaby`)}&url=${encodeURIComponent(`https://honestbaby-care.com/product/${selectedProduct.id}`)}`}
+                 target="_blank" rel="noopener noreferrer"
+                 className="flex items-center gap-2 bg-black text-white rounded-full px-4 py-2.5 text-xs font-black active:scale-95 transition-transform">
+                X でシェア
+              </a>
+            </div>
+
             <p className="text-sm text-[#8E8282] leading-relaxed mb-10 px-1 font-medium">{selectedProduct.description}</p>
 
             <section className="mb-10 bg-[#FFF5F5] border border-[#FFEBEB] p-8 rounded-[2.5rem] relative overflow-hidden">
