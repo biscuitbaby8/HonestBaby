@@ -69,6 +69,25 @@ const CATEGORY_TREE = [
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
 
+// 月齢→おすすめカテゴリのマッピング
+const AGE_CATEGORY_MAP = [
+  { minM: 0,   maxM: 2,   label: '新生児期',       cats: ['おむつ', 'ミルク・授乳', '寝具・ベッド', '抱っこ紐'] },
+  { minM: 2,   maxM: 6,   label: '首すわり前後',   cats: ['おむつ', 'ベビーカー', '抱っこ紐', 'おもちゃ'] },
+  { minM: 5,   maxM: 9,   label: '離乳食スタート', cats: ['離乳食・食器', 'おもちゃ', 'お風呂用品', 'ベビーカー'] },
+  { minM: 8,   maxM: 14,  label: 'ハイハイ・たっち', cats: ['安全グッズ', 'おもちゃ', '離乳食・食器', 'ウェア'] },
+  { minM: 12,  maxM: 24,  label: 'よちよち歩き',   cats: ['ウェア', 'おもちゃ', 'トイレ用品', '安全グッズ'] },
+  { minM: 24,  maxM: 999, label: '2歳〜',          cats: ['ウェア', 'トイレ用品', '車用品', 'おもちゃ'] },
+];
+
+// 月齢→おむつサイズのマッピング（体重個人差あり、目安として利用）
+const DIAPER_SIZE_BY_AGE = [
+  { maxM: 1,   size: '新生児', sub: 'テープタイプ', label: '新生児サイズ' },
+  { maxM: 5,   size: 'S',      sub: 'テープタイプ', label: 'Sサイズ' },
+  { maxM: 13,  size: 'M',      sub: null,           label: 'Mサイズ' },
+  { maxM: 25,  size: 'L',      sub: null,           label: 'Lサイズ' },
+  { maxM: 999, size: 'BIG',    sub: null,           label: 'BIGサイズ' },
+];
+
 const LEGAL_PAGES = {
   terms: {
     title: "利用規約",
@@ -626,6 +645,18 @@ const App = () => {
   const [babyInfo, setBabyInfo] = useState(() => {
     try { return JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null'); } catch { return null; }
   });
+
+  // 月齢・年齢計算（全画面・AI から参照できるようトップレベルで計算）
+  const _now = new Date();
+  const babyAgeMonths = babyInfo
+    ? ((_now.getFullYear() - babyInfo.birthYear) * 12 + (_now.getMonth() + 1 - babyInfo.birthMonth))
+    : null;
+  const babyAgeLabel = babyAgeMonths != null
+    ? babyAgeMonths < 12
+      ? `${babyAgeMonths}ヶ月`
+      : `${Math.floor(babyAgeMonths / 12)}歳${babyAgeMonths % 12 ? `${babyAgeMonths % 12}ヶ月` : ''}`
+    : null;
+
   const [recentlyViewed, setRecentlyViewed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('honestBabyRecentlyViewed') || '[]'); } catch { return []; }
   });
@@ -1643,8 +1674,13 @@ const App = () => {
       const isDiagnosis = userText.includes('診断');
       const isExpert = userText.includes('[商品詳細データ]');
 
+      // マイベビー情報をコンテキストとして注入
+      const babyContext = babyInfo && babyAgeLabel
+        ? `【お子さま情報】${babyInfo.name ? `名前: ${babyInfo.name} / ` : ''}月齢: ${babyAgeLabel}${babyInfo.gender ? ` / 性別: ${babyInfo.gender}` : ''}\nこの月齢・状況に合った提案を心がけてください。\n\n`
+        : '';
+
       if (isExpert) {
-        prompt = `あなたはベビー用品のプロ購買コンサルタントです。提供された【商品詳細データ】を元に、以下の点に重点を置いて回答してください。
+        prompt = `${babyContext}あなたはベビー用品のプロ購買コンサルタントです。提供された【商品詳細データ】を元に、以下の点に重点を置いて回答してください。
 1. その商品の市場価値（他店と比較して安いか、買い時か）
 2. 専門家から見たメリット・デメリット
 3. どんなユーザーにおすすめか
@@ -1654,7 +1690,7 @@ const App = () => {
 【ユーザーからの相談】
 ${userText}`;
       } else if (isDiagnosis) {
-        prompt = `あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
+        prompt = `${babyContext}あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
 ユーザーは「5秒診断」を希望しています。以下の手順で厳格に進めてください。
 1. まず明るく挨拶し、「どんなアイテム（ベビーカー、抱っこ紐など）をお探しですか？」と1つだけ質問してください。
 2. その後、ライフスタイルや予算について1つずつ質問を投げてください。
@@ -1668,7 +1704,7 @@ ${userText}`;
           const price = p.shops?.[0]?.lowest_price ?? p.price;
           return `${i + 1}. ${p.name}（${price ? price.toLocaleString() + '円' : '価格不明'}）`;
         }).join('\n');
-        prompt = `あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
+        prompt = `${babyContext}あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
 
 【絶対ルール】
 - 必ず以下の【商品リスト】にある商品名だけを使ってください
@@ -1976,6 +2012,34 @@ ${userText}
           <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
         </div>
 
+        {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
+        {babyInfo && babyAgeMonths != null && (() => {
+          const stage = AGE_CATEGORY_MAP.find(s => babyAgeMonths >= s.minM && babyAgeMonths < s.maxM);
+          if (!stage) return null;
+          return (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-widest">My Baby</span>
+                <span className="text-xs font-bold text-[#5A4C4C] truncate">
+                  {babyInfo.name || 'お子さま'}（{babyAgeLabel}）に今必要なもの
+                </span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+                {stage.cats.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => handleCategoryChange(cat)}
+                    className="flex-shrink-0 flex items-center gap-1.5 bg-white border border-[#F4EFEB] rounded-full px-4 py-2.5 text-xs font-bold text-[#5A4C4C] shadow-sm active:scale-95 transition-transform"
+                  >
+                    <CategoryIcon name={cat} className="w-3.5 h-3.5 text-[#7B8E76]" />
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="relative">
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
             {CATEGORY_TREE.map(cat => (
@@ -2042,6 +2106,29 @@ ${userText}
                 </div>
               )}
             </>
+          );
+        })()}
+
+        {/* ─── おむつカテゴリ：月齢別サイズ提案バナー ─── */}
+        {selectedCategory === 'おむつ' && babyInfo && babyAgeMonths != null && (() => {
+          const entry = DIAPER_SIZE_BY_AGE.find(e => babyAgeMonths < e.maxM);
+          if (!entry) return null;
+          return (
+            <div className="flex items-center justify-between bg-[#FFF5F5] border border-[#FFEBEB] rounded-2xl px-4 py-3 mb-4">
+              <p className="text-xs font-bold text-[#5A4C4C] leading-snug">
+                {babyInfo.name || 'お子さま'}（{babyAgeLabel}）は<br />
+                <span className="text-[#F2ABAC] font-black">{entry.label}頃</span>が目安です
+              </p>
+              <button
+                onClick={() => {
+                  if (entry.sub) setSelectedSubCategory(entry.sub);
+                  setSelectedSubSubCategory(entry.size);
+                }}
+                className="bg-[#F2ABAC] text-white text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform whitespace-nowrap ml-3"
+              >
+                {entry.label}を見る
+              </button>
+            </div>
           );
         })()}
 
@@ -2175,14 +2262,6 @@ ${userText}
   };
 
   const renderUser = () => {
-    const now = new Date();
-    const babyAgeMonths = babyInfo
-      ? (now.getFullYear() - babyInfo.birthYear) * 12 + (now.getMonth() + 1 - babyInfo.birthMonth)
-      : null;
-    const babyAgeLabel = babyAgeMonths != null
-      ? babyAgeMonths < 12 ? `${babyAgeMonths}ヶ月` : `${Math.floor(babyAgeMonths / 12)}歳${babyAgeMonths % 12 ? `${babyAgeMonths % 12}ヶ月` : ''}`
-      : null;
-
     return (
       <div className="animate-in slide-in-from-right duration-300 pb-20">
         {/* プロフィールカード */}
