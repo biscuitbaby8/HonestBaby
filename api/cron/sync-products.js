@@ -72,6 +72,8 @@ const CATEGORY_NG_KEYWORDS = {
     "ゴミ箱", "ごみ箱", "防臭袋", "防臭ポット", "おむつポット", "サニタリーボックス",
     "ペット", "犬用", "猫用", "ペットシーツ", "ペットシート", "犬", "猫", "わんちゃん", "ねこ",
     "トイレシーツ", "ペット用", "愛犬", "愛猫",
+    "犬猫", "わんにゃん", "ペットシーツ", "トイレシート", "ワンちゃん", "ネコちゃん",
+    "動物", "アニマル", "ペット対応",
   ],
 };
 
@@ -535,12 +537,14 @@ async function syncCategory(cat, log, opts = {}) {
 
   let savedCount = 0;
 
-  // ブロック済み商品コードを取得（is_blocked=true の rakuten_item_code）
+  // ブロック済み商品を取得（is_blocked=true の rakuten_item_code と name）
   const { data: blocklist } = await supabase
     .from('products')
-    .select('rakuten_item_code')
+    .select('rakuten_item_code, name')
     .eq('is_blocked', true);
   const blockedCodes = new Set((blocklist || []).map(b => b.rakuten_item_code).filter(Boolean));
+  // 同名商品が別ショップコードで再登録されるケースも弾く
+  const blockedNames = new Set((blocklist || []).map(b => productNameKey(b.name)).filter(Boolean));
 
   const productsToProcess = deduplicated.slice(0, limitCount);
   log.push(`  ⏱ 上位 ${productsToProcess.length}件を保存します`);
@@ -549,8 +553,9 @@ async function syncCategory(cat, log, opts = {}) {
     const product = productsToProcess[i];
     product.popularity_rank = i + 1;
 
-    // ブロックリストチェック
+    // ブロックリストチェック（コードと名前の両方で判定）
     if (blockedCodes.has(product.rakuten_item_code)) continue;
+    if (blockedNames.has(productNameKey(product.name))) continue;
 
     const shopInfo = product._rakuten_shop;
     const allRakutenSellers = product._all_sellers && product._all_sellers.length > 0
