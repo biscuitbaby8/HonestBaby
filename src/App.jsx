@@ -436,6 +436,10 @@ const App = () => {
   // 直前の削除操作（アンドゥ用）
   const [lastBlocked, setLastBlocked] = useState(null);  // { product, timer }
   const [showUndoToast, setShowUndoToast] = useState(false);
+  // ブロック済み商品リストモーダル
+  const [showBlockedList, setShowBlockedList] = useState(false);
+  const [blockedProducts, setBlockedProducts] = useState([]);
+  const [isLoadingBlocked, setIsLoadingBlocked] = useState(false);
 
   // User Data States
   const [favorites, setFavorites] = useState(() => {
@@ -951,19 +955,61 @@ const App = () => {
     setShowUndoToast(false);
     setLastBlocked(null);
 
-    // ローカル状態から除去したコードを戻す
     setBlocklist(prev => {
       const next = new Set([...prev]);
       next.delete(code);
       try { localStorage.setItem('honestBabyBlocklist', JSON.stringify([...next])); } catch { }
       return next;
     });
-    // DB に商品を戻す（is_blocked を解除）
     setDbProducts(prev => [...prev, product].sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999)));
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(product.id));
     const restoreById = supabase.from('products').update({ is_blocked: false }).eq('id', product.id);
     const restoreByCode = supabase.from('products').update({ is_blocked: false }).eq('rakuten_item_code', code);
     await Promise.all([isUuid ? restoreById : Promise.resolve({}), restoreByCode]);
+  };
+
+  // ブロック済み商品一覧を取得（管理者モード専用）
+  const fetchBlockedProducts = async () => {
+    setIsLoadingBlocked(true);
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, image_url, category, rakuten_item_code')
+      .eq('is_blocked', true)
+      .order('name');
+    setBlockedProducts(data || []);
+    setIsLoadingBlocked(false);
+  };
+
+  // ブロック済み商品を個別に復元
+  const restoreBlockedProduct = async (p) => {
+    await supabase.from('products').update({ is_blocked: false }).eq('id', p.id);
+    setBlockedProducts(prev => prev.filter(b => b.id !== p.id));
+    // ローカルのブロックリストからも除去
+    const code = p.rakuten_item_code || p.id;
+    setBlocklist(prev => {
+      const next = new Set([...prev]);
+      next.delete(code);
+      try { localStorage.setItem('honestBabyBlocklist', JSON.stringify([...next])); } catch { }
+      return next;
+    });
+    // 画面の商品リストに戻す（再フェッチで確実に反映）
+    const { data: restored } = await supabase
+      .from('products')
+      .select('*, shops:shops_prices(*)')
+      .eq('id', p.id)
+      .single();
+    if (restored) {
+      const fmt = {
+        ...restored,
+        rating: Number(restored.rating),
+        subCategory: restored.sub_category,
+        image: restored.image_url,
+        shops: (restored.shops || []).map(s => ({
+          ...s, name: s.shop_name, type: s.shop_type, lowestPrice: s.lowest_price, sellers: []
+        })),
+      };
+      setDbProducts(prev => [...prev, fmt].sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999)));
+    }
   };
 
   // 初回ロード: DBに事前保存されたデータを表示（Cronバッチで毎晩自動更新）
@@ -2708,6 +2754,47 @@ ${userText}
             onClick={unblockProduct}
             className="bg-white text-[#5A4C4C] px-3 py-1 rounded-full text-xs font-black active:scale-95 transition-transform"
           >元に戻す</button>
+        </div>
+      )}
+
+      {/* ＝＝＝＝＝ 管理者: 非表示リスト浮きボタン ＝＝＝＝＝ */}
+      {isAdminMode && !showUndoToast && (
+        <button
+          onClick={() => { setShowBlockedList(true); fetchBlockedProducts(); }}
+          className="fixed bottom-28 right-4 z-[200] bg-red-500 text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+        >🚫 非表示リスト</button>
+      )}
+
+      {/* ＝＝＝＝＝ 管理者: ブロック済み商品モーダル ＝＝＝＝＝ */}
+      {showBlockedList && (
+        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end" onClick={() => setShowBlockedList(false)}>
+          <div className="bg-white w-full max-h-[80vh] rounded-t-[2rem] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#F4EFEB]">
+              <h3 className="font-black text-[#5A4C4C] text-lg">非表示にした商品</h3>
+              <button onClick={() => setShowBlockedList(false)} className="text-[#A5A19E] font-bold text-sm">閉じる</button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-4 py-3 space-y-2">
+              {isLoadingBlocked && <p className="text-center text-sm text-[#A5A19E] py-8">読み込み中...</p>}
+              {!isLoadingBlocked && blockedProducts.length === 0 && (
+                <p className="text-center text-sm text-[#A5A19E] py-8">非表示にした商品はありません</p>
+              )}
+              {blockedProducts.map(p => (
+                <div key={p.id} className="flex items-center gap-3 bg-[#F9F6F3] rounded-2xl p-3">
+                  {p.image_url && (
+                    <img src={p.image_url} className="w-12 h-12 rounded-xl object-cover flex-shrink-0 opacity-60" alt={p.name} />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black text-[#5A4C4C] line-clamp-2">{p.name}</p>
+                    <p className="text-[10px] text-[#A5A19E]">{p.category}</p>
+                  </div>
+                  <button
+                    onClick={() => restoreBlockedProduct(p)}
+                    className="bg-[#7B8E76] text-white px-4 py-2 rounded-full text-xs font-black whitespace-nowrap active:scale-95 transition-transform"
+                  >復元</button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
