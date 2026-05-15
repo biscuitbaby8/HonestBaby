@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/sync-products?manual=1&batch=2",
       "schedule": "30 18 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-push",
+      "schedule": "0 10 * * 1"
     }
   ],
   "redirects": [
@@ -34,6 +38,17 @@
         }
       ],
       "destination": "/api/ogp?id=:id"
+    },
+    {
+      "source": "/category/:cat",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|TelegramBot|WhatsApp|Line|Discordbot|Google-InspectionTool).*"
+        }
+      ],
+      "destination": "/api/ogp?cat=:cat"
     },
     {
       "source": "/api/:path*",
