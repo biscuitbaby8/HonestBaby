@@ -100,6 +100,10 @@ const LEGAL_PAGES = {
   disclaimer: {
     title: "運営者情報・免責事項",
     content: "【運営について】本サイトは、Amazon.co.jpを宣伝しリンクすることによってサイトが紹介料を獲得できる手段を提供することを目的に設定されたアフィリエイトプログラムである、Amazonアソシエイト・プログラムの参加者です。\n\nまた、楽天、Yahoo!ショッピング、バリューコマース、A8.net、もしもアフィリエイト、アクセストレード等の各プログラムにも参加しており、これらを通じて適格販売により紹介料を得ています。\n\n【免責事項】当サイトのコンテンツや情報につきまして、可能な限り正確な情報を掲載するよう努めておりますが、必ずしも正確性・信頼性を保証するものではありません。価格や在庫状況等は常に変動画するため、購入時は必ずリンク先のショップにて最新の情報をご確認ください。"
+  },
+  tokushoho: {
+    title: "特定商取引法に基づく表記",
+    content: "■ 販売業者\n個人運営者（請求があった場合、遅滞なく開示いたします）\n\n■ 所在地\n請求があった場合、遅滞なく開示いたします\n\n■ 連絡先\nお問い合わせはアプリ内のお問い合わせフォームよりご連絡ください\n\n■ サービスの内容\nベビー用品の価格比較・口コミ情報の提供（無料）\n\n■ 販売価格\n本サービスは無料でご利用いただけます。各商品の購入はリンク先の各ショップにて行われ、価格はリンク先のショップが定める価格となります。\n\n■ 商品代金以外の必要料金\nなし（本サービスの利用料は無料です）\n\n■ 支払方法・支払時期\n本サービス自体の料金は発生しません。商品のご購入はリンク先ショップの規定に従います。\n\n■ 商品の引き渡し時期\n本サービスは情報提供サービスです。商品の配送はリンク先ショップが行います。\n\n■ 返品・キャンセルについて\n本サービスは情報提供のみを行っており、商品の販売は行っておりません。商品の返品・キャンセルはご購入先のショップの規定に従ってください。\n\n■ アフィリエイトについて\n本サービスはAmazon.co.jpアソシエイト・プログラム、楽天アフィリエイト、Yahoo!ショッピングアフィリエイト、バリューコマース等のアフィリエイトプログラムに参加しており、リンク経由でご購入いただいた場合に紹介料を受け取ることがあります。"
   }
 };
 
@@ -2463,6 +2467,7 @@ ${userText}
             <button onClick={() => setActiveLegalPage('terms')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 利用規約</button>
             <button onClick={() => setActiveLegalPage('privacy')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Shield className="w-4 h-4 mr-2" /> プライバシーポリシー</button>
             <button onClick={() => setActiveLegalPage('disclaimer')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors text-left leading-relaxed"><Info className="w-4 h-4 mr-2 flex-shrink-0" /> 運営者情報・免責事項<br />(アフィリエイトについて)</button>
+            <button onClick={() => setActiveLegalPage('tokushoho')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 特定商取引法に基づく表記</button>
           </div>
         </div>
       </div>
