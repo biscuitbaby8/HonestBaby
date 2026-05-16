@@ -95,7 +95,7 @@ const LEGAL_PAGES = {
   },
   privacy: {
     title: "プライバシーポリシー",
-    content: "運営者は、本サービスの提供にあたり、ユーザーの個人情報を適切に取り扱います。本サービスでは、アクセス解析（Google Analytics等）や広告配信のためにCookieを使用しています。取得した情報は、サービスの品質向上や適切な情報提供の目的でのみ使用され、法令に基づく場合を除き、第三者に提供することはありません。"
+    content: "■ 収集する情報\n本サービスでは、以下の情報を収集・利用します。\n\n【Googleアカウント情報】\nGoogleログインを利用された場合、メールアドレス・表示名・アイコン画像を取得します。これらはお気に入り管理・価格アラート・お問い合わせ対応のために利用します。\n\n【端末内に保存する情報（localStorage）】\n・お気に入り商品リスト\n・閲覧履歴\n・赤ちゃんの月齢・名前・性別（任意入力）\n・保存した検索条件\n・価格アラート設定\nこれらはお客様の端末内にのみ保存され、ログイン時にサーバーと同期されます。\n\n■ アクセス解析・Cookie\n本サービスはGoogle Analytics 4を使用しており、アクセス状況の把握のためにCookieを利用しています。取得データはGoogleのプライバシーポリシーに従って管理されます。Cookieの使用を希望されない場合は、ブラウザの設定から無効にすることができます。\n\n■ アフィリエイト\n本サービスはAmazon、楽天、Yahoo!ショッピング等のアフィリエイトプログラムに参加しており、バリューコマース等のASPを通じてトラッキングCookieを使用する場合があります。\n\n■ 第三者提供\n取得した情報は、法令に基づく場合を除き、第三者に提供することはありません。\n\n■ お問い合わせ\n個人情報の開示・訂正・削除のご請求は、アプリ内のお問い合わせフォームよりご連絡ください。"
   },
   disclaimer: {
     title: "運営者情報・免責事項",
@@ -689,6 +689,10 @@ const App = () => {
   const [alertTargetPrice, setAlertTargetPrice] = useState('');
   const [saveSearchLabel, setSaveSearchLabel] = useState('');
 
+  const [showCookieBanner, setShowCookieBanner] = useState(() => {
+    try { return !localStorage.getItem('honestBabyCookieConsent'); } catch { return false; }
+  });
+
   // Modal & Expand States
   const [expandedMall, setExpandedMall] = useState(null);
   const [activeLegalPage, setActiveLegalPage] = useState(null);
@@ -849,6 +853,13 @@ const App = () => {
     };
 
     restore();
+  }, [location.pathname]);
+
+  // 法的ページ直接URL対応: /privacy /terms /tokushoho /disclaimer
+  useEffect(() => {
+    const legalRoutes = { '/privacy': 'privacy', '/terms': 'terms', '/tokushoho': 'tokushoho', '/disclaimer': 'disclaimer' };
+    const key = legalRoutes[location.pathname];
+    if (key) { setActiveLegalPage(key); navigate('/', { replace: true }); }
   }, [location.pathname]);
 
   useEffect(() => {
@@ -3363,6 +3374,21 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
       )}
 
       {/* ＝＝＝＝＝ 法務・運営者情報モーダル ＝＝＝＝＝ */}
+      {showCookieBanner && (
+        <div className="fixed bottom-[72px] left-0 right-0 z-[70] px-4 pointer-events-none">
+          <div className="bg-[#5A4C4C] text-white rounded-2xl shadow-xl px-5 py-4 flex items-center gap-3 pointer-events-auto max-w-md mx-auto">
+            <p className="text-[11px] font-bold leading-relaxed flex-1">
+              本サービスはGoogle Analytics等のCookieを使用しています。
+              <button onClick={() => setActiveLegalPage('privacy')} className="underline ml-1">詳細</button>
+            </p>
+            <button onClick={() => { try { localStorage.setItem('honestBabyCookieConsent', '1'); } catch { } setShowCookieBanner(false); }}
+              className="text-[11px] font-black bg-white text-[#5A4C4C] px-3 py-1.5 rounded-full flex-shrink-0 active:scale-95 transition-transform">
+              同意する
+            </button>
+          </div>
+        </div>
+      )}
+
       {activeLegalPage && (
         <div className="fixed inset-0 z-[80] bg-[#FFFDFB] flex flex-col animate-in slide-in-from-bottom duration-300">
           <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
