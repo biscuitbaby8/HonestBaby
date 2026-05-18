@@ -47,6 +47,10 @@
       "destination": "/api/ogp?cat=:cat"
     },
     {
+      "source": "/article/:slug",
+      "destination": "/api/article?slug=:slug"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     },
