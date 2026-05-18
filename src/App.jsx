@@ -2526,7 +2526,7 @@ ${userText}
             ? <meta property="og:description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。`} />
             : <meta property="og:description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。" />
         }
-        <meta property="og:image" content={selectedProduct?.image || "https://honestbaby-care.com/logo.png"} />
+        <meta property="og:image" content={selectedProduct?.image || "https://honestbaby-care.com/favicon.png"} />
         {selectedProduct
           ? <meta property="og:url" content={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
           : selectedCategory !== "すべて"
@@ -2540,7 +2540,7 @@ ${userText}
           ? <meta name="twitter:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
           : <meta name="twitter:title" content="HonestBaby | 忖度なしのベビー用品比較" />
         }
-        <meta name="twitter:image" content={selectedProduct?.image || "https://honestbaby-care.com/logo.png"} />
+        <meta name="twitter:image" content={selectedProduct?.image || "https://honestbaby-care.com/favicon.png"} />
 
         {/* JSON-LD: WebSite + Organization */}
         <script type="application/ld+json">{JSON.stringify({
@@ -2559,7 +2559,7 @@ ${userText}
               "@id": "https://honestbaby-care.com/#organization",
               "name": "HonestBaby",
               "url": "https://honestbaby-care.com/",
-              "logo": "https://honestbaby-care.com/logo.png"
+              "logo": "https://honestbaby-care.com/favicon.png"
             }
           ]
         })}</script>
@@ -3426,7 +3426,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
         <div className="fixed bottom-[72px] left-0 right-0 z-50 px-4 pointer-events-none">
           <div className="bg-white border border-[#F2ABAC]/40 rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 pointer-events-auto max-w-md mx-auto">
             <div className="w-9 h-9 rounded-xl bg-[#FFF5F5] flex items-center justify-center flex-shrink-0">
-              <img src="/icons/icon-192x192.png" alt="" className="w-6 h-6 rounded-lg" />
+              <img src="/apple-touch-icon.png" alt="" className="w-6 h-6 rounded-lg" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-black text-[#5A4C4C] leading-tight">ホーム画面に追加</p>
