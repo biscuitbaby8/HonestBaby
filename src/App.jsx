@@ -2323,7 +2323,8 @@ ${userText}
                   <span className="text-[10px] text-white bg-[#7B8E76] px-2 py-0.5 rounded-md font-bold">{babyInfo.gender}</span>
                 )}
                 <button onClick={() => {
-                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+                  const today = new Date();
+                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
                   setShowBabyModal(true);
                 }} className="text-[10px] text-[#A5A19E] flex items-center gap-0.5 font-bold hover:text-[#5A4C4C] transition-colors">
                   {babyInfo ? '編集' : 'プロフィール登録'} <Edit3 className="w-3 h-3" />
@@ -2342,7 +2343,8 @@ ${userText}
             <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest bg-[#F9F6F3] px-2 py-1 rounded-md">おすすめの最適化</span>
           </div>
           <div onClick={() => {
-            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+            const today = new Date();
+            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
             setShowBabyModal(true);
           }} className="bg-[#FFF5F5] border border-[#FFEBEB] p-5 rounded-[2rem] shadow-sm flex items-center justify-between active:scale-95 transition-transform cursor-pointer relative overflow-hidden group">
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#F2ABAC] rounded-l-[2rem]"></div>
