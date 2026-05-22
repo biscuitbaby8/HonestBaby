@@ -49,7 +49,7 @@ const CATEGORY_TREE = [
       { name: "パンツタイプ", subsubs: ["S", "M", "L", "BIG", "BIGより大きい"] },
       { name: "夜用おむつ", subsubs: ["M", "L", "BIG", "BIGより大きい"] },
       { name: "おしりふき" },
-      { name: "ゴミ箱・袋", subsubs: ["おむつポット", "防臭袋", "サニタリーボックス"] },
+      { name: "ゴミ箱・袋", subsubs: ["おむつポット", "防臭袋"] },
     ]
   },
   { name: "ベビーカー", id: "200833", keyword: "ベビーカー", subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
