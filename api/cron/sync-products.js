@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sendPushNotification, isPushConfigured } from '../lib/web-push.js';
 
 // =============================================
 // 夜間自動同期クローラー (Vercel Cron)
@@ -20,6 +21,7 @@ const VC_SID = process.env.VITE_VC_SID || '3768537';
 // カテゴリ定義（App.jsx の CATEGORY_TREE と同期）
 const CATEGORIES = [
   { name: "おむつ",       genreId: "101070", keyword: "紙おむつ 赤ちゃん" },
+  { name: "ゴミ箱・袋",  genreId: "101070", keyword: "おむつ ゴミ箱 防臭" },
   { name: "ベビーカー",   genreId: "501062", keyword: "ベビーカー" },
   { name: "抱っこ紐",     genreId: "209214", keyword: "抱っこ紐 新生児" },
   { name: "ウェア",       genreId: "110464", keyword: "ベビー服 赤ちゃん" },
@@ -37,37 +39,101 @@ const CATEGORIES = [
 
 // カテゴリ別のキーワードフィルタ（本体のみ残す）
 const REQUIRED_KEYWORDS = {
-  "おむつ":       ["おむつ", "オムツ"],
+  "おむつ":       ["おむつ", "オムツ", "おしりふき"],
+  "ゴミ箱・袋":   ["ゴミ箱", "ごみ箱", "防臭袋", "防臭ポット", "おむつポット", "おむつゴミ箱", "サニタリー"],
   "ベビーカー":   ["ベビーカー", "バギー", "ストローラー"],
   "抱っこ紐":     ["抱っこ紐", "だっこひも", "スリング", "ヒップシート", "キャリア"],
-  "ウェア":       ["ロンパース", "カバーオール", "肌着", "コンビ"],
-  "ミルク・授乳": ["哺乳瓶", "搾乳", "授乳クッション", "母乳"],
-  "離乳食・食器": ["離乳食", "ベビーフード", "ベビーチェア"],
-  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー"],
-  "おもちゃ":     ["おもちゃ", "知育", "ガラガラ", "メリー"],
-  "安全グッズ":   ["ゲート", "コーナーガード", "ドアロック", "転倒防止"],
-  "お風呂用品":   ["沐浴", "ベビーバス", "体温計", "保湿"],
-  "トイレ用品":   ["おまる", "補助便座", "トイトレ"],
-  "車用品":       ["チャイルドシート"],
-  "マタニティ":   ["マタニティ", "妊娠", "授乳ブラ", "葉酸"],
-  "ギフトセット": ["ギフト", "出産祝い"],
+  "ウェア":       ["ロンパース", "カバーオール", "肌着"],
+  "ミルク・授乳": ["哺乳瓶", "搾乳", "授乳クッション", "母乳", "哺乳"],
+  "離乳食・食器": ["離乳食", "ベビーフード", "ベビーチェア", "ベビー食器"],
+  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー", "ベビー布団"],
+  "おもちゃ":     ["おもちゃ", "知育", "ガラガラ", "メリー", "プレイマット"],
+  "安全グッズ":   ["ゲート", "コーナーガード", "ドアロック", "転倒防止", "ベビーガード"],
+  "お風呂用品":   ["沐浴", "ベビーバス", "体温計", "保湿", "ベビーソープ"],
+  "トイレ用品":   ["おまる", "補助便座", "トイトレ", "おしりふき"],
+  "車用品":       ["チャイルドシート", "ジュニアシート"],
+  "マタニティ":   ["マタニティ", "妊娠", "授乳ブラ", "葉酸", "産前"],
+  "ギフトセット": ["ギフト", "出産祝い", "プレゼント"],
 };
 
-// 除外キーワード
+// 除外キーワード（全カテゴリ共通）
 const NG_KEYWORDS = [
   'ふるさと納税', 'ポイント消化', 'クーポン対象', 'お試しセット',
-  '訳あり', 'アウトレット', '中古', 'リユース', 'メール便のみ'
+  '訳あり', 'アウトレット', '中古', 'リユース', 'メール便のみ',
+  // ギフト専用商品（ホームのランキングには不要）
+  'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
 ];
 
-// 商品名クリーニング
+// カテゴリ別追加除外キーワード
+const CATEGORY_NG_KEYWORDS = {
+  "おむつ": [
+    "大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用",
+    "大人",
+    "ゴミ箱", "ごみ箱", "防臭袋", "防臭ポット", "おむつポット", "サニタリーボックス",
+    "ペット", "犬用", "猫用", "ペットシーツ", "ペットシート", "犬", "猫", "わんちゃん", "ねこ",
+    "トイレシーツ", "ペット用", "愛犬", "愛猫",
+    "犬猫", "わんにゃん", "ペットシーツ", "トイレシート", "ワンちゃん", "ネコちゃん",
+    "動物", "アニマル", "ペット対応",
+  ],
+};
+
+// Yahoo画像URLを標準サイズに正規化（/i/g/はショップ依存で低画質の場合あり）
+function upgradeYahooImage(url) {
+  if (!url) return url;
+  return url.replace(/\/i\/[ngs]\//, '/i/j/');
+}
+
+// 先頭ノイズトークンセット（スペース区切りで完全一致するもののみ除去）
+const LEADING_NOISE_SET = new Set([
+  'おもちゃ', '知育玩具', '知育', '玩具', '木のおもちゃ', '積み木',
+  'ベビー用品', 'ベビー', '赤ちゃん', '新生児', '乳幼児', 'キッズ',
+  '子ども', '子供', '幼児', '男の子', '女の子',
+  '誕生日', 'プレゼント', 'ギフト', '贈り物', '出産祝い', 'クリスマス', 'お祝い',
+  'ランキング', '人気', '売れ筋', 'おすすめ',
+  '一歳', '二歳', '三歳', '四歳', '五歳',
+]);
+const TRAILING_NOISE_SET = new Set([
+  '誕生日', 'プレゼント', 'ギフト', '贈り物', '出産祝い', 'クリスマス', 'お祝い',
+  '知育', 'ランキング', '人気', '売れ筋', 'おすすめ', '正規品', '公式', '新品',
+  '一歳', '二歳', '三歳', '四歳', '五歳',
+]);
+const AGE_TOKEN_RE = /^[0-9０-９一二三四五六七八九十]+[歳ヶ月]児?$/;
+
+// 商品名クリーニング（SEOキーワード羅列を除去してシンプルな商品名に）
 function cleanName(name) {
-  return name
+  let s = name
     .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
-    .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
-    .replace(/\s*(送料無料|あす楽|即納|限定|新品|正規品|公式|人気|売れ筋|ランキング1位).*$/g, '')
+    .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯！!✓]+/g, '')
+    .replace(/[\s　]*(送料無料|あす楽|即納|正規品|公式).*$/g, '')
     .replace(/[\s　]+/g, ' ')
-    .trim()
-    .slice(0, 80);
+    .trim();
+
+  const tokens = s.split(' ');
+
+  // 先頭のSEOノイズトークンを除去（最低1トークン残す）
+  let start = 0;
+  while (start < tokens.length - 1) {
+    const t = tokens[start];
+    if (LEADING_NOISE_SET.has(t) || AGE_TOKEN_RE.test(t)) start++;
+    else break;
+  }
+
+  // 末尾のSEOノイズトークンを除去（最低1トークン残す）
+  let end = tokens.length;
+  while (end > start + 1) {
+    const t = tokens[end - 1];
+    if (TRAILING_NOISE_SET.has(t) || AGE_TOKEN_RE.test(t)) end--;
+    else break;
+  }
+
+  s = tokens.slice(start, end).join(' ');
+
+  // 45文字でカット（単語の途中を避ける）
+  if (s.length > 45) {
+    s = s.slice(0, 45).replace(/\s+\S*$/, '').trim();
+  }
+
+  return s || name.slice(0, 30).trim();
 }
 
 // ブランド名推定
@@ -105,18 +171,36 @@ function extractSubCategory(category, itemName) {
       { match: /おしりふき/, sub: "おしりふき" },
     ],
     "ベビーカー": [
+      // 周辺グッズを先に判定（本体より優先）
+      { match: /レインカバー|雨カバー|防雨カバー/, sub: "周辺グッズ" },
+      { match: /ドリンクホルダー|カップホルダー|スマホホルダー|スマートフォンホルダー/, sub: "周辺グッズ" },
+      { match: /フットマフ|ハンドルカバー|バンパーバー|サンキャノピー|サンシェード/, sub: "周辺グッズ" },
+      { match: /フック|収納ポーチ|サイドバッグ|アームバー/, sub: "周辺グッズ" },
+      { match: /よだれカバー|防寒ケープ|ベビーカーシート|シートカバー/, sub: "周辺グッズ" },
       { match: /AB型|ＡＢ型/, sub: "AB型" },
       { match: /[AＡ]型/, sub: "A型" },
       { match: /[BＢ]型/, sub: "B型" },
       { match: /バギー/, sub: "バギー" },
     ],
     "抱っこ紐": [
+      // 周辺グッズを先に判定
+      { match: /よだれパッド|ケープ|抱っこ紐カバー|防寒カバー/, sub: "周辺グッズ" },
       { match: /スリング/, sub: "スリング" },
       { match: /ヒップシート/, sub: "ヒップシート" },
     ],
     "車用品": [
+      // 周辺グッズを先に判定（本体より優先）
+      { match: /シートプロテクター|座席保護|シート保護|保護シート|保護マット|チェアプロテクター/, sub: "周辺グッズ" },
+      { match: /シートカバー|チェアカバー|座席カバー/, sub: "周辺グッズ" },
+      { match: /ミラー|カーミラー|後部座席ミラー/, sub: "周辺グッズ" },
+      { match: /サンシェード|日よけ|UVカット|車用遮光|車用日除け/, sub: "周辺グッズ" },
+      { match: /シートベルトカバー|シートベルトパッド|ベルトパッド/, sub: "周辺グッズ" },
+      { match: /ネックピロー|ヘッドサポート|ヘッドレスト/, sub: "周辺グッズ" },
+      { match: /収納|ポーチ|トレイ|バック|オーガナイザー/, sub: "周辺グッズ" },
+      // 本体を判定
       { match: /ジュニアシート/, sub: "ジュニアシート" },
       { match: /新生児/, sub: "新生児用" },
+      { match: /2way|2ウェイ|二way|コンバーチブル/, sub: "2wayタイプ" },
     ]
   };
 
@@ -160,13 +244,64 @@ async function fetchRakutenRanking(genreId) {
   return fetchWithRetry(url);
 }
 
-// --- Yahoo API呼び出し（フォールバック用） ---
+// --- Yahoo商品データを正規化（共通化） ---
+function normalizeYahooItem(item, category) {
+  const rawName = item.name;
+  const name = cleanName(rawName);
+  const brand = extractBrand(rawName);
+  const subCategory = extractSubCategory(category, rawName);
+  const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
+  let rawUrl = item.url || '';
+  if (/yahoo\.co\.jp/.test(rawUrl)) {
+    const sep = rawUrl.includes('?') ? '&' : '?';
+    rawUrl = `${rawUrl}${sep}sc_e=afvc_shp_${VC_SID}`;
+  }
+  return {
+    name,
+    category,
+    sub_category: subCategory,
+    brand,
+    image_url: upgradeYahooImage(item.image?.large || item.image?.medium || ''),
+    rating: parseFloat(item.review?.rate) || 0,
+    reviews_count: parseInt(item.review?.count) || 0,
+    rakuten_item_code: `yahoo-${item.code}`,
+    is_market_wide: true,
+    unit_count: unitCount,
+    unit_name: unitCount ? '枚' : null,
+    last_synced_at: new Date().toISOString(),
+    _rakuten_shop: {
+      shop_name: item.seller?.name || 'Yahoo!ショッピング',
+      price: item.price,
+      url: rawUrl,
+      shipping: item.shipping?.code === 2 ? 0 : null,
+      points: 0,
+      rating: parseFloat(item.review?.rate) || 0,
+      reviews_count: parseInt(item.review?.count) || 0,
+    }
+  };
+}
+
+// --- Yahoo常時補完取得（楽天と並行して市場網羅を高める。1ページ50件） ---
+async function fetchYahooSupplement(keyword, category) {
+  if (!YAHOO_CLIENT_ID) return [];
+  try {
+    const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=50&sort=-review_count`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.hits || [])
+      .filter(item => !NG_KEYWORDS.some(kw => (item.name || '').includes(kw)))
+      .map(item => normalizeYahooItem(item, category));
+  } catch {
+    return [];
+  }
+}
+
+// --- Yahoo API呼び出し（楽天全滅時のフォールバック用、3ページ網羅） ---
 async function fetchYahooSearchFallback(keyword, category) {
   if (!YAHOO_CLIENT_ID) return [];
-  
   let allHits = [];
   try {
-    // 3ページ分（最大300件）取得して網羅性を極限まで高める
     for (let page = 1; page <= 3; page++) {
       const start = (page - 1) * 100;
       const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=100&start=${start}&sort=-review_count`;
@@ -177,44 +312,9 @@ async function fetchYahooSearchFallback(keyword, category) {
       }
       await new Promise(r => setTimeout(r, 300));
     }
-    
     return allHits
       .filter(item => !NG_KEYWORDS.some(kw => item.name.includes(kw)))
-      // あまりに厳しいフィルタは網羅性を損なうため削除
-      .map(item => {
-        const rawName = item.name;
-        const name = cleanName(rawName);
-        const brand = extractBrand(rawName);
-        const subCategory = extractSubCategory(category, rawName);
-        const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
-        let rawUrl = item.url || '';
-        if (/yahoo\.co\.jp/.test(rawUrl)) {
-          const sep = rawUrl.includes('?') ? '&' : '?';
-          rawUrl = `${rawUrl}${sep}sc_e=afvc_shp_${VC_SID}`;
-        }
-        
-        return {
-          name,
-          category,
-          sub_category: subCategory,
-          brand,
-          image_url: item.image?.large || item.image?.medium || '',
-          rating: parseFloat(item.review?.rate) || 0,
-          reviews_count: parseInt(item.review?.count) || 0,
-          rakuten_item_code: `yahoo-${item.code}`, 
-          is_market_wide: true,
-          unit_count: unitCount,
-          unit_name: unitCount ? '枚' : null,
-          last_synced_at: new Date().toISOString(),
-          _rakuten_shop: {
-            shop_name: item.seller?.name || 'Yahoo!ショッピング',
-            price: item.price,
-            url: rawUrl,
-            shipping: item.shipping?.code === 2 ? 0 : null,
-            points: 0,
-          }
-        };
-      });
+      .map(item => normalizeYahooItem(item, category));
   } catch {
     return [];
   }
@@ -238,7 +338,9 @@ async function fetchYahooPrice(keyword) {
         name: item.seller?.name || 'Yahoo!ショッピング',
         price: item.price,
         url: rawUrl,
-        source: 'yahoo'
+        source: 'yahoo',
+        rating: parseFloat(item.review?.rate) || 0,
+        reviews_count: parseInt(item.review?.count) || 0,
       };
     });
   } catch {
@@ -249,9 +351,11 @@ async function fetchYahooPrice(keyword) {
 // --- 楽天の検索結果を正規化 ---
 function normalizeRakutenItems(items, category) {
   const requiredKws = REQUIRED_KEYWORDS[category] || [];
+  const extraNG = CATEGORY_NG_KEYWORDS[category] || [];
 
   return items
     .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+    .filter(item => extraNG.length === 0 || !extraNG.some(kw => item.Item.itemName.includes(kw)))
     .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.Item.itemName.includes(kw)))
     .map((item, idx) => {
       const rawName = item.Item.itemName;
@@ -259,7 +363,8 @@ function normalizeRakutenItems(items, category) {
       const brand = extractBrand(rawName);
       const subCategory = extractSubCategory(category, rawName);
       const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
-      const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || '';
+      const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl
+        || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
 
       return {
         name,
@@ -281,46 +386,111 @@ function normalizeRakutenItems(items, category) {
           url: item.Item.affiliateUrl || item.Item.itemUrl,
           shipping: item.Item.postageFlag === 1 ? 0 : null,
           points: item.Item.pointRate || 0,
+          rating: parseFloat(item.Item.reviewAverage) || 0,
+          reviews_count: parseInt(item.Item.reviewCount) || 0,
         }
       };
     });
 }
 
-// --- 重複統合（同名商品をマージ）---
+// --- 重複統合（同名商品をマージ。各 _rakuten_shop を _all_sellers に集約）---
 function deduplicateProducts(products) {
   const map = new Map();
   for (const p of products) {
     const key = p.name.replace(/[\s　]/g, '').toLowerCase().slice(0, 30);
     if (!map.has(key)) {
-      map.set(key, p);
+      map.set(key, { ...p, _all_sellers: p._rakuten_shop ? [p._rakuten_shop] : [] });
     } else {
       const existing = map.get(key);
-      // レビュー数が多い方を優先
+      if (p._rakuten_shop) existing._all_sellers.push(p._rakuten_shop);
+      // レビュー数が多い方を代表として採用（sellers は引き継ぐ）
       if (p.reviews_count > existing.reviews_count) {
-        map.set(key, { ...p });
+        map.set(key, { ...p, _all_sellers: existing._all_sellers });
       }
     }
   }
   return Array.from(map.values());
 }
 
+// --- 複数 seller にロール（公式/最安値/高評価）を付与 ---
+function assignRoles(sellers) {
+  if (!sellers || sellers.length === 0) return [];
+  // 同一ショップ名は除去（同じ店が複数入るのを防ぐ）
+  const unique = [];
+  const seen = new Set();
+  for (const s of sellers) {
+    const key = (s.shop_name || s.name || '').trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push({ ...s, isOfficial: /公式|直営|メーカー/.test(key) });
+  }
+
+  const withPrice = unique.filter(s => (s.price || 0) > 0);
+  if (withPrice.length === 0) return unique;
+
+  // 最安値
+  const cheapest = withPrice.reduce((a, b) => (a.price <= b.price ? a : b));
+  cheapest.role = 'cheapest';
+
+  // 高評価（最安値と異なる + レビューあり、評価値→レビュー数 の順で比較）
+  const topRated = withPrice
+    .filter(s => s !== cheapest && (s.reviews_count || 0) > 0)
+    .sort((a, b) => {
+      if ((b.rating || 0) !== (a.rating || 0)) return (b.rating || 0) - (a.rating || 0);
+      return (b.reviews_count || 0) - (a.reviews_count || 0);
+    })[0];
+  if (topRated) topRated.role = 'top_rated';
+
+  // 公式（まだロールが付いてないもの優先）
+  const official = unique.find(s => s.isOfficial && !s.role)
+    || unique.find(s => s.isOfficial);
+  if (official && !official.role) official.role = 'official';
+
+  return unique;
+}
+
+// --- seller オブジェクトを sellers JSONB 用の形式に整形 ---
+function serializeSeller(s) {
+  return {
+    name: s.shop_name || s.name,
+    price: s.price,
+    url: s.url,
+    shipping: s.shipping ?? 0,
+    points: s.points ?? 0,
+    rating: s.rating || 0,
+    reviews_count: s.reviews_count || 0,
+    role: s.role || null,
+    isOfficial: !!s.isOfficial,
+  };
+}
+
+// --- 商品名キー化（重複判定用） ---
+function productNameKey(name) {
+  return (name || '').replace(/[\s　]/g, '').toLowerCase().slice(0, 30);
+}
+
 // --- メイン同期処理 ---
-async function syncCategory(cat, log) {
+async function syncCategory(cat, log, opts = {}) {
+  const {
+    limitCount = 30,
+    includeYahooSupplement = true,
+    includeYahooPrice = true,
+  } = opts;
+
   log.push(`📦 カテゴリ「${cat.name}」の同期開始...`);
 
   if (!RAKUTEN_APP_ID) {
     log.push(`  ⚠️ RAKUTEN_APP_IDが設定されていません`);
   }
 
-  let allItems = [];
+  let rakutenItems = [];
   let rakutenFailed = false;
 
   try {
     // 検索API（レビュー数順、2ページ分）
     const res1 = await fetchRakutenSearch(cat.keyword, cat.genreId, 1);
     const res2 = await fetchRakutenSearch(cat.keyword, cat.genreId, 2);
-    
-    allItems = [
+    rakutenItems = [
       ...normalizeRakutenItems(res1.Items || [], cat.name),
       ...normalizeRakutenItems(res2.Items || [], cat.name),
     ];
@@ -333,13 +503,28 @@ async function syncCategory(cat, log) {
   try {
     const rankingData = await fetchRakutenRanking(cat.genreId);
     const rankingItems = normalizeRakutenItems(rankingData.Items || [], cat.name);
-    allItems = [...allItems, ...rankingItems];
+    rakutenItems = [...rakutenItems, ...rankingItems];
   } catch (e) {
     log.push(`  ⚠️ 楽天ランキングAPI失敗: ${e.message}`);
     rakutenFailed = true;
   }
 
-  // 楽天が完全に失敗した場合はYahooから取得（フォールバック）
+  let allItems = [...rakutenItems];
+
+  // Yahoo常時補完（楽天と重複しない商品だけ追加。市場網羅を高める）
+  if (includeYahooSupplement && !rakutenFailed && rakutenItems.length > 0) {
+    try {
+      const yahooSupp = await fetchYahooSupplement(cat.keyword, cat.name);
+      const rakutenKeys = new Set(rakutenItems.map(p => productNameKey(p.name)));
+      const yahooUnique = yahooSupp.filter(p => !rakutenKeys.has(productNameKey(p.name)));
+      log.push(`  🛒 楽天 ${rakutenItems.length}件 + Yahoo独占 ${yahooUnique.length}件（${yahooSupp.length - yahooUnique.length}件は楽天と重複のため除外）`);
+      allItems = [...allItems, ...yahooUnique];
+    } catch (e) {
+      log.push(`  ⚠️ Yahoo補完取得失敗: ${e.message}`);
+    }
+  }
+
+  // 楽天が完全に失敗した場合はYahoo全件フォールバック
   if (allItems.length === 0 && rakutenFailed) {
     log.push(`  🔄 楽天API全滅のため、YahooショッピングAPIから代替取得を試みます...`);
     const yahooItems = await fetchYahooSearchFallback(cat.keyword, cat.name);
@@ -362,25 +547,32 @@ async function syncCategory(cat, log) {
 
   let savedCount = 0;
 
-  // ブロックリスト取得
-  const { data: blocklist } = await supabase.from('product_blocklist').select('item_code');
-  const blockedCodes = new Set((blocklist || []).map(b => b.item_code));
+  // ブロック済み商品を取得（is_blocked=true の rakuten_item_code と name）
+  const { data: blocklist } = await supabase
+    .from('products')
+    .select('rakuten_item_code, name')
+    .eq('is_blocked', true);
+  const blockedCodes = new Set((blocklist || []).map(b => b.rakuten_item_code).filter(Boolean));
+  // 同名商品が別ショップコードで再登録されるケースも弾く
+  const blockedNames = new Set((blocklist || []).map(b => productNameKey(b.name)).filter(Boolean));
 
-  // タイムアウト回避（手動実行時は10秒制限を考慮して控えめに、自動実行時は150件フルで処理）
-  const isManual = log.some(l => l.includes('🎯 フィルタ適用')); 
-  const limitCount = isManual ? 40 : 150;
   const productsToProcess = deduplicated.slice(0, limitCount);
-  log.push(`  ⏱ 市場網羅のため、上位 ${productsToProcess.length}件を処理します`);
+  log.push(`  ⏱ 上位 ${productsToProcess.length}件を保存します`);
 
   for (let i = 0; i < productsToProcess.length; i++) {
     const product = productsToProcess[i];
     product.popularity_rank = i + 1;
 
-    // ブロックリストチェック
+    // ブロックリストチェック（コードと名前の両方で判定）
     if (blockedCodes.has(product.rakuten_item_code)) continue;
+    if (blockedNames.has(productNameKey(product.name))) continue;
 
     const shopInfo = product._rakuten_shop;
+    const allRakutenSellers = product._all_sellers && product._all_sellers.length > 0
+      ? product._all_sellers
+      : (shopInfo ? [shopInfo] : []);
     delete product._rakuten_shop;
+    delete product._all_sellers;
 
     try {
       // 既存商品をrakuten_item_codeで検索
@@ -421,57 +613,57 @@ async function syncCategory(cat, log) {
         productId = inserted[0].id;
       }
 
-      // --- 楽天ショップ情報をshops_pricesに保存 ---
+      // --- 楽天ショップ情報をshops_pricesに保存（同一商品の複数seller を集約） ---
+      const rankedRakuten = assignRoles(allRakutenSellers);
+      const rakutenPrices = rankedRakuten.filter(s => (s.price || 0) > 0).map(s => s.price);
+      const rakutenLowest = rakutenPrices.length > 0 ? Math.min(...rakutenPrices) : (shopInfo?.price || 0);
+      const rakutenHasOfficial = rankedRakuten.some(s => s.isOfficial);
+
       await supabase
         .from('shops_prices')
         .upsert([{
           product_id: productId,
-          shop_name: shopInfo.shop_name,
-          shop_type: 'mall',
-          lowest_price: shopInfo.price,
+          shop_name: '楽天市場',
+          shop_type: rakutenHasOfficial ? 'official' : 'mall',
+          lowest_price: rakutenLowest,
           source: 'rakuten',
-          sellers: JSON.stringify([{
-            name: shopInfo.shop_name,
-            price: shopInfo.price,
-            shipping: shopInfo.shipping ?? 0,
-            points: shopInfo.points ?? 0,
-            url: shopInfo.url,
-            note: ''
-          }])
+          sellers: JSON.stringify(rankedRakuten.slice(0, 5).map(serializeSeller))
         }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
 
-      // --- Yahoo価格を取得（上位10件のみ詳細調査、それ以外はスキップして高速化） ---
-      if (i < 10) {
+      // --- Yahoo価格を取得（上位5件のみ詳細調査、複数 seller を集約） ---
+      if (includeYahooPrice && i < 5) {
         const searchKeyword = product.name.split(/[\s　]+/).slice(0, 3).join(' ');
         const yahooResults = await fetchYahooPrice(searchKeyword);
 
         if (yahooResults.length > 0) {
-          // 最安値のものを選択
-          const best = yahooResults.sort((a, b) => a.price - b.price)[0];
+          const yahooSellers = yahooResults.map(r => ({
+            shop_name: r.name || 'Yahoo!ショッピング',
+            price: r.price,
+            url: r.url,
+            shipping: 0,
+            points: 0,
+            rating: r.rating || 0,
+            reviews_count: r.reviews_count || 0,
+          }));
+          const rankedYahoo = assignRoles(yahooSellers);
+          const yahooPrices = rankedYahoo.filter(s => (s.price || 0) > 0).map(s => s.price);
+          const yahooLowest = yahooPrices.length > 0 ? Math.min(...yahooPrices) : 0;
+          const yahooHasOfficial = rankedYahoo.some(s => s.isOfficial);
+
           await supabase
             .from('shops_prices')
             .upsert([{
               product_id: productId,
-              shop_name: best.name || 'Yahoo!ショッピング',
-              shop_type: 'mall',
-              lowest_price: best.price,
+              shop_name: 'Yahoo!ショッピング',
+              shop_type: yahooHasOfficial ? 'official' : 'mall',
+              lowest_price: yahooLowest,
               source: 'yahoo',
-              sellers: JSON.stringify([{
-                name: best.name || 'Yahoo!ショッピング',
-                price: best.price,
-                shipping: 0,
-                points: 0,
-                url: best.url,
-                note: ''
-              }])
+              sellers: JSON.stringify(rankedYahoo.slice(0, 5).map(serializeSeller))
             }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
         }
       }
 
       savedCount++;
-
-      // APIレート制限対策: 1商品あたり少し待つ
-      if (i % 5 === 4) await new Promise(r => setTimeout(r, 500));
 
     } catch (e) {
       log.push(`  ⚠️ ${product.name.slice(0, 20)}... エラー: ${e.message}`);
@@ -503,24 +695,50 @@ export default async function handler(req, res) {
 
   let targetCategories = CATEGORIES;
   const filterCat = req.query.category;
+  const batch = req.query.batch; // '1' or '2'
+
   if (filterCat) {
     targetCategories = CATEGORIES.filter(c => c.name === filterCat);
     if (targetCategories.length === 0) {
       return res.status(400).json({ error: `Category "${filterCat}" not found` });
     }
     log.push(`🎯 フィルタ適用: カテゴリ「${filterCat}」のみ同期します`);
+  } else if (batch === '1') {
+    // 前半7カテゴリ（60秒制限内に確実に収めるため2分割）
+    targetCategories = CATEGORIES.slice(0, 7);
+    log.push(`📦 バッチ1: ${targetCategories.map(c => c.name).join('、')}`);
+  } else if (batch === '2') {
+    targetCategories = CATEGORIES.slice(7);
+    log.push(`📦 バッチ2: ${targetCategories.map(c => c.name).join('、')}`);
   }
 
-  for (const cat of targetCategories) {
-    try {
-      const count = await syncCategory(cat, log);
-      totalSaved += count;
-    } catch (e) {
-      log.push(`❌ カテゴリ「${cat.name}」で致命的エラー: ${e.message}`);
+  // カテゴリ指定あり = 単発テスト用（軽量処理）、それ以外 = 通常同期（フル処理）
+  const isSingleCategory = !!filterCat;
+  const opts = isSingleCategory
+    ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false }
+    : { limitCount: 25, includeYahooSupplement: true, includeYahooPrice: false };
+
+  // カテゴリを並列処理（合計時間を大幅短縮）
+  const results = await Promise.allSettled(
+    targetCategories.map(cat => syncCategory(cat, log, opts))
+  );
+  results.forEach((r, idx) => {
+    if (r.status === 'fulfilled') {
+      totalSaved += r.value || 0;
+    } else {
+      log.push(`❌ カテゴリ「${targetCategories[idx].name}」で致命的エラー: ${r.reason?.message || r.reason}`);
     }
-  }
+  });
 
   log.push(`\n🎉 同期完了: 合計 ${totalSaved}件保存`);
+
+  // 価格アラートのトリガー判定 + Push通知送信
+  try {
+    const notifyResult = await checkAndNotifyPriceAlerts();
+    log.push(`🔔 アラート確認: ${notifyResult.checked}件中 ${notifyResult.triggered}件トリガー、${notifyResult.pushed}件にプッシュ送信`);
+  } catch (e) {
+    log.push(`⚠️ アラート確認失敗: ${e.message}`);
+  }
 
   return res.status(200).json({
     success: true,
@@ -528,4 +746,69 @@ export default async function handler(req, res) {
     log,
     timestamp: new Date().toISOString()
   });
+}
+
+// --- 価格アラートをチェックし、トリガーしたらPush通知を送る ---
+async function checkAndNotifyPriceAlerts() {
+  let checked = 0, triggered = 0, pushed = 0;
+
+  const { data: alerts } = await supabase
+    .from('price_alerts')
+    .select('*')
+    .is('triggered_at', null);
+  if (!alerts || alerts.length === 0) return { checked: 0, triggered: 0, pushed: 0 };
+
+  checked = alerts.length;
+
+  for (const alert of alerts) {
+    // product_code から products.id を解決
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(alert.product_code);
+    const { data: product } = isUuid
+      ? await supabase.from('products').select('id').eq('id', alert.product_code).maybeSingle()
+      : await supabase.from('products').select('id').eq('rakuten_item_code', alert.product_code).maybeSingle();
+    if (!product) continue;
+
+    // 最安値を取得
+    const { data: prices } = await supabase
+      .from('shops_prices')
+      .select('lowest_price')
+      .eq('product_id', product.id);
+    if (!prices || prices.length === 0) continue;
+    const minPrice = Math.min(...prices.map(p => p.lowest_price).filter(p => p > 0));
+    if (!isFinite(minPrice)) continue;
+    if (minPrice > alert.target_price) continue;
+
+    // トリガー！
+    triggered++;
+    await supabase.from('price_alerts')
+      .update({ triggered_at: new Date().toISOString(), current_price: minPrice })
+      .eq('id', alert.id);
+
+    // Push通知送信
+    if (!isPushConfigured()) continue;
+    const { data: subs } = await supabase
+      .from('push_subscriptions')
+      .select('*')
+      .eq('user_id', alert.user_id);
+    if (!subs) continue;
+
+    for (const sub of subs) {
+      const result = await sendPushNotification(sub, {
+        title: '値下がりしました！',
+        body: `${alert.product_name} が ¥${minPrice.toLocaleString()} に（目標 ¥${alert.target_price.toLocaleString()}）`,
+        icon: alert.image_url || '/favicon.png',
+        image: alert.image_url,
+        url: alert.affiliate_url || '/',
+        tag: `price-alert-${alert.id}`,
+      });
+      if (result.ok) {
+        pushed++;
+      } else if (result.statusCode === 410 || result.statusCode === 404) {
+        // 期限切れ購読は削除
+        await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+      }
+    }
+  }
+
+  return { checked, triggered, pushed };
 }

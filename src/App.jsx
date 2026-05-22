@@ -9,7 +9,7 @@ import {
   Package, Layers, ChevronDown, ChevronUp, Calculator,
   Store, Gift, ChevronLeft, ShieldCheck, Baby, BellRing, Edit3,
   FileText, Shield, Info, Edit2, Camera, Mail,
-  LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind
+  LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2
 } from 'lucide-react';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
@@ -29,6 +29,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
     case 'トイレ用品': return <Wind className={className} />;
     case '車用品': return <Car className={className} />;
     case 'マタニティ': return <Leaf className={className} />;
+    case 'ゴミ箱・袋': return <Trash2 className={className} />;
     case 'ギフトセット': return <Gift className={className} />;
     default: return <Package className={className} />;
   }
@@ -50,6 +51,7 @@ const CATEGORY_TREE = [
       { name: "おしりふき" },
     ]
   },
+  { name: "ゴミ箱・袋", id: "101070", keyword: "おむつ ゴミ箱 防臭", subs: ["おむつポット", "防臭袋", "サニタリーボックス"] },
   { name: "ベビーカー", id: "200833", keyword: "ベビーカー", subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
   { name: "抱っこ紐", id: "412209", keyword: "抱っこ紐", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
   { name: "ウェア", id: "111102", keyword: "ベビー服", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
@@ -67,6 +69,25 @@ const CATEGORY_TREE = [
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
 
+// 月齢→おすすめカテゴリのマッピング
+const AGE_CATEGORY_MAP = [
+  { minM: 0,   maxM: 2,   label: '新生児期',       cats: ['おむつ', 'ミルク・授乳', '寝具・ベッド', '抱っこ紐'] },
+  { minM: 2,   maxM: 6,   label: '首すわり前後',   cats: ['おむつ', 'ベビーカー', '抱っこ紐', 'おもちゃ'] },
+  { minM: 5,   maxM: 9,   label: '離乳食スタート', cats: ['離乳食・食器', 'おもちゃ', 'お風呂用品', 'ベビーカー'] },
+  { minM: 8,   maxM: 14,  label: 'ハイハイ・たっち', cats: ['安全グッズ', 'おもちゃ', '離乳食・食器', 'ウェア'] },
+  { minM: 12,  maxM: 24,  label: 'よちよち歩き',   cats: ['ウェア', 'おもちゃ', 'トイレ用品', '安全グッズ'] },
+  { minM: 24,  maxM: 999, label: '2歳〜',          cats: ['ウェア', 'トイレ用品', '車用品', 'おもちゃ'] },
+];
+
+// 月齢→おむつサイズのマッピング（体重個人差あり、目安として利用）
+const DIAPER_SIZE_BY_AGE = [
+  { maxM: 1,   size: '新生児', sub: 'テープタイプ', label: '新生児サイズ' },
+  { maxM: 5,   size: 'S',      sub: 'テープタイプ', label: 'Sサイズ' },
+  { maxM: 13,  size: 'M',      sub: null,           label: 'Mサイズ' },
+  { maxM: 25,  size: 'L',      sub: null,           label: 'Lサイズ' },
+  { maxM: 999, size: 'BIG',    sub: null,           label: 'BIGサイズ' },
+];
+
 const LEGAL_PAGES = {
   terms: {
     title: "利用規約",
@@ -74,11 +95,15 @@ const LEGAL_PAGES = {
   },
   privacy: {
     title: "プライバシーポリシー",
-    content: "運営者は、本サービスの提供にあたり、ユーザーの個人情報を適切に取り扱います。本サービスでは、アクセス解析（Google Analytics等）や広告配信のためにCookieを使用しています。取得した情報は、サービスの品質向上や適切な情報提供の目的でのみ使用され、法令に基づく場合を除き、第三者に提供することはありません。"
+    content: "■ 収集する情報\n本サービスでは、以下の情報を収集・利用します。\n\n【Googleアカウント情報】\nGoogleログインを利用された場合、メールアドレス・表示名・アイコン画像を取得します。これらはお気に入り管理・価格アラート・お問い合わせ対応のために利用します。\n\n【端末内に保存する情報（localStorage）】\n・お気に入り商品リスト\n・閲覧履歴\n・赤ちゃんの月齢・名前・性別（任意入力）\n・保存した検索条件\n・価格アラート設定\nこれらはお客様の端末内にのみ保存され、ログイン時にサーバーと同期されます。\n\n■ アクセス解析・Cookie\n本サービスはGoogle Analytics 4を使用しており、アクセス状況の把握のためにCookieを利用しています。取得データはGoogleのプライバシーポリシーに従って管理されます。Cookieの使用を希望されない場合は、ブラウザの設定から無効にすることができます。\n\n■ アフィリエイト\n本サービスはAmazon、楽天、Yahoo!ショッピング等のアフィリエイトプログラムに参加しており、バリューコマース等のASPを通じてトラッキングCookieを使用する場合があります。\n\n■ 第三者提供\n取得した情報は、法令に基づく場合を除き、第三者に提供することはありません。\n\n■ お問い合わせ\n個人情報の開示・訂正・削除のご請求は、アプリ内のお問い合わせフォームよりご連絡ください。"
   },
   disclaimer: {
     title: "運営者情報・免責事項",
     content: "【運営について】本サイトは、Amazon.co.jpを宣伝しリンクすることによってサイトが紹介料を獲得できる手段を提供することを目的に設定されたアフィリエイトプログラムである、Amazonアソシエイト・プログラムの参加者です。\n\nまた、楽天、Yahoo!ショッピング、バリューコマース、A8.net、もしもアフィリエイト、アクセストレード等の各プログラムにも参加しており、これらを通じて適格販売により紹介料を得ています。\n\n【免責事項】当サイトのコンテンツや情報につきまして、可能な限り正確な情報を掲載するよう努めておりますが、必ずしも正確性・信頼性を保証するものではありません。価格や在庫状況等は常に変動画するため、購入時は必ずリンク先のショップにて最新の情報をご確認ください。"
+  },
+  tokushoho: {
+    title: "特定商取引法に基づく表記",
+    content: "■ 販売業者\n個人運営者（請求があった場合、遅滞なく開示いたします）\n\n■ 所在地\n請求があった場合、遅滞なく開示いたします\n\n■ 連絡先\nお問い合わせはアプリ内のお問い合わせフォームよりご連絡ください\n\n■ サービスの内容\nベビー用品の価格比較・口コミ情報の提供（無料）\n\n■ 販売価格\n本サービスは無料でご利用いただけます。各商品の購入はリンク先の各ショップにて行われ、価格はリンク先のショップが定める価格となります。\n\n■ 商品代金以外の必要料金\nなし（本サービスの利用料は無料です）\n\n■ 支払方法・支払時期\n本サービス自体の料金は発生しません。商品のご購入はリンク先ショップの規定に従います。\n\n■ 商品の引き渡し時期\n本サービスは情報提供サービスです。商品の配送はリンク先ショップが行います。\n\n■ 返品・キャンセルについて\n本サービスは情報提供のみを行っており、商品の販売は行っておりません。商品の返品・キャンセルはご購入先のショップの規定に従ってください。\n\n■ アフィリエイトについて\n本サービスはAmazon.co.jpアソシエイト・プログラム、楽天アフィリエイト、Yahoo!ショッピングアフィリエイト、バリューコマース等のアフィリエイトプログラムに参加しており、リンク経由でご購入いただいた場合に紹介料を受け取ることがあります。"
   }
 };
 
@@ -111,20 +136,49 @@ const filterAccessories = (items, getNameFn = (p) => p.name || p.itemName || '')
   items.filter(item => !ACCESSORY_EXCLUDE_WORDS.some(w => getNameFn(item).includes(w)));
 
 // 商品名クリーニング: プロモ・ランキング表記・記号・括弧を除去
-const cleanName = (name) => (name || '')
-  .replace(/^[<＜〈]?\s*\d{1,2}[\/／]\d{1,2}\s*[〜～\-―]\s*\d{1,2}[\/／]\d{1,2}[^\s]*\s*[\/／]?\s*/g, '')
-  .replace(/^[\(（]?\s*(ポイント\d+倍|\d+倍ポイント)\s*[\/／\)）]?\s*/g, '')
-  .replace(/^[★☆◆■●▲]*\s*(当選確実|エントリー|抽選|抽選で)\s*[★☆◆■●▲]*\s*/g, '')
-  .replace(/^[\\\/][^\\\/]{1,60}[\\\/]\s*/g, '')
-  .replace(/^(楽天|第)\s*[0-9０-９]+\s*位(受賞)?\s*/g, '')
-  .replace(/^[0-9０-９]+位(受賞)?\s*/g, '')
-  .replace(/^\s*\d+%OFF[^\s\/]*\s*[\/／]\s*/g, '')
-  .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
-  .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯]+/g, '')
-  .replace(/\s*(送料無料|あす楽|即納|新品未開封|正規品|公式正規品|売れ筋ランキング|ランキング1位)\s*.*$/, '')
-  .replace(/[\s　]+/g, ' ')
-  .trim()
-  .slice(0, 60);
+const CLEAN_LEADING = new Set([
+  'おもちゃ', '知育玩具', '知育', '玩具', '木のおもちゃ', '積み木',
+  'ベビー用品', 'ベビー', '赤ちゃん', '新生児', '乳幼児', 'キッズ',
+  '子ども', '子供', '幼児', '男の子', '女の子',
+  '誕生日', 'プレゼント', 'ギフト', '贈り物', '出産祝い', 'クリスマス', 'お祝い',
+  'ランキング', '人気', '売れ筋', 'おすすめ',
+  '一歳', '二歳', '三歳', '四歳', '五歳',
+]);
+const CLEAN_TRAILING = new Set([
+  '誕生日', 'プレゼント', 'ギフト', '贈り物', '出産祝い', 'クリスマス', 'お祝い',
+  '知育', 'ランキング', '人気', '売れ筋', 'おすすめ', '正規品', '公式', '新品',
+  '一歳', '二歳', '三歳', '四歳', '五歳',
+]);
+const CLEAN_AGE_RE = /^[0-9０-９一二三四五六七八九十]+[歳ヶ月]児?$/;
+
+const cleanName = (name) => {
+  if (!name) return '';
+  let s = name
+    .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
+    .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯！!✓]+/g, '')
+    .replace(/^(楽天|第)?\s*[0-9０-９]+\s*位(受賞)?\s*/g, '')
+    .replace(/[\s　]*(送料無料|あす楽|即納|正規品|公式).*$/g, '')
+    .replace(/[\s　]+/g, ' ')
+    .trim();
+
+  const tokens = s.split(' ');
+  let start = 0;
+  while (start < tokens.length - 1) {
+    const t = tokens[start];
+    if (CLEAN_LEADING.has(t) || CLEAN_AGE_RE.test(t)) start++;
+    else break;
+  }
+  let end = tokens.length;
+  while (end > start + 1) {
+    const t = tokens[end - 1];
+    if (CLEAN_TRAILING.has(t) || CLEAN_AGE_RE.test(t)) end--;
+    else break;
+  }
+  s = tokens.slice(start, end).join(' ');
+
+  if (s.length > 45) s = s.slice(0, 45).replace(/\s+\S*$/, '').trim();
+  return s || name.slice(0, 30).trim();
+};
 
 // 商品の品質バリデーション
 const validateProduct = (p) => {
@@ -148,6 +202,42 @@ const OFFICIAL_SHOP_RULES = [
   { match: /(公式|official)(ショップ|ストア|店)?/i, brand: null },
 ];
 
+// ベビー専門小売店 公式EC（ASP提携後は affiliateParam を設定）
+const OFFICIAL_RETAILERS = [
+  {
+    name: 'アカチャンホンポ',
+    shortName: 'アカチャン',
+    searchUrl: (kw) => `https://shop.akachan.jp/shop/search/?keyword=${encodeURIComponent(kw)}`,
+    affiliateParam: '',  // バリューコマース提携後に追加
+    color: '#E85298',
+    domain: 'shop.akachan.jp',
+  },
+  {
+    name: '西松屋',
+    shortName: '西松屋',
+    searchUrl: (kw) => `https://www.24028-net.jp/search?keyword=${encodeURIComponent(kw)}`,
+    affiliateParam: '',
+    color: '#00965E',
+    domain: '24028-net.jp',
+  },
+  {
+    name: 'トイザらス・ベビーザらス',
+    shortName: 'ベビザらス',
+    searchUrl: (kw) => `https://www.toysrus.co.jp/search/?q=${encodeURIComponent(kw)}`,
+    affiliateParam: '',  // LinkShare / A8 提携後に追加
+    color: '#E31837',
+    domain: 'toysrus.co.jp',
+  },
+  {
+    name: 'ミキハウス',
+    shortName: 'ミキハウス',
+    searchUrl: (kw) => `https://www.mikihouse.co.jp/search?type=product&q=${encodeURIComponent(kw)}`,
+    affiliateParam: '',  // LinkShare 提携後に追加
+    color: '#2356A5',
+    domain: 'mikihouse.co.jp',
+  },
+];
+
 const detectOfficialShop = (shop) => {
   const target = `${shop?.name || ''} ${shop?.url || ''}`;
   for (const rule of OFFICIAL_SHOP_RULES) {
@@ -156,13 +246,179 @@ const detectOfficialShop = (shop) => {
   return { isOfficial: false, brand: null };
 };
 
+const normalizeShop = (shop) => {
+  if (!shop) return { name: 'ショップ', type: 'mall', lowestPrice: 0, sellers: [] };
+  const name = shop.name || shop.shop_name || 'ショップ';
+  const lowestPrice = Number(shop.lowestPrice || shop.lowest_price || shop.price || 0);
+  const { isOfficial, brand } = detectOfficialShop({ name, url: shop.url });
+  const type = isOfficial ? 'official' : (shop.type || shop.shop_type || 'mall');
+  let rawSellers = shop.sellers;
+  if (typeof rawSellers === 'string') {
+    try { rawSellers = JSON.parse(rawSellers); } catch { rawSellers = []; }
+  }
+  const sellers = Array.isArray(rawSellers) && rawSellers.length > 0
+    ? rawSellers.filter(s => s.url && s.url !== '#')
+    : (shop.url && shop.url !== '#' ? [{ name, price: lowestPrice, shipping: shop.shipping ?? 0, points: shop.points ?? 0, url: shop.url, note: shop.note || '' }] : []);
+  return { ...shop, name, type, lowestPrice, sellers, brandName: brand };
+};
+
+const normalizeShops = (shops) => {
+  if (!shops || shops.length === 0) return [];
+  return shops.map(normalizeShop);
+};
+
+const getLowestPrice = (shops) => {
+  if (!shops || shops.length === 0) return 0;
+  const normalized = normalizeShops(shops);
+  const prices = normalized.map(s => s.lowestPrice).filter(p => p > 0 && isFinite(p));
+  return prices.length > 0 ? Math.min(...prices) : 0;
+};
+
+// Yahoo!ショッピング BONUS+優良ストア日（不定期のため毎月更新）
+const YAHOO_BONUS_PLUS_DATES = [
+  '2026-05-07',
+  '2026-05-09',
+  '2026-05-13',
+  '2026-05-27',
+  '2026-05-28',
+];
+
+const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const getYahooSaleEvents = (fromDate, count = 5) => {
+  const today = toYMD(fromDate);
+  const results = [];
+  const seen = new Set();
+
+  for (let i = 0; i < 90 && results.length < count; i++) {
+    const d = new Date(fromDate);
+    d.setDate(fromDate.getDate() + i);
+    const ymd = toYMD(d);
+    const day = d.getDate();
+    const dow = d.getDay(); // 0=Sun
+
+    const events = [];
+    if (day === 1) events.push({ name: 'ファーストデイ', bonus: '+4%', color: 'orange' });
+    if (day === 5 || day === 15 || day === 25) events.push({ name: '5のつく日', bonus: '+4%', color: 'orange' });
+    if (day === 11 || day === 22) events.push({ name: 'ヤフショ感謝デー', bonus: '+4%', color: 'orange' });
+    if (dow === 0) events.push({ name: 'プレミアムな日曜日', bonus: '+5%', color: 'yellow' });
+    if (YAHOO_BONUS_PLUS_DATES.includes(ymd)) events.push({ name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' });
+
+    events.forEach(ev => {
+      const key = `${ymd}-${ev.name}`;
+      if (!seen.has(key) && results.length < count) {
+        seen.add(key);
+        results.push({ ...ev, date: ymd, isToday: ymd === today, dateObj: d });
+      }
+    });
+  }
+
+  return results;
+};
+
+const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock }) => (
+  <div
+    className="bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full relative active:scale-95 transition-all cursor-pointer border border-[#F4EFEB]"
+    onClick={(e) => {
+      if (e.target.closest('[data-no-open]')) return;
+      onOpen(product);
+    }}
+  >
+    <div className="relative aspect-square bg-[#F9F6F3] p-4">
+      <img
+        src={getHighResImage(product.image)}
+        onError={(e) => { e.target.onerror = null; e.target.src = product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }}
+        className="w-full h-full object-cover rounded-[1.5rem]"
+        alt={product.name}
+      />
+      <button
+        onClick={(e) => onToggleFavorite(e, product)}
+        className="absolute top-6 right-6 bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-sm z-10 hover:bg-rose-50 transition-colors"
+      >
+        <Heart className={`w-4 h-4 ${favoriteIds.has(product.id) ? 'text-rose-400 fill-current' : 'text-[#D4CDC7]'}`} />
+      </button>
+      {isAdminMode && (
+        <button
+          data-no-open
+          onPointerDown={(e) => { e.stopPropagation(); }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onBlock(product); }}
+          title="この商品を非表示にする"
+          style={{ touchAction: 'manipulation' }}
+          className="absolute top-2 left-2 bg-red-500 text-white w-14 h-14 rounded-full text-2xl font-black shadow-2xl z-[999] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-4 border-white pointer-events-auto"
+        >×</button>
+      )}
+      <div className="pointer-events-none">
+        {localRank && (
+          <div className="absolute top-6 left-6 bg-[#F9DC5C] text-[#5A4C4C] w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-md border-2 border-white">
+            {localRank}
+          </div>
+        )}
+        {product.isBestSeller && (
+          <div className="absolute top-6 left-6 bg-[#F2ABAC] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
+            <Award className="w-3.5 h-3.5" />
+            <span>BEST SELLER</span>
+          </div>
+        )}
+        {!product.isBestSeller && product.isTopRated && (
+          <div className="absolute top-6 left-6 bg-[#7B8E76] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>TOP RATED</span>
+          </div>
+        )}
+      </div>
+      <div className={`absolute bottom-6 left-6 px-2.5 py-1 rounded-full text-[9px] font-bold tracking-wider ${product.subCategory === '周辺グッズ' ? 'bg-[#FFE8D6] text-[#A67B5B]' : 'bg-[#7B8E76] text-white'}`}>
+        {product.subCategory}
+      </div>
+    </div>
+    <div className="p-4 flex flex-col flex-1">
+      <div className="flex items-center gap-1 mb-2">
+        <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest">{product.category}</span>
+        <div className="flex items-center gap-1 ml-auto bg-[#FFF9E6] px-2 py-0.5 rounded-full text-[#D4AF37]">
+          <Star className="w-3 h-3 fill-current" />
+          <span className="text-[10px] font-black">{Number(product.rating).toFixed(2)}</span>
+        </div>
+      </div>
+      <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{product.name}</h3>
+
+      <div className="mt-auto">
+        {(product.shops?.length || 0) >= 2 && (
+          <p className="text-[9px] text-[#7B8E76] font-black mb-1 uppercase tracking-wider">
+            {product.shops.length}店舗で比較
+          </p>
+        )}
+        {product.unitCount && (
+          <p className="text-[10px] text-[#A5A19E] font-bold mb-1">
+            1{product.unitName}あたり <span className="text-[#F2ABAC]">¥{Math.ceil(getLowestPrice(product.shops) / product.unitCount)}</span>
+          </p>
+        )}
+        <p className="text-xl font-black text-[#7B8E76] leading-none">
+          <span className="text-xs mr-0.5">¥</span>
+          {getLowestPrice(product.shops) > 0 ? getLowestPrice(product.shops).toLocaleString() : "---"}
+          <span className="text-[10px] text-[#A5A19E] ml-1 font-normal">{getLowestPrice(product.shops) > 0 ? "〜" : ""}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
 // ValueCommerce MyLink: 対象ドメインのURLをアフィリエイトURLにラップ
 const VC_SID = import.meta.env.VITE_VC_SID || '3768537';
 const VC_DOMAIN_PIDS = {
   'dadway-onlineshop.com': import.meta.env.VITE_VC_PID_DADWAY || '892608374',
   'ergobaby.jp': import.meta.env.VITE_VC_PID_ERGOBABY || '892609670',
+  'shopping.yahoo.co.jp': import.meta.env.VITE_VC_PID_YAHOO || '892613329',
 };
 const AMAZON_TAG = import.meta.env.VITE_AMAZON_TAG || 'honestbaby-22';
+
+// VAPID公開鍵をUint8Arrayに変換（Web Push API用）
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const output = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) output[i] = rawData.charCodeAt(i);
+  return output;
+}
 
 const toVCUrl = (url) => {
   if (!url || url === '#') return url;
@@ -180,13 +436,13 @@ const toVCUrl = (url) => {
 const getHighResImage = (url) => {
   if (!url) return "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby";
   try {
-    // 楽天
+    // 楽天: ?_ex=NxN を 1000x1000 に上書き（元のサイズより大きくする）
     if (url.indexOf('rakuten.co.jp') !== -1) {
       return url.split('?_ex=')[0] + '?_ex=1000x1000';
     }
-    // Yahoo
-    if (url.indexOf('shopping.yahoo.co.jp') !== -1) {
-      return url.replace('/medium/', '/large/').replace('_m.jpg', '_l.jpg');
+    // Yahoo yimg.jp: /i/n/ /i/g/ /i/s/ → /i/j/ (標準サイズ。/i/g/はショップ依存で低画質の場合あり)
+    if (url.indexOf('yimg.jp') !== -1) {
+      return url.replace(/\/i\/[ngs]\//, '/i/j/');
     }
     return url;
   } catch (e) {
@@ -253,6 +509,13 @@ const App = () => {
 
   // ブロックリスト（非表示商品）
   const [blocklist, setBlocklist] = useState(new Set());
+  // 直前の削除操作（アンドゥ用）
+  const [lastBlocked, setLastBlocked] = useState(null);  // { product, timer }
+  const [showUndoToast, setShowUndoToast] = useState(false);
+  // ブロック済み商品リストモーダル
+  const [showBlockedList, setShowBlockedList] = useState(false);
+  const [blockedProducts, setBlockedProducts] = useState([]);
+  const [isLoadingBlocked, setIsLoadingBlocked] = useState(false);
 
   // User Data States
   const [favorites, setFavorites] = useState(() => {
@@ -310,6 +573,156 @@ const App = () => {
     } catch { }
   };
 
+  // --- 価格アラート: DBとのsync ---
+  const syncPriceAlertsWithDB = async (userId) => {
+    try {
+      const { data: dbAlerts } = await supabase
+        .from('price_alerts')
+        .select('*')
+        .eq('user_id', userId);
+      if (!dbAlerts) return;
+
+      // localStorageのアラートをDBに保存（未登録のもの）
+      const localAlerts = JSON.parse(localStorage.getItem('honestBabyPriceAlerts') || '[]');
+      const dbCodes = new Set(dbAlerts.map(a => a.product_code));
+      for (const la of localAlerts) {
+        if (!dbCodes.has(String(la.id))) {
+          await supabase.from('price_alerts').insert({
+            user_id: userId,
+            product_code: String(la.id),
+            product_name: la.name,
+            image_url: la.image || null,
+            target_price: la.targetPrice,
+            current_price: la.price || null,
+            affiliate_url: la.url || null,
+          });
+        }
+      }
+
+      // DBのアラートをstateに反映
+      const merged = dbAlerts.map(a => ({
+        id: a.product_code,
+        dbId: a.id,
+        name: a.product_name,
+        image: a.image_url,
+        price: a.current_price,
+        targetPrice: a.target_price,
+        url: a.affiliate_url,
+        addedAt: a.created_at,
+        triggered: !!a.triggered_at,
+      }));
+      setPriceAlerts(merged);
+
+      // トリガー済みアラートを通知
+      const triggered = merged.filter(a => a.triggered);
+      if (triggered.length > 0) setTriggeredAlerts(triggered);
+    } catch { }
+  };
+
+  // --- 赤ちゃん情報: DBとのsync ---
+  const syncBabyProfileWithDB = async (userId) => {
+    try {
+      const { data: dbProfile } = await supabase
+        .from('baby_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (dbProfile) {
+        // DBにあれば localStorage を上書き
+        setBabyInfo({
+          name: dbProfile.name || '',
+          birthYear: dbProfile.birth_year,
+          birthMonth: dbProfile.birth_month,
+          gender: dbProfile.gender || '',
+        });
+      } else {
+        // DBに無い & localStorageにあれば DB へ push
+        const local = JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null');
+        if (local && local.birthYear) {
+          await supabase.from('baby_profiles').upsert({
+            user_id: userId,
+            name: local.name || null,
+            birth_year: local.birthYear,
+            birth_month: local.birthMonth,
+            gender: local.gender || null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id' });
+        }
+      }
+    } catch { }
+  };
+
+  const saveBabyProfileToDB = async (userId, info) => {
+    try {
+      await supabase.from('baby_profiles').upsert({
+        user_id: userId,
+        name: info.name || null,
+        birth_year: info.birthYear,
+        birth_month: info.birthMonth,
+        gender: info.gender || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+    } catch { }
+  };
+
+  const savePriceAlertToDB = async (userId, alert) => {
+    try {
+      await supabase.from('price_alerts').upsert({
+        user_id: userId,
+        product_code: String(alert.id),
+        product_name: alert.name,
+        image_url: alert.image || null,
+        target_price: alert.targetPrice,
+        current_price: alert.price || null,
+        affiliate_url: alert.url || null,
+      }, { onConflict: 'user_id,product_code' });
+    } catch { }
+  };
+
+  // --- Web Push 通知購読 ---
+  const subscribeToPushNotifications = async (userId) => {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) return false;
+
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return false;
+
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        });
+      }
+
+      const subJson = subscription.toJSON();
+      await supabase.from('push_subscriptions').upsert({
+        user_id: userId,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys.p256dh,
+        auth: subJson.keys.auth,
+        user_agent: navigator.userAgent,
+      }, { onConflict: 'endpoint' });
+      return true;
+    } catch (e) {
+      console.warn('Push subscription failed:', e);
+      return false;
+    }
+  };
+
+  const deletePriceAlertFromDB = async (userId, productCode) => {
+    try {
+      await supabase.from('price_alerts')
+        .delete()
+        .eq('user_id', userId)
+        .eq('product_code', String(productCode));
+    } catch { }
+  };
+
   // --- 検索キャッシュ（localStorage → カテゴリ別）---
   const [cachedProducts, setCachedProducts] = useState(() => {
     const cache = {};
@@ -336,6 +749,18 @@ const App = () => {
   const [babyInfo, setBabyInfo] = useState(() => {
     try { return JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null'); } catch { return null; }
   });
+
+  // 月齢・年齢計算（全画面・AI から参照できるようトップレベルで計算）
+  const _now = new Date();
+  const babyAgeMonths = babyInfo
+    ? ((_now.getFullYear() - babyInfo.birthYear) * 12 + (_now.getMonth() + 1 - babyInfo.birthMonth))
+    : null;
+  const babyAgeLabel = babyAgeMonths != null
+    ? babyAgeMonths < 12
+      ? `${babyAgeMonths}ヶ月`
+      : `${Math.floor(babyAgeMonths / 12)}歳${babyAgeMonths % 12 ? `${babyAgeMonths % 12}ヶ月` : ''}`
+    : null;
+
   const [recentlyViewed, setRecentlyViewed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('honestBabyRecentlyViewed') || '[]'); } catch { return []; }
   });
@@ -363,6 +788,10 @@ const App = () => {
   const [alertTargetPrice, setAlertTargetPrice] = useState('');
   const [saveSearchLabel, setSaveSearchLabel] = useState('');
 
+  const [showCookieBanner, setShowCookieBanner] = useState(() => {
+    try { return !localStorage.getItem('honestBabyCookieConsent'); } catch { return false; }
+  });
+
   // Modal & Expand States
   const [expandedMall, setExpandedMall] = useState(null);
   const [activeLegalPage, setActiveLegalPage] = useState(null);
@@ -376,7 +805,13 @@ const App = () => {
   const [reviewTab, setReviewTab] = useState('honest'); // 'honest' or 'sns'
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [reviewForm, setReviewForm] = useState({ rating: 5, content: "" });
+  const [reviewPhotoFile, setReviewPhotoFile] = useState(null);
+  const [reviewPhotoPreview, setReviewPhotoPreview] = useState(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const reviewPhotoInputRef = useRef(null);
+
+  // --- 価格アラート通知 ---
+  const [triggeredAlerts, setTriggeredAlerts] = useState([]);
 
   // AI Chat States
   const [chatMessages, setChatMessages] = useState([
@@ -432,7 +867,11 @@ const App = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
       setUser(u);
-      if (u) migrateLocalFavoritesToDB(u.id);
+      if (u) {
+        migrateLocalFavoritesToDB(u.id);
+        syncPriceAlertsWithDB(u.id);
+        syncBabyProfileWithDB(u.id);
+      }
     });
 
     // 既存セッションの復元（ページリロード時など）
@@ -516,6 +955,13 @@ const App = () => {
     restore();
   }, [location.pathname]);
 
+  // 法的ページ直接URL対応: /privacy /terms /tokushoho /disclaimer
+  useEffect(() => {
+    const legalRoutes = { '/privacy': 'privacy', '/terms': 'terms', '/tokushoho': 'tokushoho', '/disclaimer': 'disclaimer' };
+    const key = legalRoutes[location.pathname];
+    if (key) { setActiveLegalPage(key); navigate('/', { replace: true }); }
+  }, [location.pathname]);
+
   useEffect(() => {
     const fetchProducts = async () => {
       setDbLoading(true);
@@ -528,7 +974,8 @@ const App = () => {
             shops:shops_prices(*),
             honestReviews:reviews(*),
             snsReviews:sns_reviews(*)
-          `);
+          `)
+          .or('is_blocked.is.null,is_blocked.eq.false');
 
         if (error) throw error;
 
@@ -568,6 +1015,33 @@ const App = () => {
             }))
           }));
           setDbProducts(formatted);
+
+          // プレースホルダー画像の商品に対してRakutenから実際の画像をバックグラウンド取得
+          // 厳格な名前マッチング: DB商品名の全キーワードがAPI結果の名前に含まれる場合のみ更新
+          const placeholders = formatted.filter(p => p.image?.includes('placehold.jp'));
+          if (placeholders.length > 0) {
+            (async () => {
+              for (const product of placeholders.slice(0, 8)) {
+                try {
+                  await new Promise(r => setTimeout(r, 400));
+                  const res = await fetch(`/api/rakuten?query=${encodeURIComponent(product.name)}`);
+                  if (!res.ok) continue;
+                  const { products: results } = await res.json();
+                  // DB商品名を2文字以上のキーワードに分割し、全て一致するAPI結果のみ採用
+                  const dbWords = product.name.split(/[\s　]+/).filter(w => w.length >= 2);
+                  const match = results?.find(r => {
+                    if (!r.image || r.image.includes('placehold')) return false;
+                    const apiName = r.name.toLowerCase();
+                    return dbWords.every(w => apiName.includes(w.toLowerCase()));
+                  });
+                  if (!match?.image) continue;
+                  const realImage = getHighResImage(match.image);
+                  await supabase.from('products').update({ image_url: match.image }).eq('id', product.id);
+                  setDbProducts(prev => prev.map(p => p.id === product.id ? { ...p, image: realImage } : p));
+                } catch { }
+              }
+            })();
+          }
         }
       } catch (err) {
         console.error("Error fetching products from Supabase:", err);
@@ -580,19 +1054,109 @@ const App = () => {
     fetchProducts();
   }, []);
 
-  // ブロックリストを起動時に読み込む
+  // ブロックリストを起動時に読み込む（localStorage のみ。DB ブロックは fetchProducts の is_blocked フィルタで処理）
   useEffect(() => {
-    supabase.from('product_blocklist').select('item_code').then(({ data }) => {
-      if (data) setBlocklist(new Set(data.map(r => r.item_code)));
-    });
+    try {
+      const stored = JSON.parse(localStorage.getItem('honestBabyBlocklist') || '[]');
+      if (stored.length > 0) setBlocklist(new Set(stored));
+    } catch { }
   }, []);
 
   // 商品を非表示にする（管理者モード専用）
   const blockProduct = async (product) => {
-    const code = product.id.replace(/^(ranking|product)-/, '');
-    await supabase.from('product_blocklist').upsert({ item_code: code });
-    setBlocklist(prev => new Set([...prev, code]));
+    const code = String(product.id).replace(/^(ranking|product)-/, '');
+    setBlocklist(prev => {
+      const next = new Set([...prev, code]);
+      try { localStorage.setItem('honestBabyBlocklist', JSON.stringify([...next])); } catch { }
+      return next;
+    });
     setRemoteProducts(prev => prev.filter(p => p.id !== product.id));
+    setDbProducts(prev => prev.filter(p => p.id !== product.id));
+    setCachedProducts(prev => {
+      const updated = { ...prev };
+      for (const cat of Object.keys(updated)) {
+        updated[cat] = (updated[cat] || []).filter(p => p.id !== product.id);
+      }
+      return updated;
+    });
+
+    // アンドゥトーストを表示（5秒間）
+    if (lastBlocked?.timer) clearTimeout(lastBlocked.timer);
+    const timer = setTimeout(() => setShowUndoToast(false), 5000);
+    setLastBlocked({ product, code });
+    setShowUndoToast(true);
+
+    // DB: is_blocked フラグを立てる
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(product.id));
+    const updateById = supabase.from('products').update({ is_blocked: true }).eq('id', product.id);
+    const updateByCode = supabase.from('products').update({ is_blocked: true }).eq('rakuten_item_code', code);
+    const [r1, r2] = await Promise.all([isUuid ? updateById : Promise.resolve({}), updateByCode]);
+    if (r1.error) console.error('Block by id failed:', r1.error.message);
+    if (r2.error) console.error('Block by code failed:', r2.error.message);
+  };
+
+  // 誤って削除した商品を復元する
+  const unblockProduct = async () => {
+    if (!lastBlocked) return;
+    const { product, code } = lastBlocked;
+    setShowUndoToast(false);
+    setLastBlocked(null);
+
+    setBlocklist(prev => {
+      const next = new Set([...prev]);
+      next.delete(code);
+      try { localStorage.setItem('honestBabyBlocklist', JSON.stringify([...next])); } catch { }
+      return next;
+    });
+    setDbProducts(prev => [...prev, product].sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999)));
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(product.id));
+    const restoreById = supabase.from('products').update({ is_blocked: false }).eq('id', product.id);
+    const restoreByCode = supabase.from('products').update({ is_blocked: false }).eq('rakuten_item_code', code);
+    await Promise.all([isUuid ? restoreById : Promise.resolve({}), restoreByCode]);
+  };
+
+  // ブロック済み商品一覧を取得（管理者モード専用）
+  const fetchBlockedProducts = async () => {
+    setIsLoadingBlocked(true);
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, image_url, category, rakuten_item_code')
+      .eq('is_blocked', true)
+      .order('name');
+    setBlockedProducts(data || []);
+    setIsLoadingBlocked(false);
+  };
+
+  // ブロック済み商品を個別に復元
+  const restoreBlockedProduct = async (p) => {
+    await supabase.from('products').update({ is_blocked: false }).eq('id', p.id);
+    setBlockedProducts(prev => prev.filter(b => b.id !== p.id));
+    // ローカルのブロックリストからも除去
+    const code = p.rakuten_item_code || p.id;
+    setBlocklist(prev => {
+      const next = new Set([...prev]);
+      next.delete(code);
+      try { localStorage.setItem('honestBabyBlocklist', JSON.stringify([...next])); } catch { }
+      return next;
+    });
+    // 画面の商品リストに戻す（再フェッチで確実に反映）
+    const { data: restored } = await supabase
+      .from('products')
+      .select('*, shops:shops_prices(*)')
+      .eq('id', p.id)
+      .single();
+    if (restored) {
+      const fmt = {
+        ...restored,
+        rating: Number(restored.rating),
+        subCategory: restored.sub_category,
+        image: restored.image_url,
+        shops: (restored.shops || []).map(s => ({
+          ...s, name: s.shop_name, type: s.shop_type, lowestPrice: s.lowest_price, sellers: []
+        })),
+      };
+      setDbProducts(prev => [...prev, fmt].sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999)));
+    }
   };
 
   // 初回ロード: DBに事前保存されたデータを表示（Cronバッチで毎晩自動更新）
@@ -693,65 +1257,40 @@ const App = () => {
     fetchCross();
   }, [selectedProduct]);
 
-  // ギフトタブ: 楽天検索APIから直接取得（VITE_キー使用）
-  const fetchGiftProducts = async (budgetFilter = 'すべて', sceneFilter = 'すべて') => {
-    setIsGiftLoading(true);
-    const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
-    const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
-    const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
-    if (!appId) { setIsGiftLoading(false); return; }
-
-    const sceneKeywordMap = {
-      '出産祝い': '出産祝い ベビーギフト',
-      'ハーフバースデー': 'ハーフバースデー 赤ちゃん ギフト',
-      '友人へ': '出産祝い おしゃれ ギフト',
-      '同僚へ': '出産祝い 実用的 ギフト',
-      '家族・親戚から': '出産祝い セット ギフト',
-    };
-    const baseKeyword = sceneFilter !== 'すべて' ? sceneKeywordMap[sceneFilter] || '出産祝い ベビーギフト' : '出産祝い ベビーギフト セット';
-
-    const priceParams = {
-      '3000円〜': { minPrice: 3000, maxPrice: 4999 },
-      '5000円〜': { minPrice: 5000, maxPrice: 9999 },
-      '10000円〜': { minPrice: 10000, maxPrice: '' },
-    };
-    const price = priceParams[budgetFilter] || {};
-
-    try {
-      const params = new URLSearchParams({
-        applicationId: appId,
-        ...(accessKey && { accessKey }),
-        ...(affiliateId && { affiliateId }),
-        keyword: baseKeyword,
-        sort: '-reviewCount',
-        hits: 30,
-        availability: 1,
-        ...(price.minPrice && { minPrice: price.minPrice }),
-        ...(price.maxPrice && { maxPrice: price.maxPrice }),
-      });
-      const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?${params}`;
-      const data = await fetch(url).then(r => r.json());
-      const products = filterAccessories((data.Items || []).map(item => ({
-        id: `gift-${item.Item.itemCode}`,
-        name: cleanName(item.Item.itemName),
-        price: item.Item.itemPrice,
-        image: (item.Item.mediumImageUrls?.[0]?.imageUrl || '').replace(/_ex=\d+x\d+/, '_ex=640x640'),
-        url: item.Item.affiliateUrl || item.Item.itemUrl,
-        brand: item.Item.shopName || '楽天市場',
-        rating: parseFloat(item.Item.reviewAverage) || 4.5,
-        category: 'ギフトセット',
-        shops: [{ name: item.Item.shopName || '楽天市場', price: item.Item.itemPrice, url: item.Item.affiliateUrl || item.Item.itemUrl }]
-      })).filter(validateProduct));
-      setGiftProducts(products);
-    } catch (e) {
-      console.error('Gift fetch error:', e);
-    }
-    setIsGiftLoading(false);
+  // ギフトタブ: DBから取得してフィルタ（クロンが毎朝更新）
+  const sceneKeywords = {
+    '出産祝い': ['出産祝い', 'ギフト', 'プレゼント'],
+    'ハーフバースデー': ['ハーフバースデー', '6ヶ月', '半年'],
+    '友人へ': ['おしゃれ', 'かわいい', 'おしゃれ'],
+    '同僚へ': ['実用', 'セット', '消耗品'],
+    '家族・親戚から': ['セット', '豪華', 'まとめ'],
   };
 
   useEffect(() => {
-    if (activeTab === 'gift') fetchGiftProducts(giftBudgetFilter, giftSceneFilter);
-  }, [activeTab, giftBudgetFilter, giftSceneFilter]);
+    if (activeTab !== 'gift') return;
+    const base = dbProducts.filter(p => p.category === 'ギフトセット');
+
+    const priceRanges = {
+      '3000円〜': [3000, 4999],
+      '5000円〜': [5000, 9999],
+      '10000円〜': [10000, Infinity],
+    };
+    const range = priceRanges[giftBudgetFilter];
+    const kws = sceneKeywords[giftSceneFilter];
+
+    const filtered = base.filter(p => {
+      const price = getLowestPrice(p.shops) || p.price || 0;
+      if (range && (price < range[0] || price > range[1])) return false;
+      if (kws && !kws.some(kw => p.name.includes(kw))) return false;
+      return true;
+    });
+
+    setGiftProducts(filtered.length > 0 ? filtered : base.filter(p => {
+      const price = getLowestPrice(p.shops) || p.price || 0;
+      if (range && (price < range[0] || price > range[1])) return false;
+      return true;
+    }));
+  }, [activeTab, giftBudgetFilter, giftSceneFilter, dbProducts]);
 
   useEffect(() => {
     if (!window.visualViewport) return;
@@ -780,13 +1319,22 @@ const App = () => {
 
     const NG_KEYWORDS = [
       'ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍',
-      'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース'
+      'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース',
+      'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
     ];
+    const CATEGORY_NG = {
+      "おむつ": ["大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用"],
+    };
     const mapItems = (items, cat) => items
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+      .filter(item => {
+        const ng = CATEGORY_NG[cat] || [];
+        return ng.length === 0 || !ng.some(kw => item.Item.itemName.includes(kw));
+      })
       .map(item => {
         const name = cleanName(item.Item.itemName);
-        const rawImg = item.Item.mediumImageUrls?.[0]?.imageUrl || "";
+        const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl
+          || item.Item.mediumImageUrls?.[0]?.imageUrl || "";
         const unitCount = cat === "おむつ" ? parseDiaperCount(item.Item.itemName) : null;
         return {
           id: `ranking-${item.Item.itemCode}`,
@@ -907,7 +1455,7 @@ const App = () => {
                   unitCount: catName === "おむつ" ? parseDiaperCount(p.name) : null,
                   unitName: catName === "おむつ" ? "枚" : null,
                 })).filter(p => {
-                  const code = p.id.replace('product-', '');
+                  const code = p.id.replace(/^(ranking|product)-/, '');
                   return !blocklist.has(code);
                 });
             }
@@ -961,8 +1509,13 @@ const App = () => {
         if (accessoryFiltered.length > 0) rawItems = accessoryFiltered;
       }
 
-      // Step 1: 生データをすぐに表示（APIが動いていれば商品が即座に出る）
-      const immediateProducts = rawItems.map(i => ({ ...i, isMarketWide: true }));
+      // Step 1: 生データをすぐに表示（ブロック済みは除外）
+      const immediateProducts = rawItems
+        .filter(i => {
+          const code = String(i.id).replace(/^(ranking|product)-/, '');
+          return !blocklist.has(code);
+        })
+        .map(i => ({ ...i, isMarketWide: true }));
       setRemoteProducts(immediateProducts);
       setIsRemoteLoading(false);
     } catch (e) {
@@ -1175,35 +1728,7 @@ const App = () => {
   };
 
   const isFavorite = (id) => favorites.some(f => f.id === id);
-  // ステップ3: ショップデータ正規化 — API経由でもDB経由でも同じ形式に統一
-  const normalizeShop = (shop) => {
-    if (!shop) return { name: 'ショップ', type: 'mall', lowestPrice: 0, sellers: [] };
-    const name = shop.name || shop.shop_name || 'ショップ';
-    const lowestPrice = Number(shop.lowestPrice || shop.lowest_price || shop.price || 0);
-    const { isOfficial, brand } = detectOfficialShop({ name, url: shop.url });
-    const type = isOfficial ? 'official' : (shop.type || shop.shop_type || 'mall');
-    let rawSellers = shop.sellers;
-    if (typeof rawSellers === 'string') {
-      try { rawSellers = JSON.parse(rawSellers); } catch { rawSellers = []; }
-    }
-    const sellers = Array.isArray(rawSellers) && rawSellers.length > 0
-      ? rawSellers.filter(s => s.url && s.url !== '#')
-      : (shop.url && shop.url !== '#' ? [{ name, price: lowestPrice, shipping: shop.shipping ?? 0, points: shop.points ?? 0, url: shop.url, note: shop.note || '' }] : []);
-    return { ...shop, name, type, lowestPrice, sellers, brandName: brand };
-  };
-
-  const normalizeShops = (shops) => {
-    if (!shops || shops.length === 0) return [];
-    return shops.map(normalizeShop);
-  };
-
-  const getLowestPrice = (shops) => {
-    if (!shops || shops.length === 0) return 0;
-    const normalized = normalizeShops(shops);
-    const prices = normalized.map(s => s.lowestPrice).filter(p => p > 0 && isFinite(p));
-    return prices.length > 0 ? Math.min(...prices) : 0;
-  };
-
+  const favoriteSet = useMemo(() => new Set(favorites.map(f => f.id)), [favorites]);
   const handleSendMessage = async () => {
     if (!userInput.trim()) return;
     const userText = userInput;
@@ -1265,8 +1790,13 @@ const App = () => {
       const isDiagnosis = userText.includes('診断');
       const isExpert = userText.includes('[商品詳細データ]');
 
+      // マイベビー情報をコンテキストとして注入
+      const babyContext = babyInfo && babyAgeLabel
+        ? `【お子さま情報】${babyInfo.name ? `名前: ${babyInfo.name} / ` : ''}月齢: ${babyAgeLabel}${babyInfo.gender ? ` / 性別: ${babyInfo.gender}` : ''}\nこの月齢・状況に合った提案を心がけてください。\n\n`
+        : '';
+
       if (isExpert) {
-        prompt = `あなたはベビー用品のプロ購買コンサルタントです。提供された【商品詳細データ】を元に、以下の点に重点を置いて回答してください。
+        prompt = `${babyContext}あなたはベビー用品のプロ購買コンサルタントです。提供された【商品詳細データ】を元に、以下の点に重点を置いて回答してください。
 1. その商品の市場価値（他店と比較して安いか、買い時か）
 2. 専門家から見たメリット・デメリット
 3. どんなユーザーにおすすめか
@@ -1276,7 +1806,7 @@ const App = () => {
 【ユーザーからの相談】
 ${userText}`;
       } else if (isDiagnosis) {
-        prompt = `あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
+        prompt = `${babyContext}あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
 ユーザーは「5秒診断」を希望しています。以下の手順で厳格に進めてください。
 1. まず明るく挨拶し、「どんなアイテム（ベビーカー、抱っこ紐など）をお探しですか？」と1つだけ質問してください。
 2. その後、ライフスタイルや予算について1つずつ質問を投げてください。
@@ -1290,12 +1820,13 @@ ${userText}`;
           const price = p.shops?.[0]?.lowest_price ?? p.price;
           return `${i + 1}. ${p.name}（${price ? price.toLocaleString() + '円' : '価格不明'}）`;
         }).join('\n');
-        prompt = `あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
+        prompt = `${babyContext}あなたはベビー用品比較アプリ「Honest Baby」のAIコンサルタントです。
 
 【絶対ルール】
-- 必ず以下の【商品リスト】にある番号と商品名だけを使ってください
-- リストに存在しない商品名（例：マグネタック、マリオバティ等）は絶対に作ってはいけません
-- 2〜3個の商品を選び、各商品を「■ X番：おすすめ理由（1〜2文）」の形式で答えてください
+- 必ず以下の【商品リスト】にある商品名だけを使ってください
+- リストに存在しない商品名は絶対に作ってはいけません
+- 2〜3個の商品を選び、各商品を「■ 商品名：おすすめ理由（1〜2文）」の形式で答えてください
+- 「1番」「2番」のような番号参照は使わず、必ず商品名そのものを書いてください
 - 絵文字は使わず、簡潔に友人のように温かく答えてください
 
 【商品リスト】
@@ -1307,8 +1838,8 @@ ${userText}
 【回答例】
 お探しですね。おすすめはこちらです。
 
-■ 1番：〇〇という理由でとても人気です。
-■ 3番：コスパが良く〜な方にぴったりです。
+■ ベビーカー〇〇：軽量で扱いやすく、人気の一台です。
+■ 抱っこ紐△△：コスパが良く初心者にもおすすめです。
 
 上記フォーマットで答えてください。リスト外の商品名は絶対に使わないでください。`;
       } else {
@@ -1332,7 +1863,16 @@ ${userText}
         return;
       }
       const aiText = data.text || "すみません、一時的にエラーが発生しました。もう一度お試しください。";
-      setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: contextProducts.slice(0, 3) }]);
+
+      // AIテキスト内で実際に言及された商品だけカードに表示する
+      const mentionedProducts = contextProducts.filter(p =>
+        aiText.includes(p.name) || aiText.includes(p.name.slice(0, 15))
+      );
+      const productsToShow = mentionedProducts.length > 0
+        ? mentionedProducts.slice(0, 3)
+        : contextProducts.slice(0, 3);
+
+      setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: productsToShow }]);
     } catch (e) {
       console.error("AI Chat Error:", e);
       setChatMessages([...newMessages, { role: 'assistant', text: `⚠️ ${e.message}` }]);
@@ -1381,6 +1921,20 @@ ${userText}
 
       const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'ユーザー';
 
+      // 写真アップロード（あれば）
+      let uploadedImageUrl = null;
+      if (reviewPhotoFile) {
+        const ext = reviewPhotoFile.name.split('.').pop();
+        const path = `${user.id}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('review-photos')
+          .upload(path, reviewPhotoFile, { cacheControl: '3600', upsert: false });
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('review-photos').getPublicUrl(path);
+          uploadedImageUrl = urlData.publicUrl;
+        }
+      }
+
       // SupabaseにINSERT
       const { data, error } = await supabase
         .from('reviews')
@@ -1388,7 +1942,8 @@ ${userText}
           product_id: productId,
           rating: reviewForm.rating,
           content: reviewForm.content,
-          user_name: displayName
+          user_name: displayName,
+          image_url: uploadedImageUrl,
         }])
         .select();
 
@@ -1412,6 +1967,8 @@ ${userText}
 
         setIsReviewFormOpen(false);
         setReviewForm({ rating: 5, content: "" });
+        setReviewPhotoFile(null);
+        setReviewPhotoPreview(null);
         alert("口コミを投稿しました！ありがとうございます。");
       }
     } catch (e) {
@@ -1488,88 +2045,8 @@ ${userText}
     setExpandedMall(null);
     setReviewTab('honest');
     try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
-    navigate(-1);
+    navigate('/', { replace: true });
   };
-
-  const ProductCard = ({ product, localRank = null }) => (
-    <div
-      className="bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full relative active:scale-95 transition-all cursor-pointer border border-[#F4EFEB]"
-      onClick={() => openProduct(product)}
-    >
-      <div className="relative aspect-square bg-[#F9F6F3] p-4">
-        <img
-          src={getHighResImage(product.image)}
-          onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }}
-          className="w-full h-full object-cover rounded-[1.5rem]"
-          alt={product.name}
-        />
-        <button
-          onClick={(e) => toggleFavorite(e, product)}
-          className="absolute top-6 right-6 bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-sm z-10 hover:bg-rose-50 transition-colors"
-        >
-          <Heart className={`w-4 h-4 ${isFavorite(product.id) ? 'text-rose-400 fill-current' : 'text-[#D4CDC7]'}`} />
-        </button>
-        {isAdminMode && (
-          <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); blockProduct(product); }}
-            title="この商品を非表示にする"
-            className="absolute top-4 left-4 bg-red-500 text-white w-10 h-10 rounded-full text-xl font-black shadow-2xl z-[999] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-4 border-white pointer-events-auto"
-          >×</button>
-        )}
-        <div className="pointer-events-none">
-          {localRank && (
-            <div className="absolute top-6 left-6 bg-[#F9DC5C] text-[#5A4C4C] w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-md border-2 border-white">
-              {localRank}
-            </div>
-          )}
-          {/* 動的なおすすめバッジ */}
-          {product.isBestSeller && (
-            <div className="absolute top-6 left-6 bg-[#F2ABAC] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
-              <Award className="w-3.5 h-3.5" />
-              <span>BEST SELLER</span>
-            </div>
-          )}
-          {!product.isBestSeller && product.isTopRated && (
-            <div className="absolute top-6 left-6 bg-[#7B8E76] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>TOP RATED</span>
-            </div>
-          )}
-        </div>
-        <div className={`absolute bottom-6 left-6 px-2.5 py-1 rounded-full text-[9px] font-bold tracking-wider ${product.subCategory === '周辺グッズ' ? 'bg-[#FFE8D6] text-[#A67B5B]' : 'bg-[#7B8E76] text-white'}`}>
-          {product.subCategory}
-        </div>
-      </div>
-      <div className="p-4 flex flex-col flex-1">
-        <div className="flex items-center gap-1 mb-2">
-          <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest">{product.category}</span>
-          <div className="flex items-center gap-1 ml-auto bg-[#FFF9E6] px-2 py-0.5 rounded-full text-[#D4AF37]">
-            <Star className="w-3 h-3 fill-current" />
-            <span className="text-[10px] font-black">{product.rating}</span>
-          </div>
-        </div>
-        <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{product.name}</h3>
-
-        <div className="mt-auto">
-          {(product.shops?.length || 0) >= 2 && (
-            <p className="text-[9px] text-[#7B8E76] font-black mb-1 uppercase tracking-wider">
-              {product.shops.length}店舗で比較
-            </p>
-          )}
-          {product.unitCount && (
-            <p className="text-[10px] text-[#A5A19E] font-bold mb-1">
-              1{product.unitName}あたり <span className="text-[#F2ABAC]">¥{Math.ceil(getLowestPrice(product.shops) / product.unitCount)}</span>
-            </p>
-          )}
-          <p className="text-xl font-black text-[#7B8E76] leading-none">
-            <span className="text-xs mr-0.5">¥</span>
-            {getLowestPrice(product.shops) > 0 ? getLowestPrice(product.shops).toLocaleString() : "---"}
-            <span className="text-[10px] text-[#A5A19E] ml-1 font-normal">{getLowestPrice(product.shops) > 0 ? "〜" : ""}</span>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
 
   // --- 各画面レンダリング ---
 
@@ -1599,16 +2076,11 @@ ${userText}
 
     if (dbLoading) {
       return (
-        <div className="loading-container">
-          <div className="rabbit-path">
-            <img 
-              src="/assets/loading-rabbit.png" 
-              alt="Loading..." 
-              className="rabbit-character"
-            />
-          </div>
-          <div className="loading-text font-serif font-black">
-            データを読み込んでいます<span className="loading-dots"></span>
+        <div className="flex flex-col items-center py-32 text-[#A5A19E] animate-in fade-in duration-700">
+          <div className="w-10 h-10 border-4 border-[#F2ABAC]/20 border-t-[#F2ABAC] rounded-full animate-spin mb-6"></div>
+          <div className="space-y-2 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F2ABAC]/60">Loading</p>
+            <p className="text-xs font-bold text-[#A5A19E]">データを読み込んでいます...</p>
           </div>
         </div>
       );
@@ -1616,6 +2088,10 @@ ${userText}
 
     let filtered = dbProducts
       .filter(p => {
+        const code = p.id.replace(/^(ranking|product)-/, '');
+        if (blocklist.has(code)) return false;
+        // ギフトセットはギフトページ専用。「すべて」ホームには表示しない
+        if (selectedCategory === "すべて" && p.category === "ギフトセット") return false;
         const matchCat = selectedCategory === "すべて" || p.category === selectedCategory;
         const matchSub = selectedSubCategory === "すべて" || p.subCategory === selectedSubCategory;
         const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
@@ -1652,8 +2128,53 @@ ${userText}
           <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
         </div>
 
+        {/* ─── Yahoo!ショッピング 今日のお得バナー ─── */}
+        {(() => {
+          const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
+          if (!todayEvents.length) return null;
+          const ev = todayEvents[0];
+          return (
+            <div className="mb-6 bg-[#FFF3E8] border border-[#FFD9B5] rounded-[2rem] p-5 flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-[10px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!ショッピング 今日のお得</p>
+                <p className="text-base font-black text-[#5A4C4C]">{ev.name}</p>
+                <p className="text-xs text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+              </div>
+              <span className="text-3xl">🛒</span>
+            </div>
+          );
+        })()}
+
+        {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
+        {babyInfo && babyAgeMonths != null && (() => {
+          const stage = AGE_CATEGORY_MAP.find(s => babyAgeMonths >= s.minM && babyAgeMonths < s.maxM);
+          if (!stage) return null;
+          return (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-widest">My Baby</span>
+                <span className="text-xs font-bold text-[#5A4C4C] truncate">
+                  {babyInfo.name || 'お子さま'}（{babyAgeLabel}）に今必要なもの
+                </span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+                {stage.cats.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => handleCategoryChange(cat)}
+                    className="flex-shrink-0 flex items-center gap-1.5 bg-white border border-[#F4EFEB] rounded-full px-4 py-2.5 text-xs font-bold text-[#5A4C4C] shadow-sm active:scale-95 transition-transform"
+                  >
+                    <CategoryIcon name={cat} className="w-3.5 h-3.5 text-[#7B8E76]" />
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="relative">
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
             {CATEGORY_TREE.map(cat => (
               <button
                 key={cat.name}
@@ -1681,7 +2202,7 @@ ${userText}
           return (
             <>
               <div className="mb-3 relative">
-                <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
                   {["すべて", ...currentSubs].map(sub => {
                     const subName = getSubName(sub);
                     return (
@@ -1701,7 +2222,7 @@ ${userText}
               </div>
               {currentSubsubs.length > 0 && (
                 <div className="mb-5 relative">
-                  <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
                     {["すべて", ...currentSubsubs].map(subsub => (
                       <button
                         key={subsub}
@@ -1718,6 +2239,29 @@ ${userText}
                 </div>
               )}
             </>
+          );
+        })()}
+
+        {/* ─── おむつカテゴリ：月齢別サイズ提案バナー ─── */}
+        {selectedCategory === 'おむつ' && babyInfo && babyAgeMonths != null && (() => {
+          const entry = DIAPER_SIZE_BY_AGE.find(e => babyAgeMonths < e.maxM);
+          if (!entry) return null;
+          return (
+            <div className="flex items-center justify-between bg-[#FFF5F5] border border-[#FFEBEB] rounded-2xl px-4 py-3 mb-4">
+              <p className="text-xs font-bold text-[#5A4C4C] leading-snug">
+                {babyInfo.name || 'お子さま'}（{babyAgeLabel}）は<br />
+                <span className="text-[#F2ABAC] font-black">{entry.label}頃</span>が目安です
+              </p>
+              <button
+                onClick={() => {
+                  if (entry.sub) setSelectedSubCategory(entry.sub);
+                  setSelectedSubSubCategory(entry.size);
+                }}
+                className="bg-[#F2ABAC] text-white text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform whitespace-nowrap ml-3"
+              >
+                {entry.label}を見る
+              </button>
+            </div>
           );
         })()}
 
@@ -1756,7 +2300,7 @@ ${userText}
           </div>
         )}
 
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 -mx-4 px-4 mb-4">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 -mx-4 px-4 mb-4 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
           {[
             { key: 'standard', label: '標準' },
             { key: 'popular', label: '評価順' },
@@ -1769,19 +2313,23 @@ ${userText}
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4 xl:grid-cols-5">
           {/* DB商品を優先表示（Cronバッチで毎晩自動更新） */}
           {filtered.length > 0 && applySortOrder(filtered).map((p) => (
-            <ProductCard key={p.id} product={p} />
+            <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
           ))}
 
-          {/* DB商品がないカテゴリではリモート検索結果をフォールバック表示 */}
-          {filtered.length === 0 && remoteProducts.length > 0 && applySortOrder(remoteProducts).map((p) => (
-            <ProductCard key={p.id} product={p} />
+          {/* DB商品がないカテゴリではリモート検索結果をフォールバック表示（ブロック済み除外） */}
+          {filtered.length === 0 && remoteProducts.length > 0 && applySortOrder(
+            remoteProducts.filter(p => !blocklist.has(String(p.id).replace(/^(ranking|product)-/, '')))
+          ).map((p) => (
+            <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
           ))}
 
           {filtered.length === 0 && remoteProducts.length === 0 && cachedProducts[selectedCategory]?.length > 0 && (
-            applySortOrder(cachedProducts[selectedCategory]).map((p) => <ProductCard key={p.id} product={p} />)
+            applySortOrder(
+              cachedProducts[selectedCategory].filter(p => !blocklist.has(String(p.id).replace(/^(ranking|product)-/, '')))
+            ).map((p) => <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)
           )}
 
           {/* Empty State */}
@@ -1835,11 +2383,11 @@ ${userText}
         </div>
 
         <div className="flex items-center justify-between mb-5 px-1"><h3 className="font-black text-[#5A4C4C] text-xl">おすすめのギフト</h3></div>
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          {isGiftLoading
-            ? <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold animate-pulse">ギフト商品を検索中...</div>
+        <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4 xl:grid-cols-5">
+          {dbLoading
+            ? <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold animate-pulse">ギフト商品を読み込み中...</div>
             : giftProducts.length > 0
-              ? giftProducts.map((p, i) => <ProductCard key={p.id || i} product={p} />)
+              ? giftProducts.map((p, i) => <ProductCard key={p.id || i} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)
               : <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold">条件に合うギフトが見つかりません</div>}
         </div>
       </div>
@@ -1847,14 +2395,6 @@ ${userText}
   };
 
   const renderUser = () => {
-    const now = new Date();
-    const babyAgeMonths = babyInfo
-      ? (now.getFullYear() - babyInfo.birthYear) * 12 + (now.getMonth() + 1 - babyInfo.birthMonth)
-      : null;
-    const babyAgeLabel = babyAgeMonths != null
-      ? babyAgeMonths < 12 ? `${babyAgeMonths}ヶ月` : `${Math.floor(babyAgeMonths / 12)}歳${babyAgeMonths % 12 ? `${babyAgeMonths % 12}ヶ月` : ''}`
-      : null;
-
     return (
       <div className="animate-in slide-in-from-right duration-300 pb-20">
         {/* プロフィールカード */}
@@ -1900,7 +2440,8 @@ ${userText}
                   <span className="text-[10px] text-white bg-[#7B8E76] px-2 py-0.5 rounded-md font-bold">{babyInfo.gender}</span>
                 )}
                 <button onClick={() => {
-                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+                  const today = new Date();
+                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
                   setShowBabyModal(true);
                 }} className="text-[10px] text-[#A5A19E] flex items-center gap-0.5 font-bold hover:text-[#5A4C4C] transition-colors">
                   {babyInfo ? '編集' : 'プロフィール登録'} <Edit3 className="w-3 h-3" />
@@ -1919,7 +2460,8 @@ ${userText}
             <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest bg-[#F9F6F3] px-2 py-1 rounded-md">おすすめの最適化</span>
           </div>
           <div onClick={() => {
-            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+            const today = new Date();
+            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
             setShowBabyModal(true);
           }} className="bg-[#FFF5F5] border border-[#FFEBEB] p-5 rounded-[2rem] shadow-sm flex items-center justify-between active:scale-95 transition-transform cursor-pointer relative overflow-hidden group">
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#F2ABAC] rounded-l-[2rem]"></div>
@@ -1952,12 +2494,12 @@ ${userText}
           {recentlyViewed.length === 0 ? (
             <p className="text-xs text-[#A5A19E] font-bold text-center py-6 bg-[#F9F6F3] rounded-[2rem]">まだ見ていません</p>
           ) : (
-            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
               {recentlyViewed.map(p => (
                 <div key={p.id} onClick={() => { const full = [...remoteProducts, ...dbProducts].find(r => r.id === p.id) || p; openProduct(full); }}
                   className="flex-shrink-0 w-28 cursor-pointer active:scale-95 transition-transform">
                   <div className="w-28 h-28 rounded-[1.5rem] overflow-hidden bg-[#F9F6F3] mb-2">
-                    {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#A5A19E]"><Package className="w-8 h-8" /></div>}
+                    {p.image ? <img src={getHighResImage(p.image)} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#A5A19E]"><Package className="w-8 h-8" /></div>}
                   </div>
                   <p className="text-[10px] font-bold text-[#5A4C4C] leading-tight line-clamp-2">{p.name}</p>
                   {p.price && <p className="text-[10px] text-[#F2ABAC] font-black mt-0.5">¥{p.price.toLocaleString()}</p>}
@@ -1968,22 +2510,40 @@ ${userText}
         </div>
 
         {/* クイックアクション */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4 xl:grid-cols-5">
           <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => setActiveTab('heart')}>
             <div className="w-12 h-12 bg-[#FFF5F5] rounded-[1.25rem] flex items-center justify-center text-[#F2ABAC] mb-3"><Heart className="w-6 h-6 fill-current" /></div>
             <p className="text-sm font-black text-[#5A4C4C]">保存リスト</p>
             <p className="text-[10px] text-[#A5A19E] font-bold mt-1">{favorites.length} items</p>
           </div>
-          <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => setAlertTargetPrice('') || setShowPriceAlertModal(false)}>
+          <div className="bg-white border border-[#F4EFEB] p-5 rounded-[2rem] shadow-sm flex flex-col justify-center active:scale-95 transition-transform cursor-pointer" onClick={() => priceAlerts.length > 0 ? document.getElementById('price-alert-list')?.scrollIntoView({ behavior: 'smooth' }) : setActiveTab('home')}>
             <div className="w-12 h-12 bg-[#FFF9E6] rounded-[1.25rem] flex items-center justify-center text-[#D4AF37] mb-3"><BellRing className="w-6 h-6" /></div>
             <p className="text-sm font-black text-[#5A4C4C]">価格アラート</p>
             <p className="text-[10px] text-[#A5A19E] font-bold mt-1">{priceAlerts.length > 0 ? `${priceAlerts.length}件設定中` : '値下がり通知を設定'}</p>
           </div>
         </div>
 
+        {/* 価格アラート: トリガー済み通知バナー */}
+        {triggeredAlerts.length > 0 && (
+          <div className="mb-6 bg-[#FFF9E6] border border-[#F9DC5C]/40 rounded-[1.5rem] p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <BellRing className="w-4 h-4 text-[#D4AF37]" />
+              <p className="text-xs font-black text-[#B8860B]">価格アラート！{triggeredAlerts.length}件が目標価格に到達しました</p>
+            </div>
+            {triggeredAlerts.map(a => (
+              <div key={a.id} className="flex items-center gap-2 mt-2">
+                {a.image && <img src={a.image} className="w-8 h-8 rounded-lg object-cover" alt="" />}
+                <p className="text-[11px] font-bold text-[#5A4C4C] flex-1 line-clamp-1">{a.name}</p>
+                {a.url && <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-[#D4AF37] underline">確認</a>}
+              </div>
+            ))}
+            <button onClick={() => setTriggeredAlerts([])} className="mt-3 text-[10px] text-[#A5A19E] font-bold">閉じる</button>
+          </div>
+        )}
+
         {/* 価格アラート一覧 */}
         {priceAlerts.length > 0 && (
-          <div className="mb-8">
+          <div id="price-alert-list" className="mb-8">
             <h3 className="font-black text-[#5A4C4C] mb-4 px-1 flex items-center gap-2">
               <BellRing className="w-5 h-5 text-[#D4AF37]" /> 設定中のアラート
             </h3>
@@ -1991,7 +2551,7 @@ ${userText}
               {priceAlerts.map(alert => (
                 <div key={alert.id} className="bg-white border border-[#F4EFEB] p-4 rounded-[1.5rem] shadow-sm flex items-center gap-3">
                   <div className="w-14 h-14 rounded-[1rem] overflow-hidden bg-[#F9F6F3] flex-shrink-0">
-                    {alert.image ? <img src={alert.image} alt={alert.name} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-[#A5A19E] m-auto mt-4" />}
+                    {alert.image ? <img src={getHighResImage(alert.image)} alt={alert.name} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-[#A5A19E] m-auto mt-4" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-black text-[#5A4C4C] leading-tight line-clamp-1">{alert.name}</p>
@@ -2000,7 +2560,7 @@ ${userText}
                   </div>
                   <div className="flex flex-col gap-1 flex-shrink-0">
                     <a href={alert.url} target="_blank" rel="noopener noreferrer" className="text-[9px] bg-[#F2ABAC] text-white px-2 py-1 rounded-full font-black text-center">確認</a>
-                    <button onClick={() => setPriceAlerts(prev => prev.filter(a => a.id !== alert.id))} className="text-[9px] bg-[#F9F6F3] text-[#A5A19E] px-2 py-1 rounded-full font-black">削除</button>
+                    <button onClick={() => { setPriceAlerts(prev => prev.filter(a => a.id !== alert.id)); if (user) deletePriceAlertFromDB(user.id, alert.id); }} className="text-[9px] bg-[#F9F6F3] text-[#A5A19E] px-2 py-1 rounded-full font-black">削除</button>
                   </div>
                 </div>
               ))}
@@ -2037,6 +2597,7 @@ ${userText}
             <button onClick={() => setActiveLegalPage('terms')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 利用規約</button>
             <button onClick={() => setActiveLegalPage('privacy')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Shield className="w-4 h-4 mr-2" /> プライバシーポリシー</button>
             <button onClick={() => setActiveLegalPage('disclaimer')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors text-left leading-relaxed"><Info className="w-4 h-4 mr-2 flex-shrink-0" /> 運営者情報・免責事項<br />(アフィリエイトについて)</button>
+            <button onClick={() => setActiveLegalPage('tokushoho')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 特定商取引法に基づく表記</button>
           </div>
         </div>
       </div>
@@ -2044,7 +2605,7 @@ ${userText}
   };
 
   return (
-    <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col' : 'min-h-screen pb-32'}`}>
+    <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col lg:pl-60' : 'min-h-screen pb-32 lg:pb-0 lg:pl-60'}`}>
       <Helmet>
         <meta name="google-site-verification" content="bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI" />
         {/* タイトル */}
@@ -2084,7 +2645,7 @@ ${userText}
             ? <meta property="og:description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。`} />
             : <meta property="og:description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。" />
         }
-        <meta property="og:image" content={selectedProduct?.image || "https://honestbaby-care.com/logo.png"} />
+        <meta property="og:image" content={selectedProduct?.image || "https://honestbaby-care.com/favicon.png"} />
         {selectedProduct
           ? <meta property="og:url" content={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
           : selectedCategory !== "すべて"
@@ -2098,7 +2659,7 @@ ${userText}
           ? <meta name="twitter:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
           : <meta name="twitter:title" content="HonestBaby | 忖度なしのベビー用品比較" />
         }
-        <meta name="twitter:image" content={selectedProduct?.image || "https://honestbaby-care.com/logo.png"} />
+        <meta name="twitter:image" content={selectedProduct?.image || "https://honestbaby-care.com/favicon.png"} />
 
         {/* JSON-LD: WebSite + Organization */}
         <script type="application/ld+json">{JSON.stringify({
@@ -2117,7 +2678,7 @@ ${userText}
               "@id": "https://honestbaby-care.com/#organization",
               "name": "HonestBaby",
               "url": "https://honestbaby-care.com/",
-              "logo": "https://honestbaby-care.com/logo.png"
+              "logo": "https://honestbaby-care.com/favicon.png"
             }
           ]
         })}</script>
@@ -2149,8 +2710,68 @@ ${userText}
           })}</script>
         )}
       </Helmet>
-      {/* 上部ヘッダー */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
+      {/* ===== PC左サイドバー (lg以上のみ表示) ===== */}
+      <aside className="hidden lg:flex flex-col fixed top-0 left-0 h-screen w-60 bg-white border-r border-[#F4EFEB] z-40">
+        {/* ロゴ */}
+        <div className="px-6 py-6 border-b border-[#F4EFEB]">
+          <h1 className="text-xl font-black text-[#7B8E76] tracking-tight cursor-pointer font-serif" onClick={() => setActiveTab('home')}>
+            Honest Baby<span className="text-[#F2ABAC] text-3xl leading-[0] relative top-1">.</span>
+          </h1>
+          <p className="text-[10px] text-[#A5A19E] font-bold mt-1">忖度なしのベビー用品比較</p>
+        </div>
+
+        {/* タブナビ */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {[
+            { id: 'home',   label: 'ホーム',   icon: <Home className="w-5 h-5" /> },
+            { id: 'search', label: '検索',     icon: <Search className="w-5 h-5" /> },
+            { id: 'ai',     label: 'AIコンサル', icon: <Bot className="w-5 h-5" /> },
+            { id: 'gift',   label: 'ギフト',   icon: <Gift className="w-5 h-5" /> },
+            { id: 'user',   label: 'マイページ', icon: <User className="w-5 h-5" /> },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-black transition-all ${
+                activeTab === tab.id
+                  ? 'bg-[#7B8E76]/10 text-[#7B8E76]'
+                  : 'text-[#A5A19E] hover:bg-[#F9F6F3] hover:text-[#5A4C4C]'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* 下部: お気に入り・ログイン状態 */}
+        <div className="px-4 py-4 border-t border-[#F4EFEB] space-y-2">
+          {user ? (
+            <div className="flex items-center gap-3 px-2 py-2">
+              {user.user_metadata?.avatar_url
+                ? <img src={user.user_metadata.avatar_url} className="w-8 h-8 rounded-full" alt="" />
+                : <div className="w-8 h-8 rounded-full bg-[#F2ABAC]/20 flex items-center justify-center"><User className="w-4 h-4 text-[#F2ABAC]" /></div>
+              }
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-[#5A4C4C] truncate">{user.user_metadata?.full_name || 'ユーザー'}</p>
+                <button onClick={signOut} className="text-[10px] text-[#A5A19E] font-bold hover:text-[#F2ABAC]">ログアウト</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={signInWithGoogle} className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#F2ABAC] text-white rounded-2xl text-xs font-black hover:bg-[#e89899] transition-colors">
+              Googleでログイン
+            </button>
+          )}
+          {favorites.length > 0 && (
+            <button onClick={() => setActiveTab('heart')} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-[#F2ABAC] hover:bg-[#FFF5F5]">
+              <Heart className="w-4 h-4 fill-current" /> {favorites.length}件お気に入り
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* 上部ヘッダー (スマホのみ) */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB] lg:hidden">
         <h1 className="text-2xl font-black text-[#7B8E76] tracking-tight cursor-pointer font-serif" onClick={() => setActiveTab('home')}>
           Honest Baby<span className="text-[#F2ABAC] text-4xl leading-[0] relative top-1">.</span>
         </h1>
@@ -2169,7 +2790,7 @@ ${userText}
         </div>
       </header>
 
-      <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden' : 'px-6 pt-4'} style={activeTab === 'ai' ? { paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)' } : {}}>
+      <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden lg:flex-1 lg:overflow-auto' : 'px-6 pt-4 lg:px-10 lg:pt-8 lg:max-w-7xl lg:mx-auto'} style={activeTab === 'ai' ? { paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)' } : {}}>
         {activeTab === 'home' && renderHome()}
         {activeTab === 'gift' && renderGift()}
         {activeTab === 'user' && renderUser()}
@@ -2250,7 +2871,7 @@ ${userText}
                     <div key={p.id} className="bg-white rounded-[2rem] border border-[#F4EFEB] shadow-sm overflow-hidden flex gap-4 p-4 active:scale-[0.98] transition-transform cursor-pointer"
                       onClick={() => openProduct(p)}>
                       <div className="w-20 h-20 rounded-[1.25rem] overflow-hidden bg-[#F9F6F3] flex-shrink-0">
-                        {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-[#A5A19E] m-auto mt-6" />}
+                        {p.image ? <img src={getHighResImage(p.image)} alt={p.name} className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-[#A5A19E] m-auto mt-6" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-black text-[#5A4C4C] leading-tight line-clamp-2 mb-1">{p.name}</p>
@@ -2276,7 +2897,7 @@ ${userText}
               </div>
             </div>
             {favorites.length === 0 ? <p className="text-center text-[#A5A19E] mt-20 font-bold text-xs uppercase tracking-widest leading-loose">保存されているアイテムは<br />ありません</p> :
-              <div className="grid grid-cols-2 gap-4">{favorites.map(p => <ProductCard key={p.id} product={p} />)}</div>}
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5">{favorites.map(p => <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)}</div>}
           </div>
         )}
         {activeTab === 'ai' && (
@@ -2291,15 +2912,33 @@ ${userText}
             <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FFFDFB] min-h-0">
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[85%] p-4 text-sm font-medium leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'
-                    }`}>
-                    {msg.text}
+                  <div className={`max-w-[85%] p-4 text-sm font-medium leading-relaxed ${msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'}`}>
+                    {msg.role === 'assistant' ? (
+                      <div className="space-y-3">
+                        {msg.text.split(/(?=■)/).map((chunk, ci) => {
+                          const trimmed = chunk.trim();
+                          if (!trimmed) return null;
+                          if (trimmed.startsWith('■')) {
+                            const colonIdx = trimmed.indexOf('：');
+                            const title = colonIdx > -1 ? trimmed.slice(1, colonIdx).trim() : trimmed.slice(1).trim();
+                            const body = colonIdx > -1 ? trimmed.slice(colonIdx + 1).trim() : '';
+                            return (
+                              <div key={ci} className="bg-[#F9F6F3] rounded-xl px-3 py-2.5">
+                                <p className="text-xs font-black text-[#5A4C4C] leading-snug mb-1">{title}</p>
+                                {body && <p className="text-[11px] text-[#7A6E6E] leading-relaxed">{body}</p>}
+                              </div>
+                            );
+                          }
+                          return <p key={ci} className="text-sm leading-relaxed whitespace-pre-wrap">{trimmed}</p>;
+                        })}
+                      </div>
+                    ) : msg.text}
                   </div>
                   {msg.products && msg.products.length > 0 && (
                     <div className="mt-2 space-y-2 w-[85%]">
                       {msg.products.map(p => (
                         <button key={p.id} onClick={() => setSelectedProduct(p)} className="w-full flex items-center gap-3 bg-white rounded-2xl p-3 text-left border border-[#F4EFEB] shadow-sm active:scale-[0.98] transition-transform">
-                          <img src={p.image} onError={e => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/80x80.png?text=Baby"; }} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" alt={p.name} />
+                          <img src={getHighResImage(p.image)} onError={e => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/80x80.png?text=Baby"; }} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" alt={p.name} />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-black text-[#5A4C4C] line-clamp-2 leading-snug">{p.name}</p>
                             <p className="text-xs text-[#7B8E76] font-bold mt-1">¥{(p.shops?.[0]?.lowest_price ?? p.price)?.toLocaleString()}</p>
@@ -2322,22 +2961,76 @@ ${userText}
         )}
       </main>
 
+      {/* ＝＝＝＝＝ 管理者: 削除アンドゥトースト ＝＝＝＝＝ */}
+      {showUndoToast && (
+        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 bg-[#5A4C4C] text-white text-sm font-bold px-5 py-3.5 rounded-full shadow-xl animate-in slide-in-from-bottom duration-200">
+          <span>非表示にしました</span>
+          <button
+            onClick={unblockProduct}
+            className="bg-white text-[#5A4C4C] px-3 py-1 rounded-full text-xs font-black active:scale-95 transition-transform"
+          >元に戻す</button>
+        </div>
+      )}
+
+      {/* ＝＝＝＝＝ 管理者: 非表示リスト浮きボタン ＝＝＝＝＝ */}
+      {isAdminMode && !showUndoToast && (
+        <button
+          onClick={() => { setShowBlockedList(true); fetchBlockedProducts(); }}
+          className="fixed bottom-28 right-4 z-[200] bg-red-500 text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+        >🚫 非表示リスト</button>
+      )}
+
+      {/* ＝＝＝＝＝ 管理者: ブロック済み商品モーダル ＝＝＝＝＝ */}
+      {showBlockedList && (
+        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end" onClick={() => setShowBlockedList(false)}>
+          <div className="bg-white w-full max-h-[80vh] rounded-t-[2rem] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#F4EFEB]">
+              <h3 className="font-black text-[#5A4C4C] text-lg">非表示にした商品</h3>
+              <button onClick={() => setShowBlockedList(false)} className="text-[#A5A19E] font-bold text-sm">閉じる</button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-4 py-3 space-y-2">
+              {isLoadingBlocked && <p className="text-center text-sm text-[#A5A19E] py-8">読み込み中...</p>}
+              {!isLoadingBlocked && blockedProducts.length === 0 && (
+                <p className="text-center text-sm text-[#A5A19E] py-8">非表示にした商品はありません</p>
+              )}
+              {blockedProducts.map(p => (
+                <div key={p.id} className="flex items-center gap-3 bg-[#F9F6F3] rounded-2xl p-3">
+                  {p.image_url && (
+                    <img src={p.image_url} className="w-12 h-12 rounded-xl object-cover flex-shrink-0 opacity-60" alt={p.name} />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black text-[#5A4C4C] line-clamp-2">{p.name}</p>
+                    <p className="text-[10px] text-[#A5A19E]">{p.category}</p>
+                  </div>
+                  <button
+                    onClick={() => restoreBlockedProduct(p)}
+                    className="bg-[#7B8E76] text-white px-4 py-2 rounded-full text-xs font-black whitespace-nowrap active:scale-95 transition-transform"
+                  >復元</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ＝＝＝＝＝ 商品詳細モーダル ＝＝＝＝＝ */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-[60] bg-[#FFFDFB] flex flex-col animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 z-[60] bg-[#FFFDFB] flex flex-col animate-in slide-in-from-bottom duration-300 lg:bg-black/50 lg:backdrop-blur-sm lg:items-center lg:justify-center" onClick={(e) => { if (e.target === e.currentTarget) closeProduct(); }}>
+          <div className="flex flex-col w-full h-full lg:max-w-4xl lg:max-h-[90vh] lg:rounded-3xl lg:overflow-hidden lg:shadow-2xl lg:bg-[#FFFDFB] lg:h-auto">
           <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
             <button onClick={closeProduct} className="p-2 -ml-2 bg-[#F9F6F3] rounded-full text-[#5A4C4C]"><ChevronLeft className="w-6 h-6" /></button>
             <span className="text-sm font-black text-[#5A4C4C]">商品詳細</span>
             <button onClick={handleShare} className="p-2 -mr-2 text-[#A5A19E] active:scale-90 transition-transform"><Share2 className="w-5 h-5" /></button>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 pb-32">
+          <div className="flex-1 overflow-y-auto px-6 pb-32 lg:pb-8">
             <div className="bg-[#F9F6F3] rounded-[3rem] p-6 my-6">
-              <img src={getHighResImage(selectedProduct.image)} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
+              <img src={getHighResImage(selectedProduct.image)} onError={(e) => { e.target.onerror = null; e.target.src = selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
             </div>
 
             <div className="flex justify-between items-start mb-8 px-1">
               <div className="flex-1 pr-4">
-                <div className="flex gap-2 mb-2">
+                <div className="flex gap-2 mb-2 flex-wrap">
+                  {selectedProduct.brand && <span className="text-[10px] font-black text-[#B8860B] bg-[#FFF9E6] px-2 py-0.5 rounded-md">{selectedProduct.brand}</span>}
                   <span className="text-[10px] font-black text-[#7B8E76] bg-[#7B8E76]/10 px-2 py-0.5 rounded-md uppercase tracking-wider">{selectedProduct.category}</span>
                   {selectedProduct.giftTags && <span className="text-[10px] font-black text-[#F2ABAC] bg-[#F2ABAC]/10 px-2 py-0.5 rounded-md uppercase tracking-wider">Gift</span>}
                 </div>
@@ -2352,24 +3045,65 @@ ${userText}
               </button>
             </div>
 
-            <p className="text-sm text-[#8E8282] leading-relaxed mb-10 px-1 font-medium">{selectedProduct.description}</p>
+            <div className="grid grid-cols-3 gap-3 mb-6 px-1">
+              <div className="bg-[#F9F6F3] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">最安値</p>
+                <p className="text-sm font-black text-[#5A4C4C]">
+                  {getLowestPrice(selectedProduct.shops) > 0 ? `¥${getLowestPrice(selectedProduct.shops).toLocaleString()}` : '---'}
+                </p>
+              </div>
+              <div className="bg-[#FFF9E6] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">評価</p>
+                <p className="text-sm font-black text-[#D4AF37]">★ {Number(selectedProduct.rating).toFixed(2)}</p>
+              </div>
+              <div className="bg-[#F0F4EF] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">取扱店舗</p>
+                <p className="text-sm font-black text-[#7B8E76]">{(selectedProduct.shops || []).length}店</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mb-8 px-1">
+              <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(`https://honestbaby-care.com/product/${selectedProduct.id}`)}`}
+                 target="_blank" rel="noopener noreferrer"
+                 className="flex items-center gap-2 bg-[#06C755] text-white rounded-full px-4 py-2.5 text-xs font-black active:scale-95 transition-transform">
+                LINE でシェア
+              </a>
+              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`${selectedProduct.name} | HonestBaby`)}&url=${encodeURIComponent(`https://honestbaby-care.com/product/${selectedProduct.id}`)}`}
+                 target="_blank" rel="noopener noreferrer"
+                 className="flex items-center gap-2 bg-black text-white rounded-full px-4 py-2.5 text-xs font-black active:scale-95 transition-transform">
+                X でシェア
+              </a>
+            </div>
+
+            {selectedProduct.description && (
+              <section className="mb-10 bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
+                <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 text-[#7B8E76]" /> 商品について
+                </h3>
+                <p className="text-sm text-[#8E8282] leading-relaxed font-medium">{selectedProduct.description}</p>
+              </section>
+            )}
 
             <section className="mb-10 bg-[#FFF5F5] border border-[#FFEBEB] p-8 rounded-[2.5rem] relative overflow-hidden">
               <div className="flex items-center gap-2 mb-4 relative z-10"><Sparkles className="w-5 h-5 text-[#F2ABAC]" /><h3 className="font-black text-[#5A4C4C] text-lg">AIによる分析</h3></div>
               <p className="text-sm text-[#8E8282] leading-relaxed font-medium mb-8 relative z-10">{selectedProduct.aiAnalysis}</p>
-              <button onClick={() => { 
-                setActiveTab('ai'); 
-                const shopInfo = (selectedProduct.shops || []).map(s => `${s.name}: ¥${s.lowestPrice.toLocaleString()}`).join(', ');
+              <button onClick={() => {
+                setActiveTab('ai');
+                const shopInfo = (selectedProduct.shops || []).map(s => {
+                  const price = s.lowestPrice || s.lowest_price || s.price;
+                  const name = s.name || s.shop_name || 'ショップ';
+                  return `${name}: ¥${price ? price.toLocaleString() : '不明'}`;
+                }).join(', ');
                 const context = `[商品詳細データ]
 名前: ${selectedProduct.name}
 ブランド: ${selectedProduct.brand}
-価格帯: ${selectedProduct.price?.toLocaleString()}円
+価格帯: ${selectedProduct.price ? selectedProduct.price.toLocaleString() + '円' : '不明'}
 ショップ状況: ${shopInfo}
-AI分析: ${selectedProduct.aiAnalysis}
+AI分析: ${selectedProduct.aiAnalysis || ''}
 
 この商品について、他と比較したメリット・デメリットや、今の買い得度を詳しく教えてください。`;
-                setUserInput(context); 
-                setSelectedProduct(null); 
+                setUserInput(context);
+                setSelectedProduct(null);
               }} className="w-full py-4 bg-white border border-[#F2ABAC] text-[#F2ABAC] rounded-full text-xs font-black shadow-sm active:scale-95 transition-transform relative z-10">AIコンサルタントにさらに聞く</button>
               <button onClick={() => { setAlertTargetPrice(''); setShowPriceAlertModal(true); }} className="w-full mt-3 py-4 bg-[#FFF9E6] border border-[#F9DC5C]/40 text-[#B8860B] rounded-full text-xs font-black shadow-sm active:scale-95 transition-transform relative z-10 flex items-center justify-center gap-2">
                 <BellRing className="w-4 h-4" /> 価格アラートを設定する
@@ -2388,6 +3122,41 @@ AI分析: ${selectedProduct.aiAnalysis}
                 </div>
               </section>
             )}
+
+            {/* Yahoo!ショッピング お得な日 */}
+            {(() => {
+              const hasYahoo =
+                (selectedProduct.shops || []).some(s => (s.name || '').includes('Yahoo')) ||
+                (selectedProduct.crossPlatformPrices || []).some(p => p.source === 'yahoo');
+              if (!hasYahoo) return null;
+              const events = getYahooSaleEvents(new Date(), 3);
+              if (!events.length) return null;
+              const fmtDate = (d) => {
+                const m = d.getMonth() + 1;
+                const day = d.getDate();
+                const dows = ['日', '月', '火', '水', '木', '金', '土'];
+                return `${m}月${day}日（${dows[d.getDay()]}）`;
+              };
+              return (
+                <section className="mb-8 bg-white border border-[#FFD9B5] rounded-[2rem] p-6 shadow-sm">
+                  <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-4">
+                    <span className="text-base">🛒</span> Yahoo!ショッピングのお得な日
+                  </h3>
+                  <div className="space-y-2">
+                    {events.map((ev, i) => (
+                      <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${ev.isToday ? 'bg-[#FFF3E8] border border-[#FFD9B5]' : 'bg-[#F9F6F3]'}`}>
+                        <div className="flex items-center gap-2">
+                          {ev.isToday && <span className="text-[10px] font-black text-white bg-[#E07A30] px-2 py-0.5 rounded-full">今日</span>}
+                          <span className="text-xs font-bold text-[#5A4C4C]">{fmtDate(ev.dateObj)}</span>
+                          <span className="text-xs font-black text-[#8E8282]">{ev.name}</span>
+                        </div>
+                        <span className="text-xs font-black text-[#E07A30]">{ev.bonus}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
 
             {/* ショップ比較 */}
             <section className="mb-12">
@@ -2476,31 +3245,92 @@ AI分析: ${selectedProduct.aiAnalysis}
                       </div>
                     </div>
 
-                    {/* 出品者アコーディオン */}
+                    {/* 出品者アコーディオン（公式/最安値/高評価 をラベル付きで表示） */}
                     {expandedMall === (shop.name || shop.shop_name) && shop.sellers?.length > 0 && (
                       <div className="bg-[#F9F6F3] border-t border-[#F4EFEB] p-4 space-y-3">
-                        {shop.sellers.map((seller, sIdx) => (
-                          <div key={sIdx} className="bg-white p-5 rounded-[1.5rem] flex items-center justify-between shadow-sm">
-                            <div className="flex-1 pr-4">
-                              <p className="text-xs font-black text-[#5A4C4C] line-clamp-1">{seller.name}</p>
-                              <div className="flex flex-wrap gap-2 mt-2 text-[9px] font-bold">
-                                {seller.shipping === 0 ? <span className="text-[#7B8E76] bg-[#7B8E76]/10 px-2 py-0.5 rounded">送料無料</span> : <span className="text-[#8E8282]">送料 {seller.shipping}円</span>}
-                                {seller.points > 0 && <span className="text-[#D4AF37] bg-[#FFF9E6] px-2 py-0.5 rounded">{seller.points}pt還元</span>}
+                        {[...shop.sellers]
+                          .sort((a, b) => {
+                            const order = { official: 0, cheapest: 1, top_rated: 2 };
+                            return (order[a.role] ?? 3) - (order[b.role] ?? 3);
+                          })
+                          .map((seller, sIdx) => {
+                            const roleLabel = seller.role === 'official' ? { text: '公式', bg: 'bg-[#F2ABAC]' }
+                              : seller.role === 'cheapest' ? { text: '最安値', bg: 'bg-[#7B8E76]' }
+                              : seller.role === 'top_rated' ? { text: '高評価', bg: 'bg-[#D4AF37]' }
+                              : null;
+                            return (
+                              <div key={sIdx} className="bg-white p-5 rounded-[1.5rem] flex items-center justify-between shadow-sm">
+                                <div className="flex-1 pr-4">
+                                  {roleLabel && (
+                                    <span className={`inline-block text-white text-[9px] font-black px-2 py-0.5 rounded mb-1.5 ${roleLabel.bg}`}>
+                                      {roleLabel.text}
+                                    </span>
+                                  )}
+                                  <p className="text-xs font-black text-[#5A4C4C] line-clamp-1">{seller.name}</p>
+                                  <div className="flex flex-wrap gap-2 mt-2 text-[9px] font-bold">
+                                    {seller.rating > 0 && (
+                                      <span className="text-[#D4AF37] bg-[#FFF9E6] px-2 py-0.5 rounded">
+                                        ★ {Number(seller.rating).toFixed(1)}{seller.reviews_count > 0 ? ` (${seller.reviews_count}件)` : ''}
+                                      </span>
+                                    )}
+                                    {seller.shipping === 0 ? <span className="text-[#7B8E76] bg-[#7B8E76]/10 px-2 py-0.5 rounded">送料無料</span> : seller.shipping > 0 ? <span className="text-[#8E8282]">送料 {seller.shipping}円</span> : null}
+                                    {seller.points > 0 && <span className="text-[#D4AF37] bg-[#FFF9E6] px-2 py-0.5 rounded">{seller.points}pt還元</span>}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-2 border-l border-[#F4EFEB] pl-4">
+                                  <span className="text-sm font-black text-[#7B8E76]">¥{seller.price.toLocaleString()}</span>
+                                  <a href={toVCUrl(seller.url) || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
+                                    ショップへ
+                                  </a>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2 border-l border-[#F4EFEB] pl-4">
-                              <span className="text-sm font-black text-[#7B8E76]">¥{seller.price.toLocaleString()}</span>
-                              <a href={toVCUrl(seller.url) || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
-                                ショップへ
-                              </a>
-                            </div>
-                          </div>
-                        ))}
+                            );
+                          })}
                       </div>
                     )}
                     <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.1</p>
               </div>
                 ))}
+              </div>
+            </section>
+
+            {/* ＝＝＝＝＝ ベビー専門店でも探す ＝＝＝＝＝ */}
+            <section className="mb-12">
+              <div className="flex items-center gap-2 mb-4 px-1">
+                <Store className="w-5 h-5 text-[#7B8E76]" />
+                <h3 className="font-black text-[#5A4C4C] text-xl">ベビー専門店でも探す</h3>
+              </div>
+              <p className="text-[10px] text-[#A5A19E] font-bold mb-4 px-1">公式オンラインストアで在庫・セール情報を確認できます</p>
+              <div className="grid grid-cols-2 gap-3">
+                {OFFICIAL_RETAILERS.filter(retailer =>
+                  retailer.domain !== 'mikihouse.co.jp' || selectedProduct.category === 'ウェア'
+                ).map(retailer => {
+                  const searchKw = (selectedProduct.name || '').split(/[\s　]+/).slice(0, 3).join(' ');
+                  const url = retailer.searchUrl(searchKw) + retailer.affiliateParam;
+                  return (
+                    <a
+                      key={retailer.domain}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 bg-white border border-[#F4EFEB] rounded-[1.5rem] px-4 py-4 shadow-sm active:scale-95 transition-transform"
+                    >
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-[#F4EFEB]">
+                        <img
+                          src={`https://www.google.com/s2/favicons?domain=${retailer.domain}&sz=32`}
+                          className="w-6 h-6"
+                          onError={e => { e.target.style.display = 'none'; }}
+                          alt={retailer.shortName}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-[#5A4C4C] truncate">{retailer.shortName}</p>
+                        <p className="text-[9px] text-[#A5A19E] font-bold">公式オンラインストア</p>
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-[#A5A19E] ml-auto shrink-0" />
+                    </a>
+                  );
+                })}
               </div>
             </section>
 
@@ -2525,7 +3355,7 @@ AI分析: ${selectedProduct.aiAnalysis}
                 >
                   SNSでの評判
                 </button>
-                <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-out ${reviewTab === 'sns' ? 'translate-x-full' : 'translate-x-0'}`}></div>
+                <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-out pointer-events-none ${reviewTab === 'sns' ? 'translate-x-full' : 'translate-x-0'}`}></div>
               </div>
 
               {/* Honest レビュー (ネイティブ) */}
@@ -2533,7 +3363,7 @@ AI分析: ${selectedProduct.aiAnalysis}
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center justify-between mb-6 px-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-[#5A4C4C]">{selectedProduct.rating}</span>
+                      <span className="text-3xl font-black text-[#5A4C4C]">{Number(selectedProduct.rating).toFixed(2)}</span>
                       <div className="flex items-center text-[#D4AF37]">
                         {[...Array(5)].map((_, i) => <Star key={i} className={`w-4 h-4 ${i < Math.floor(selectedProduct.rating) ? 'fill-current' : 'text-gray-200'}`} />)}
                       </div>
@@ -2549,21 +3379,48 @@ AI分析: ${selectedProduct.aiAnalysis}
                   <div className="space-y-4">
                     {selectedProduct.honestReviews && selectedProduct.honestReviews.length > 0 ? (
                       selectedProduct.honestReviews.map(review => (
-                        <div key={review.id} className="bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[#E5DACE] flex items-center justify-center text-white"><User className="w-4 h-4" /></div>
-                              <div>
-                                <p className="text-xs font-black text-[#5A4C4C]">{review.user}</p>
-                                <p className="text-[9px] font-bold text-[#A5A19E]">{review.date}</p>
+                        review.image_url ? (
+                          // Instagram風: 画像中心レイアウト
+                          <div key={review.id} className="bg-white border border-[#F4EFEB] rounded-[2rem] overflow-hidden shadow-sm">
+                            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#F2ABAC] to-[#E5DACE] flex items-center justify-center text-white shadow-sm"><User className="w-4 h-4" /></div>
+                                <div>
+                                  <p className="text-sm font-black text-[#5A4C4C]">{review.user}</p>
+                                  <p className="text-[10px] font-bold text-[#A5A19E]">{review.date}</p>
+                                </div>
+                              </div>
+                              <div className="flex text-[#D4AF37]">
+                                {[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
                               </div>
                             </div>
-                            <div className="flex text-[#D4AF37]">
-                              {[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
+                            <img src={review.image_url} alt="レビュー写真" className="w-full aspect-square object-cover" />
+                            <div className="px-5 py-4">
+                              <div className="flex items-center gap-2 mb-2 text-[#F2ABAC]">
+                                <Heart className="w-5 h-5 fill-current" />
+                                <span className="text-xs font-black text-[#5A4C4C]">使ってよかった</span>
+                              </div>
+                              <p className="text-sm text-[#5A4C4C] leading-relaxed font-medium">{review.content}</p>
                             </div>
                           </div>
-                          <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.content}"</p>
-                        </div>
+                        ) : (
+                          // テキスト中心: 従来の白カード
+                          <div key={review.id} className="bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-[#E5DACE] flex items-center justify-center text-white"><User className="w-4 h-4" /></div>
+                                <div>
+                                  <p className="text-xs font-black text-[#5A4C4C]">{review.user}</p>
+                                  <p className="text-[9px] font-bold text-[#A5A19E]">{review.date}</p>
+                                </div>
+                              </div>
+                              <div className="flex text-[#D4AF37]">
+                                {[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
+                              </div>
+                            </div>
+                            <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.content}"</p>
+                          </div>
+                        )
                       ))
                     ) : (
                       <div className="py-12 bg-white border-2 border-dashed border-[#F4EFEB] rounded-[2rem] text-center">
@@ -2619,20 +3476,21 @@ AI分析: ${selectedProduct.aiAnalysis}
               )}
             </section>
           </div>
+          </div>
         </div>
       )}
 
       {/* ＝＝＝＝＝ 口コミ投稿モーダル ＝＝＝＝＝ */}
       {isReviewFormOpen && selectedProduct && (
         <div className="fixed inset-0 z-[80] bg-black/40 backdrop-blur-sm flex justify-center items-end animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] p-6 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-300">
+          <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] p-6 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-300 lg:rounded-[2rem] lg:pb-8">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-black text-[#5A4C4C] text-lg">口コミを投稿</h3>
               <button onClick={() => setIsReviewFormOpen(false)} className="p-2 bg-[#F9F6F3] rounded-full"><X className="w-5 h-5 text-[#A5A19E]" /></button>
             </div>
 
             <div className="flex items-center gap-3 mb-6 bg-[#F9F6F3] p-3 rounded-[1.5rem]">
-              <img src={selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Loading..."; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
+              <img src={getHighResImage(selectedProduct.image) || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.onerror = null; e.target.src = selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
               <p className="text-xs font-black text-[#5A4C4C] line-clamp-1 flex-1">{selectedProduct.name}</p>
             </div>
 
@@ -2658,10 +3516,29 @@ AI分析: ${selectedProduct.aiAnalysis}
             </div>
 
             <div className="flex gap-3 mb-8">
-              <button className="flex-1 py-3 border-2 border-dashed border-[#F4EFEB] rounded-2xl flex flex-col items-center justify-center gap-1 text-[#A5A19E] hover:bg-[#F9F6F3] transition-colors">
-                <Camera className="w-5 h-5" />
-                <span className="text-[9px] font-bold">写真を追加</span>
-              </button>
+              <input
+                ref={reviewPhotoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setReviewPhotoFile(file);
+                  setReviewPhotoPreview(URL.createObjectURL(file));
+                }}
+              />
+              {reviewPhotoPreview ? (
+                <div className="relative flex-1">
+                  <img src={reviewPhotoPreview} alt="preview" className="w-full h-24 object-cover rounded-2xl" />
+                  <button onClick={() => { setReviewPhotoFile(null); setReviewPhotoPreview(null); }} className="absolute top-1 right-1 bg-black/50 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">×</button>
+                </div>
+              ) : (
+                <button onClick={() => reviewPhotoInputRef.current?.click()} className="flex-1 py-3 border-2 border-dashed border-[#F4EFEB] rounded-2xl flex flex-col items-center justify-center gap-1 text-[#A5A19E] hover:bg-[#F9F6F3] transition-colors">
+                  <Camera className="w-5 h-5" />
+                  <span className="text-[9px] font-bold">写真を追加</span>
+                </button>
+              )}
             </div>
 
             <button
@@ -2676,6 +3553,21 @@ AI分析: ${selectedProduct.aiAnalysis}
       )}
 
       {/* ＝＝＝＝＝ 法務・運営者情報モーダル ＝＝＝＝＝ */}
+      {showCookieBanner && (
+        <div className="fixed bottom-[72px] left-0 right-0 z-[70] px-4 pointer-events-none">
+          <div className="bg-[#5A4C4C] text-white rounded-2xl shadow-xl px-5 py-4 flex items-center gap-3 pointer-events-auto max-w-md mx-auto">
+            <p className="text-[11px] font-bold leading-relaxed flex-1">
+              本サービスはGoogle Analytics等のCookieを使用しています。
+              <button onClick={() => setActiveLegalPage('privacy')} className="underline ml-1">詳細</button>
+            </p>
+            <button onClick={() => { try { localStorage.setItem('honestBabyCookieConsent', '1'); } catch { } setShowCookieBanner(false); }}
+              className="text-[11px] font-black bg-white text-[#5A4C4C] px-3 py-1.5 rounded-full flex-shrink-0 active:scale-95 transition-transform">
+              同意する
+            </button>
+          </div>
+        </div>
+      )}
+
       {activeLegalPage && (
         <div className="fixed inset-0 z-[80] bg-[#FFFDFB] flex flex-col animate-in slide-in-from-bottom duration-300">
           <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
@@ -2713,7 +3605,7 @@ AI分析: ${selectedProduct.aiAnalysis}
         <div className="fixed bottom-[72px] left-0 right-0 z-50 px-4 pointer-events-none">
           <div className="bg-white border border-[#F2ABAC]/40 rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 pointer-events-auto max-w-md mx-auto">
             <div className="w-9 h-9 rounded-xl bg-[#FFF5F5] flex items-center justify-center flex-shrink-0">
-              <img src="/icons/icon-192x192.png" alt="" className="w-6 h-6 rounded-lg" />
+              <img src="/apple-touch-icon.png" alt="" className="w-6 h-6 rounded-lg" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-black text-[#5A4C4C] leading-tight">ホーム画面に追加</p>
@@ -2730,7 +3622,7 @@ AI分析: ${selectedProduct.aiAnalysis}
         </div>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-[#F4EFEB] px-8 pt-4 flex justify-between items-center rounded-t-[3rem] shadow-[0_-10px_40px_rgb(0,0,0,0.03)]" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}>
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-[#F4EFEB] px-8 pt-4 flex justify-between items-center rounded-t-[3rem] shadow-[0_-10px_40px_rgb(0,0,0,0.03)] lg:hidden" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}>
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'home' ? 'text-[#7B8E76] scale-110' : 'text-[#D4CDC7] hover:text-[#A5A19E]'}`}>
           <Home className={`w-6 h-6 ${activeTab === 'home' ? 'fill-current' : ''}`} /><span className="text-[9px] font-black uppercase tracking-tighter">ホーム</span>
         </button>
@@ -2752,8 +3644,8 @@ AI分析: ${selectedProduct.aiAnalysis}
 
       {/* ===== モーダル: 赤ちゃん情報 ===== */}
       {showBabyModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowBabyModal(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm lg:items-center" onClick={() => setShowBabyModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300 lg:rounded-[2rem] lg:pb-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><Baby className="w-5 h-5 text-[#F2ABAC]" /> Myベビー情報</h3>
               <button onClick={() => setShowBabyModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
@@ -2789,7 +3681,12 @@ AI分析: ${selectedProduct.aiAnalysis}
                   ))}
                 </div>
               </div>
-              <button onClick={() => { setBabyInfo({ ...babyForm }); setShowBabyModal(false); }}
+              <button onClick={() => {
+                const info = { ...babyForm };
+                setBabyInfo(info);
+                if (user) saveBabyProfileToDB(user.id, info);
+                setShowBabyModal(false);
+              }}
                 className="w-full py-4 bg-[#5A4C4C] text-white rounded-full font-black text-sm active:scale-95 transition-transform mt-2">
                 保存する
               </button>
@@ -2800,14 +3697,14 @@ AI分析: ${selectedProduct.aiAnalysis}
 
       {/* ===== モーダル: 価格アラート設定 ===== */}
       {showPriceAlertModal && selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowPriceAlertModal(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 backdrop-blur-sm lg:items-center" onClick={() => setShowPriceAlertModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300 lg:rounded-[2rem] lg:pb-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><BellRing className="w-5 h-5 text-[#D4AF37]" /> 価格アラート</h3>
               <button onClick={() => setShowPriceAlertModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex items-center gap-3 mb-6 p-4 bg-[#F9F6F3] rounded-[1.5rem]">
-              {selectedProduct.image && <img src={selectedProduct.image} alt="" className="w-14 h-14 rounded-[1rem] object-cover" />}
+              {selectedProduct.image && <img src={getHighResImage(selectedProduct.image)} alt="" className="w-14 h-14 rounded-[1rem] object-cover" />}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black text-[#5A4C4C] leading-tight line-clamp-2">{selectedProduct.name}</p>
                 <p className="text-xs text-[#A5A19E] font-bold mt-1">現在 ¥{selectedProduct.price?.toLocaleString()}</p>
@@ -2826,11 +3723,16 @@ AI分析: ${selectedProduct.aiAnalysis}
             <button onClick={() => {
               const target = Number(alertTargetPrice) || Math.floor((selectedProduct.price || 0) * 0.9);
               const shop = selectedProduct.shops?.[0];
-              setPriceAlerts(prev => [...prev.filter(a => a.id !== selectedProduct.id), {
+              const newAlert = {
                 id: selectedProduct.id, name: selectedProduct.name, image: selectedProduct.image,
                 price: selectedProduct.price, url: shop?.url || selectedProduct.url || '#',
                 targetPrice: target, addedAt: new Date().toISOString()
-              }]);
+              };
+              setPriceAlerts(prev => [...prev.filter(a => a.id !== selectedProduct.id), newAlert]);
+              if (user) {
+                savePriceAlertToDB(user.id, newAlert);
+                subscribeToPushNotifications(user.id);
+              }
               setShowPriceAlertModal(false);
             }} className="w-full py-4 bg-[#D4AF37] text-white rounded-full font-black text-sm active:scale-95 transition-transform">
               アラートを設定する
@@ -2841,8 +3743,8 @@ AI分析: ${selectedProduct.aiAnalysis}
 
       {/* ===== モーダル: 検索条件を保存 ===== */}
       {showSaveSearchModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowSaveSearchModal(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm lg:items-center" onClick={() => setShowSaveSearchModal(false)}>
+          <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 pb-12 animate-in slide-in-from-bottom duration-300 lg:rounded-[2rem] lg:pb-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><Bookmark className="w-5 h-5 text-[#7B8E76]" /> 検索条件を保存</h3>
               <button onClick={() => setShowSaveSearchModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
