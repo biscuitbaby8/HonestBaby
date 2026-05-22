@@ -276,11 +276,12 @@ const getLowestPrice = (shops) => {
 
 // Yahoo!ショッピング BONUS+優良ストア日（不定期のため毎月更新）
 const YAHOO_BONUS_PLUS_DATES = [
-  '2026-05-07',
-  '2026-05-09',
-  '2026-05-13',
-  '2026-05-27',
-  '2026-05-28',
+  '2026-06-04',
+  '2026-06-08',
+  '2026-06-17',
+  '2026-06-23',
+  '2026-06-27',
+  '2026-06-29',
 ];
 
 const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -454,16 +455,6 @@ const getAmazonUrl = (keyword) => {
   return `https://www.amazon.co.jp/s?k=${encodeURIComponent(keyword)}&tag=${AMAZON_TAG}`;
 };
 
-
-// Yahoo!ショッピング BONUS+優良ストア 開催日
-const YAHOO_BONUS_PLUS_DATES = [
-  '2026-06-04',
-  '2026-06-08',
-  '2026-06-17',
-  '2026-06-23',
-  '2026-06-27',
-  '2026-06-29',
-];
 
 const App = () => {
   const navigate = useNavigate();
