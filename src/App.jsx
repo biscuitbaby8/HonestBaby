@@ -2960,7 +2960,8 @@ ${userText}
 
             <div className="flex justify-between items-start mb-8 px-1">
               <div className="flex-1 pr-4">
-                <div className="flex gap-2 mb-2">
+                <div className="flex gap-2 mb-2 flex-wrap">
+                  {selectedProduct.brand && <span className="text-[10px] font-black text-[#B8860B] bg-[#FFF9E6] px-2 py-0.5 rounded-md">{selectedProduct.brand}</span>}
                   <span className="text-[10px] font-black text-[#7B8E76] bg-[#7B8E76]/10 px-2 py-0.5 rounded-md uppercase tracking-wider">{selectedProduct.category}</span>
                   {selectedProduct.giftTags && <span className="text-[10px] font-black text-[#F2ABAC] bg-[#F2ABAC]/10 px-2 py-0.5 rounded-md uppercase tracking-wider">Gift</span>}
                 </div>
@@ -2973,6 +2974,23 @@ ${userText}
               <button onClick={(e) => toggleFavorite(e, selectedProduct)} className="p-4 bg-white border border-[#F4EFEB] rounded-full shadow-sm">
                 <Heart className={`w-6 h-6 ${isFavorite(selectedProduct.id) ? 'text-red-500 fill-current' : 'text-[#D4CDC7]'}`} />
               </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-6 px-1">
+              <div className="bg-[#F9F6F3] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">最安値</p>
+                <p className="text-sm font-black text-[#5A4C4C]">
+                  {getLowestPrice(selectedProduct.shops) > 0 ? `¥${getLowestPrice(selectedProduct.shops).toLocaleString()}` : '---'}
+                </p>
+              </div>
+              <div className="bg-[#FFF9E6] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">評価</p>
+                <p className="text-sm font-black text-[#D4AF37]">★ {Number(selectedProduct.rating).toFixed(2)}</p>
+              </div>
+              <div className="bg-[#F0F4EF] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">取扱店舗</p>
+                <p className="text-sm font-black text-[#7B8E76]">{(selectedProduct.shops || []).length}店</p>
+              </div>
             </div>
 
             <div className="flex gap-3 mb-8 px-1">
@@ -2988,7 +3006,14 @@ ${userText}
               </a>
             </div>
 
-            <p className="text-sm text-[#8E8282] leading-relaxed mb-10 px-1 font-medium">{selectedProduct.description}</p>
+            {selectedProduct.description && (
+              <section className="mb-10 bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
+                <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 text-[#7B8E76]" /> 商品について
+                </h3>
+                <p className="text-sm text-[#8E8282] leading-relaxed font-medium">{selectedProduct.description}</p>
+              </section>
+            )}
 
             <section className="mb-10 bg-[#FFF5F5] border border-[#FFEBEB] p-8 rounded-[2.5rem] relative overflow-hidden">
               <div className="flex items-center gap-2 mb-4 relative z-10"><Sparkles className="w-5 h-5 text-[#F2ABAC]" /><h3 className="font-black text-[#5A4C4C] text-lg">AIによる分析</h3></div>
