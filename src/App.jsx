@@ -333,7 +333,7 @@ const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favo
         <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest">{product.category}</span>
         <div className="flex items-center gap-1 ml-auto bg-[#FFF9E6] px-2 py-0.5 rounded-full text-[#D4AF37]">
           <Star className="w-3 h-3 fill-current" />
-          <span className="text-[10px] font-black">{product.rating}</span>
+          <span className="text-[10px] font-black">{Number(product.rating).toFixed(2)}</span>
         </div>
       </div>
       <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{product.name}</h3>
@@ -3184,7 +3184,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center justify-between mb-6 px-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-[#5A4C4C]">{selectedProduct.rating}</span>
+                      <span className="text-3xl font-black text-[#5A4C4C]">{Number(selectedProduct.rating).toFixed(2)}</span>
                       <div className="flex items-center text-[#D4AF37]">
                         {[...Array(5)].map((_, i) => <Star key={i} className={`w-4 h-4 ${i < Math.floor(selectedProduct.rating) ? 'fill-current' : 'text-gray-200'}`} />)}
                       </div>
