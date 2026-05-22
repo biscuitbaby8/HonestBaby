@@ -274,6 +274,51 @@ const getLowestPrice = (shops) => {
   return prices.length > 0 ? Math.min(...prices) : 0;
 };
 
+// Yahoo!ショッピング 手動キャンペーン（感謝デー・BONUS+）— 毎月更新
+const YAHOO_MANUAL_EVENTS = [
+  { date: '2026-05-07', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
+  { date: '2026-05-09', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
+  { date: '2026-05-11', name: 'ヤフショ感謝デー', bonus: '+4%', color: 'orange' },
+  { date: '2026-05-13', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
+  { date: '2026-05-22', name: 'ヤフショ感謝デー', bonus: '+4%', color: 'orange' },
+  { date: '2026-05-27', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
+  { date: '2026-05-28', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
+];
+
+const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const getYahooSaleEvents = (fromDate, count = 5) => {
+  const today = toYMD(fromDate);
+  const results = [];
+  const seen = new Set();
+
+  // 今日から最大90日先まで候補を生成してマージ・ソート
+  for (let i = 0; i < 90 && results.length < count; i++) {
+    const d = new Date(fromDate);
+    d.setDate(fromDate.getDate() + i);
+    const ymd = toYMD(d);
+    const day = d.getDate();
+    const dow = d.getDay(); // 0=Sun
+
+    const algorithmic = [];
+    if (day === 1) algorithmic.push({ name: 'ファーストデイ', bonus: '+4%', color: 'orange' });
+    if (day === 5 || day === 15 || day === 25) algorithmic.push({ name: '5のつく日', bonus: '+4%', color: 'orange' });
+    if (dow === 0) algorithmic.push({ name: 'プレミアムな日曜日', bonus: '+5%', color: 'yellow' });
+
+    const manuals = YAHOO_MANUAL_EVENTS.filter(e => e.date === ymd);
+
+    [...algorithmic, ...manuals].forEach(ev => {
+      const key = `${ymd}-${ev.name}`;
+      if (!seen.has(key) && results.length < count) {
+        seen.add(key);
+        results.push({ ...ev, date: ymd, isToday: ymd === today, dateObj: d });
+      }
+    });
+  }
+
+  return results;
+};
+
 const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock }) => (
   <div
     className="bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full relative active:scale-95 transition-all cursor-pointer border border-[#F4EFEB]"
@@ -2076,6 +2121,23 @@ ${userText}
           <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
         </div>
 
+        {/* ─── Yahoo!ショッピング 今日のお得バナー ─── */}
+        {(() => {
+          const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
+          if (!todayEvents.length) return null;
+          const ev = todayEvents[0];
+          return (
+            <div className="mb-6 bg-[#FFF3E8] border border-[#FFD9B5] rounded-[2rem] p-5 flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-[10px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!ショッピング 今日のお得</p>
+                <p className="text-base font-black text-[#5A4C4C]">{ev.name}</p>
+                <p className="text-xs text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+              </div>
+              <span className="text-3xl">🛒</span>
+            </div>
+          );
+        })()}
+
         {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
         {babyInfo && babyAgeMonths != null && (() => {
           const stage = AGE_CATEGORY_MAP.find(s => babyAgeMonths >= s.minM && babyAgeMonths < s.maxM);
@@ -3053,6 +3115,41 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                 </div>
               </section>
             )}
+
+            {/* Yahoo!ショッピング お得な日 */}
+            {(() => {
+              const hasYahoo =
+                (selectedProduct.shops || []).some(s => (s.name || '').includes('Yahoo')) ||
+                (selectedProduct.crossPlatformPrices || []).some(p => p.source === 'yahoo');
+              if (!hasYahoo) return null;
+              const events = getYahooSaleEvents(new Date(), 3);
+              if (!events.length) return null;
+              const fmtDate = (d) => {
+                const m = d.getMonth() + 1;
+                const day = d.getDate();
+                const dows = ['日', '月', '火', '水', '木', '金', '土'];
+                return `${m}月${day}日（${dows[d.getDay()]}）`;
+              };
+              return (
+                <section className="mb-8 bg-white border border-[#FFD9B5] rounded-[2rem] p-6 shadow-sm">
+                  <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-4">
+                    <span className="text-base">🛒</span> Yahoo!ショッピングのお得な日
+                  </h3>
+                  <div className="space-y-2">
+                    {events.map((ev, i) => (
+                      <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${ev.isToday ? 'bg-[#FFF3E8] border border-[#FFD9B5]' : 'bg-[#F9F6F3]'}`}>
+                        <div className="flex items-center gap-2">
+                          {ev.isToday && <span className="text-[10px] font-black text-white bg-[#E07A30] px-2 py-0.5 rounded-full">今日</span>}
+                          <span className="text-xs font-bold text-[#5A4C4C]">{fmtDate(ev.dateObj)}</span>
+                          <span className="text-xs font-black text-[#8E8282]">{ev.name}</span>
+                        </div>
+                        <span className="text-xs font-black text-[#E07A30]">{ev.bonus}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
 
             {/* ショップ比較 */}
             <section className="mb-12">
