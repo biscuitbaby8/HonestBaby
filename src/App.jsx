@@ -567,6 +567,53 @@ const App = () => {
     } catch { }
   };
 
+  // --- 赤ちゃん情報: DBとのsync ---
+  const syncBabyProfileWithDB = async (userId) => {
+    try {
+      const { data: dbProfile } = await supabase
+        .from('baby_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (dbProfile) {
+        // DBにあれば localStorage を上書き
+        setBabyInfo({
+          name: dbProfile.name || '',
+          birthYear: dbProfile.birth_year,
+          birthMonth: dbProfile.birth_month,
+          gender: dbProfile.gender || '',
+        });
+      } else {
+        // DBに無い & localStorageにあれば DB へ push
+        const local = JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null');
+        if (local && local.birthYear) {
+          await supabase.from('baby_profiles').upsert({
+            user_id: userId,
+            name: local.name || null,
+            birth_year: local.birthYear,
+            birth_month: local.birthMonth,
+            gender: local.gender || null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id' });
+        }
+      }
+    } catch { }
+  };
+
+  const saveBabyProfileToDB = async (userId, info) => {
+    try {
+      await supabase.from('baby_profiles').upsert({
+        user_id: userId,
+        name: info.name || null,
+        birth_year: info.birthYear,
+        birth_month: info.birthMonth,
+        gender: info.gender || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+    } catch { }
+  };
+
   const savePriceAlertToDB = async (userId, alert) => {
     try {
       await supabase.from('price_alerts').upsert({
@@ -771,6 +818,7 @@ const App = () => {
       if (u) {
         migrateLocalFavoritesToDB(u.id);
         syncPriceAlertsWithDB(u.id);
+        syncBabyProfileWithDB(u.id);
       }
     });
 
@@ -3504,7 +3552,12 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   ))}
                 </div>
               </div>
-              <button onClick={() => { setBabyInfo({ ...babyForm }); setShowBabyModal(false); }}
+              <button onClick={() => {
+                const info = { ...babyForm };
+                setBabyInfo(info);
+                if (user) saveBabyProfileToDB(user.id, info);
+                setShowBabyModal(false);
+              }}
                 className="w-full py-4 bg-[#5A4C4C] text-white rounded-full font-black text-sm active:scale-95 transition-transform mt-2">
                 保存する
               </button>
