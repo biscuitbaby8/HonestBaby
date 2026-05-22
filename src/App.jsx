@@ -199,6 +199,16 @@ const getAmazonUrl = (keyword) => {
 };
 
 
+// Yahoo!ショッピング BONUS+優良ストア 開催日
+const YAHOO_BONUS_PLUS_DATES = [
+  '2026-06-04',
+  '2026-06-08',
+  '2026-06-17',
+  '2026-06-23',
+  '2026-06-27',
+  '2026-06-29',
+];
+
 const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1589,11 +1599,16 @@ ${userText}
 
     if (dbLoading) {
       return (
-        <div className="flex flex-col items-center py-32 text-[#A5A19E] animate-in fade-in duration-700">
-          <div className="w-10 h-10 border-4 border-[#F2ABAC]/20 border-t-[#F2ABAC] rounded-full animate-spin mb-6"></div>
-          <div className="space-y-2 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F2ABAC]/60">Connecting to Hub</p>
-            <p className="text-xs font-bold text-[#A5A19E]">データを読み込んでいます...</p>
+        <div className="loading-container">
+          <div className="rabbit-path">
+            <img 
+              src="/assets/loading-rabbit.png" 
+              alt="Loading..." 
+              className="rabbit-character"
+            />
+          </div>
+          <div className="loading-text font-serif font-black">
+            データを読み込んでいます<span className="loading-dots"></span>
           </div>
         </div>
       );
