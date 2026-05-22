@@ -2088,7 +2088,7 @@ ${userText}
         const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
         return matchCat && matchSub && matchSubSub;
       })
-      .sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999));
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
     const showRemote = remoteProducts.length > 0 || isRemoteLoading;
