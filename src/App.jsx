@@ -274,15 +274,13 @@ const getLowestPrice = (shops) => {
   return prices.length > 0 ? Math.min(...prices) : 0;
 };
 
-// Yahoo!ショッピング 手動キャンペーン（感謝デー・BONUS+）— 毎月更新
-const YAHOO_MANUAL_EVENTS = [
-  { date: '2026-05-07', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
-  { date: '2026-05-09', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
-  { date: '2026-05-11', name: 'ヤフショ感謝デー', bonus: '+4%', color: 'orange' },
-  { date: '2026-05-13', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
-  { date: '2026-05-22', name: 'ヤフショ感謝デー', bonus: '+4%', color: 'orange' },
-  { date: '2026-05-27', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
-  { date: '2026-05-28', name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' },
+// Yahoo!ショッピング BONUS+優良ストア日（不定期のため毎月更新）
+const YAHOO_BONUS_PLUS_DATES = [
+  '2026-05-07',
+  '2026-05-09',
+  '2026-05-13',
+  '2026-05-27',
+  '2026-05-28',
 ];
 
 const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -292,7 +290,6 @@ const getYahooSaleEvents = (fromDate, count = 5) => {
   const results = [];
   const seen = new Set();
 
-  // 今日から最大90日先まで候補を生成してマージ・ソート
   for (let i = 0; i < 90 && results.length < count; i++) {
     const d = new Date(fromDate);
     d.setDate(fromDate.getDate() + i);
@@ -300,14 +297,14 @@ const getYahooSaleEvents = (fromDate, count = 5) => {
     const day = d.getDate();
     const dow = d.getDay(); // 0=Sun
 
-    const algorithmic = [];
-    if (day === 1) algorithmic.push({ name: 'ファーストデイ', bonus: '+4%', color: 'orange' });
-    if (day === 5 || day === 15 || day === 25) algorithmic.push({ name: '5のつく日', bonus: '+4%', color: 'orange' });
-    if (dow === 0) algorithmic.push({ name: 'プレミアムな日曜日', bonus: '+5%', color: 'yellow' });
+    const events = [];
+    if (day === 1) events.push({ name: 'ファーストデイ', bonus: '+4%', color: 'orange' });
+    if (day === 5 || day === 15 || day === 25) events.push({ name: '5のつく日', bonus: '+4%', color: 'orange' });
+    if (day === 11 || day === 22) events.push({ name: 'ヤフショ感謝デー', bonus: '+4%', color: 'orange' });
+    if (dow === 0) events.push({ name: 'プレミアムな日曜日', bonus: '+5%', color: 'yellow' });
+    if (YAHOO_BONUS_PLUS_DATES.includes(ymd)) events.push({ name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' });
 
-    const manuals = YAHOO_MANUAL_EVENTS.filter(e => e.date === ymd);
-
-    [...algorithmic, ...manuals].forEach(ev => {
+    events.forEach(ev => {
       const key = `${ymd}-${ev.name}`;
       if (!seen.has(key) && results.length < count) {
         seen.add(key);
