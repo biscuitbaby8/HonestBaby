@@ -2605,9 +2605,11 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
                   { slug: 'syussan-junbi-list', label: '出産準備リスト（月齢別チェックリスト）' },
                   { slug: 'omutsu-hikaku', label: 'おむつ比較・おすすめランキング' },
                 ].map(a => (
-                  <a key={a.slug} href={`/article/${a.slug}`} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors">
-                    <FileText className="w-4 h-4 mr-2 flex-shrink-0" />{a.label}
-                  </a>
+                  <div key={a.slug} className="flex items-center gap-2 text-xs font-bold text-[#D4CDC7] cursor-default">
+                    <FileText className="w-4 h-4 flex-shrink-0" />
+                    <span>{a.label}</span>
+                    <span className="text-[9px] font-black bg-[#F4EFEB] text-[#C0B8B2] px-2 py-0.5 rounded-full uppercase tracking-wider">Coming Soon</span>
+                  </div>
                 ))}
               </div>
             </div>
