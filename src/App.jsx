@@ -1680,8 +1680,18 @@ const App = () => {
         formatted = formatRawItems(allItems);
       }
 
-      setSearchResults(formatted);
-      autoSaveSearchResultsToDb(formatted, keyword);
+      const deduped = dedupeAndMergeShops(formatted);
+      const matchedCat = CATEGORY_TREE.find(cat =>
+        cat.name !== "すべて" && (
+          keyword.includes(cat.name) ||
+          (cat.keyword && keyword.includes(cat.keyword)) ||
+          cat.subs?.some(s => keyword.includes(typeof s === 'string' ? s : s.name))
+        )
+      );
+      const resolvedCategory = matchedCat?.name || keyword;
+      const categorized = deduped.map(p => ({ ...p, category: resolvedCategory }));
+      setSearchResults(categorized);
+      autoSaveSearchResultsToDb(categorized, keyword);
     } catch (err) {
       console.error("Remote Search Error:", err);
       setSearchError(err.message);
@@ -3118,7 +3128,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
             {(() => {
               const hasYahoo =
                 (selectedProduct.shops || []).some(s => (s.name || '').includes('Yahoo')) ||
-                (selectedProduct.crossPlatformPrices || []).some(p => p.source === 'yahoo');
+                crossPlatformShops.some(s => s.source === 'yahoo');
               if (!hasYahoo) return null;
               const events = getYahooSaleEvents(new Date(), 3);
               if (!events.length) return null;
@@ -3167,14 +3177,6 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               <div className="space-y-4">
                 {(() => {
                   const existingShops = selectedProduct.shops || [];
-                  const crossPlatformShops = (selectedProduct.crossPlatformPrices || []).map(p => ({
-                    name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング',
-                    type: 'mall',
-                    lowestPrice: p.price,
-                    url: p.url,
-                    sellers: [{ name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング', price: p.price, url: p.url, shipping: 0, points: 0 }]
-                  }));
-                  
                   const shopByKey = new Map();
                   const shopKey = (s) => (s.name || s.shop_name || '').toLowerCase();
                   
@@ -3279,7 +3281,6 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           })}
                       </div>
                     )}
-                    <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.1</p>
               </div>
                 ))}
               </div>
