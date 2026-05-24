@@ -1246,7 +1246,7 @@ const App = () => {
       }
     };
     fetchCross();
-  }, [selectedProduct]);
+  }, [selectedProduct?.id]);
 
   // ギフトタブ: DBから取得してフィルタ（クロンが毎朝更新）
   const sceneKeywords = {
