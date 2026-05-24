@@ -1390,12 +1390,15 @@ const App = () => {
         const normalizedSubSub = (catName === 'おむつ' && DIAPER_SIZE_MAP[subSubCat])
           ? DIAPER_SIZE_MAP[subSubCat] : subSubCat;
         // おしりふきは「おむつ」を前置するとヒットしないため単独キーワード
+        // ゴミ箱・袋は中黒入りのカテゴリ名をそのまま使うとヒットしないため専用キーワード
         // 周辺グッズは商品名に「周辺グッズ」が入らないためカテゴリキーワードのみで検索
         const subKeyword = (catName === 'おむつ' && subCat === 'おしりふき')
           ? 'ベビー おしりふき'
-          : subCat === '周辺グッズ'
-            ? genre.keyword
-            : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
+          : (catName === 'おむつ' && subCat === 'ゴミ箱・袋')
+            ? (normalizedSubSub !== 'すべて' ? `おむつ ${normalizedSubSub}` : 'おむつポット 防臭袋 ゴミ箱')
+            : subCat === '周辺グッズ'
+              ? genre.keyword
+              : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
         // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
         const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
         const isWipes = catName === 'おむつ' && subCat === 'おしりふき';
