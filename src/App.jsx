@@ -3244,9 +3244,25 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   const shopByKey = new Map();
                   const shopKey = (s) => (s.name || s.shop_name || '').toLowerCase();
 
-                  for (const s of allCandidates.filter(isReasonablePrice)) {
+                  // crossPlatformShops はAPIから取得した正確なURLを持つため優先
+                  const hasCrossRakuten = crossPlatformShops.some(s => s.source === 'rakuten');
+                  const hasCrossYahoo = crossPlatformShops.some(s => s.source === 'yahoo');
+
+                  for (const s of crossPlatformShops.filter(isReasonablePrice)) {
                     const key = shopKey(s);
                     if (!key) continue;
+                    const cur = shopByKey.get(key);
+                    if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
+                      shopByKey.set(key, s);
+                    }
+                  }
+
+                  for (const s of existingShops.filter(isReasonablePrice)) {
+                    const key = shopKey(s);
+                    if (!key) continue;
+                    // crossPlatformShops が同プラットフォームをカバー済みならDBの古いデータはスキップ
+                    if (hasCrossRakuten && key.includes('楽天')) continue;
+                    if (hasCrossYahoo && (key.includes('yahoo') || key.includes('ヤフー'))) continue;
                     const cur = shopByKey.get(key);
                     if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
                       shopByKey.set(key, s);
