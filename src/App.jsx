@@ -1167,7 +1167,10 @@ const App = () => {
 
       try {
         const keyword = selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ');
-        const origPrice = selectedProduct.price || getLowestPrice(selectedProduct.shops) || 0;
+        // 中央値を基準価格にすることで、誤データの最安値に引っ張られないようにする
+        const shopPrices = (selectedProduct.shops || []).map(s => s.lowestPrice || s.price || 0).filter(p => p > 0).sort((a, b) => a - b);
+        const medianShopPrice = shopPrices.length > 0 ? shopPrices[Math.floor(shopPrices.length / 2)] : 0;
+        const origPrice = medianShopPrice || selectedProduct.price || 0;
         const priceMin = origPrice > 0 ? origPrice * 0.2 : 0;
         const priceMax = origPrice > 0 ? origPrice * 5 : Infinity;
         const selectedWords = keyword.split(' ').filter(w => w.length >= 2).map(w => w.toLowerCase());
@@ -3177,10 +3180,23 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               <div className="space-y-4">
                 {(() => {
                   const existingShops = selectedProduct.shops || [];
+                  const allCandidates = [...existingShops, ...crossPlatformShops];
+
+                  // 外れ値除去: 中央値の15%未満の価格は別商品の誤マッチとして除外
+                  const nonZero = allCandidates
+                    .map(s => s.lowestPrice || s.price || 0)
+                    .filter(p => p > 0)
+                    .sort((a, b) => a - b);
+                  const median = nonZero.length > 0 ? nonZero[Math.floor(nonZero.length / 2)] : 0;
+                  const isReasonablePrice = (s) => {
+                    const p = s.lowestPrice || s.price || 0;
+                    return !median || p === 0 || p >= median * 0.15;
+                  };
+
                   const shopByKey = new Map();
                   const shopKey = (s) => (s.name || s.shop_name || '').toLowerCase();
-                  
-                  for (const s of [...existingShops, ...crossPlatformShops]) {
+
+                  for (const s of allCandidates.filter(isReasonablePrice)) {
                     const key = shopKey(s);
                     if (!key) continue;
                     const cur = shopByKey.get(key);
