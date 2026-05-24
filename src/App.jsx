@@ -1210,6 +1210,8 @@ const App = () => {
           return selectedWords.some(w => lower.includes(w));
         };
         const priceInRange = (p) => origPrice === 0 || (p >= priceMin && p <= priceMax);
+        const USED_KEYWORDS = ['中古', 'リユース', '訳あり', 'アウトレット', '中古品', '再生品'];
+        const isNewItem = (name) => !USED_KEYWORDS.some(w => (name || '').includes(w));
 
         // --- 口コミ・SNSレビューの最新データをDBから取得 ---
         const fetchReviewsFromDb = async () => {
@@ -1241,7 +1243,7 @@ const App = () => {
         const newShops = [...cachedShops];
 
         if (rakutenResult.status === 'fulfilled' && rakutenResult.value.products) {
-          const items = rakutenResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          const items = rakutenResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || '楽天市場';
@@ -1256,7 +1258,7 @@ const App = () => {
         }
 
         if (yahooResult.status === 'fulfilled' && yahooResult.value.products) {
-          const items = yahooResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          const items = yahooResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || 'Yahoo!ショッピング';
