@@ -1425,20 +1425,28 @@ const App = () => {
           ? DIAPER_SIZE_MAP[subSubCat] : subSubCat;
         // おしりふきは「おむつ」を前置するとヒットしないため単独キーワード
         // ゴミ箱・袋は中黒入りのカテゴリ名をそのまま使うとヒットしないため専用キーワード
+        // ミルク(粉/液体)は授乳グッズジャンルに縛られると食品ジャンルの製品が取れないため単独キーワード+ジャンル除外
+        // 母乳パッドは「ミルク 授乳」を前置すると精度が落ちるため単独キーワード
         // 周辺グッズは商品名に「周辺グッズ」が入らないためカテゴリキーワードのみで検索
         const subKeyword = (catName === 'おむつ' && subCat === 'おしりふき')
           ? 'ベビー おしりふき'
           : (catName === 'おむつ' && subCat === 'ゴミ箱・袋')
             ? (normalizedSubSub !== 'すべて' ? `おむつ ${normalizedSubSub}` : 'おむつポット 防臭袋 ゴミ箱')
-            : subCat === '周辺グッズ'
-              ? (ACCESSORY_SEARCH_KEYWORDS[catName] || genre.keyword)
-              : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
+            : (catName === 'ミルク・授乳' && subCat === 'ミルク')
+              ? 'ベビー 粉ミルク 液体ミルク'
+              : (catName === 'ミルク・授乳' && subCat === '母乳パッド')
+                ? '母乳パッド 授乳パッド'
+                : subCat === '周辺グッズ'
+                  ? (ACCESSORY_SEARCH_KEYWORDS[catName] || genre.keyword)
+                  : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
         // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
         const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
         const isWipes = catName === 'おむつ' && subCat === 'おしりふき';
+        // ミルク(粉/液体)は食品ジャンルにあるためgenreIdを外して広範囲検索
+        const skipGenreId = isWipes || (catName === 'ミルク・授乳' && subCat === 'ミルク');
         const subFetches = SORTS.flatMap(sort =>
           [1, 2, 3].map(p =>
-            fetch(`${searchUrl(subKeyword, p, sort)}${isWipes ? '' : '&genreId=' + genreId}`)
+            fetch(`${searchUrl(subKeyword, p, sort)}${skipGenreId ? '' : '&genreId=' + genreId}`)
               .then(r => r.ok ? r.json() : { Items: [] })
               .catch(() => ({ Items: [] }))
           )
