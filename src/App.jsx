@@ -238,6 +238,12 @@ const OFFICIAL_RETAILERS = [
   },
 ];
 
+const SPECIALTY_SHOPS = [
+  { shopCode: 'akachan',      name: 'アカチャンホンポ', source: 'akachan',      domain: 'shop.akachan.jp' },
+  { shopCode: 'nishimatsuya', name: '西松屋',           source: 'nishimatsuya', domain: '24028-net.jp' },
+  { shopCode: 'toysrus',      name: 'ベビーザらス',     source: 'toysrus',      domain: 'toysrus.co.jp' },
+];
+
 const detectOfficialShop = (shop) => {
   const target = `${shop?.name || ''} ${shop?.url || ''}`;
   for (const rule of OFFICIAL_SHOP_RULES) {
@@ -1145,6 +1151,35 @@ const App = () => {
             };
             if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
           }
+        }
+
+        // ベビー専門店: shopCode 検索で在庫確認し、公式URLでカード追加
+        const specialtyResults = await Promise.allSettled(
+          SPECIALTY_SHOPS.map(sp =>
+            fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1&shopCode=${sp.shopCode}`)
+              .then(r => r.json())
+              .then(data => ({ ...sp, data }))
+              .catch(() => ({ ...sp, data: { products: [] } }))
+          )
+        );
+
+        for (const result of specialtyResults) {
+          if (result.status !== 'fulfilled') continue;
+          const { name, source, domain, data } = result.value;
+          if (!data.products?.length) continue;
+          const items = data.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          if (items.length === 0) continue;
+          const best = items.sort((a, b) => a.price - b.price)[0];
+          const retailer = OFFICIAL_RETAILERS.find(r => r.domain === domain);
+          if (!retailer) continue;
+          const officialUrl = retailer.searchUrl(keyword) + retailer.affiliateParam;
+          const idx = newShops.findIndex(s => s.source === source);
+          const shopData = {
+            name, type: 'mall', lowestPrice: best.price, source,
+            url: officialUrl,
+            sellers: [{ name, price: best.price, shipping: 0, points: 0, url: officialUrl, note: '' }]
+          };
+          if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
         }
 
         setCrossPlatformShops(newShops);
@@ -3040,10 +3075,15 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       <div className="flex-1 pr-4">
                         <div className="flex items-center flex-wrap gap-2 mb-1.5">
                           <div className="w-5 h-5 rounded-md flex items-center justify-center overflow-hidden border border-[#F4EFEB] bg-white">
-                            {(shop.name || shop.shop_name).includes('楽天') ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> : 
+                            {(shop.name || shop.shop_name).includes('楽天') ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
                              (shop.name || shop.shop_name).includes('Yahoo') ? <img src="https://shopping.yahoo.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
                              (shop.name || shop.shop_name).toLowerCase().includes('amazon') ? <img src="https://www.amazon.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
-                             <Store className="w-3.5 h-3.5 text-[#A5A19E]" />}
+                             (() => {
+                               const sp = SPECIALTY_SHOPS.find(s => s.source === (shop.source || ''));
+                               return sp
+                                 ? <img src={`https://www.google.com/s2/favicons?domain=${sp.domain}&sz=32`} className="w-3.5 h-3.5" onError={e => { e.target.style.display='none'; }} />
+                                 : <Store className="w-3.5 h-3.5 text-[#A5A19E]" />;
+                             })()}
                           </div>
                           <p className="text-base font-black text-[#5A4C4C]">{shop.name || shop.shop_name}</p>
                           {shop.type === 'official' && (
@@ -3112,46 +3152,6 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.1</p>
               </div>
                 ))}
-              </div>
-            </section>
-
-            {/* ＝＝＝＝＝ ベビー専門店でも探す ＝＝＝＝＝ */}
-            <section className="mb-12">
-              <div className="flex items-center gap-2 mb-4 px-1">
-                <Store className="w-5 h-5 text-[#7B8E76]" />
-                <h3 className="font-black text-[#5A4C4C] text-xl">ベビー専門店でも探す</h3>
-              </div>
-              <p className="text-[10px] text-[#A5A19E] font-bold mb-4 px-1">公式オンラインストアで在庫・セール情報を確認できます</p>
-              <div className="grid grid-cols-2 gap-3">
-                {OFFICIAL_RETAILERS.filter(retailer =>
-                  retailer.domain !== 'mikihouse.co.jp' || selectedProduct.category === 'ウェア'
-                ).map(retailer => {
-                  const searchKw = (selectedProduct.name || '').split(/[\s　]+/).slice(0, 3).join(' ');
-                  const url = retailer.searchUrl(searchKw) + retailer.affiliateParam;
-                  return (
-                    <a
-                      key={retailer.domain}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 bg-white border border-[#F4EFEB] rounded-[1.5rem] px-4 py-4 shadow-sm active:scale-95 transition-transform"
-                    >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-[#F4EFEB]">
-                        <img
-                          src={`https://www.google.com/s2/favicons?domain=${retailer.domain}&sz=32`}
-                          className="w-6 h-6"
-                          onError={e => { e.target.style.display = 'none'; }}
-                          alt={retailer.shortName}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-[#5A4C4C] truncate">{retailer.shortName}</p>
-                        <p className="text-[9px] text-[#A5A19E] font-bold">公式オンラインストア</p>
-                      </div>
-                      <ExternalLink className="w-3.5 h-3.5 text-[#A5A19E] ml-auto shrink-0" />
-                    </a>
-                  );
-                })}
               </div>
             </section>
 
