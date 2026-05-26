@@ -49,12 +49,12 @@ const CATEGORY_TREE = [
       { name: "パンツタイプ", subsubs: ["S", "M", "L", "BIG", "BIGより大きい"] },
       { name: "夜用おむつ", subsubs: ["M", "L", "BIG", "BIGより大きい"] },
       { name: "おしりふき" },
+      { name: "ゴミ箱・袋", subsubs: ["おむつポット", "防臭袋"] },
     ]
   },
-  { name: "ゴミ箱・袋", id: "101070", keyword: "おむつ ゴミ箱 防臭", subs: ["おむつポット", "防臭袋", "サニタリーボックス"] },
   { name: "ベビーカー", id: "200833", keyword: "ベビーカー", subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
   { name: "抱っこ紐", id: "412209", keyword: "抱っこ紐", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
-  { name: "ウェア", id: "111102", keyword: "ベビー服", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
+  { name: "ウェア", id: "111102", keyword: "ベビー服", subs: ["ロンパース", "カバーオール", "肌着", "アウター", "スタイ"] },
   { name: "ミルク・授乳", id: "205208", keyword: "ミルク 授乳", subs: ["ミルク", "哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
   { name: "離乳食・食器", id: "213980", keyword: "離乳食", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
   { name: "寝具・ベッド", id: "200822", keyword: "ベビーベッド", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
@@ -115,16 +115,44 @@ const ACCESSORY_EXCLUDE_WORDS = [
   '延長ベルト', 'アームバー', 'ベビーカード', 'タイヤ交換', 'シート生地', '車輪のみ',
   'ペットボトルホルダー', 'スマホスタンド', 'アクセサリーセット', '収納ポーチ',
   'よだれカバー', 'サンシェード単品', 'フック単品',
+  'ベビーカーシート', 'ベビーカーボード', 'ステップボード',
+  'ベビーカーフック', 'ベビーカーバッグ', 'ベビーカー用バッグ',
+  'ハンドルグリップ', 'グリップカバー',
+  'サンシェード', 'UVカバー', '日よけカバー',
+  'リュック取付', 'カバーのみ',
+  // 抱っこ紐アクセサリー
+  'よだれパッド', 'ヘッドサポート', 'よだれよけ',
+  'ベビーキャリア用', '抱っこひも用', '抱っこ紐用',
+  'ウエストポーチ', '抱っこ紐ケープ', '防寒ケープ', 'ハグウォーマー',
+  'ヒップシートカバー',
   // チャイルドシートアクセサリー
   'シートベルトカバー', 'シートプロテクター', 'ミラー取付',
-  // 抱っこ紐アクセサリー
-  'よだれパッド',
+  'チャイルドシート用', 'カーシート用',
+  'シートカバー取付', 'ヘッドレストカバー', '車用シート保護',
   // おむつ関連（おむつカテゴリ以外での混入防止）
   'おむつポーチ', 'おむつバッグ', 'おむつストッカー',
-  // ベビーカー・チャイルドシート・抱っこ紐アクセサリー追加
-  'シューズクリップ', 'ファンシート', '抜け出し防止', 'ベビーカーシート',
-  '防寒ケープ', '抱っこ紐ケープ', 'ハグウォーマー',
+  // その他
+  'シューズクリップ', 'ファンシート', '抜け出し防止',
 ];
+
+// 周辺グッズ検索時はカテゴリ別に "アクセサリー" を付加して精度向上
+const ACCESSORY_SEARCH_KEYWORDS = {
+  "ベビーカー": "ベビーカー アクセサリー",
+  "抱っこ紐": "抱っこ紐 アクセサリー",
+  "車用品": "チャイルドシート アクセサリー",
+};
+
+// subCat=すべて 時のソフトフィルタ: カテゴリ固有語が含まれない商品を除外
+// 5件以上残る場合のみ適用（空表示防止）
+const CATEGORY_CORE_WORDS = {
+  "ベビーカー": ["ベビーカー", "バギー", "ストローラー"],
+  "抱っこ紐": ["抱っこ紐", "抱っこひも", "だっこひも", "スリング", "ヒップシート", "キャリア", "おんぶ紐"],
+  "車用品": ["チャイルドシート", "カーシート", "ジュニアシート"],
+  "ウェア": ["ロンパース", "カバーオール", "肌着", "ベビー服", "アウター", "スタイ", "パジャマ", "ウェア"],
+  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー", "ベビー布団"],
+  "おもちゃ": ["おもちゃ", "玩具", "知育", "ガラガラ", "メリー", "ぬいぐるみ"],
+  "安全グッズ": ["ゲート", "ガード", "ロック", "モニター", "転倒防止", "ベビーサークル"],
+};
 
 // おむつサイズマッピング（検索精度向上用）
 const DIAPER_SIZE_MAP = {
@@ -279,6 +307,50 @@ const getLowestPrice = (shops) => {
   const prices = normalized.map(s => s.lowestPrice).filter(p => p > 0 && isFinite(p));
   return prices.length > 0 ? Math.min(...prices) : 0;
 };
+
+// Yahoo!ショッピング BONUS+優良ストア日（不定期のため毎月更新）
+const YAHOO_BONUS_PLUS_DATES = [
+  '2026-06-04',
+  '2026-06-08',
+  '2026-06-17',
+  '2026-06-23',
+  '2026-06-27',
+  '2026-06-29',
+];
+
+const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const getYahooSaleEvents = (fromDate, count = 5) => {
+  const today = toYMD(fromDate);
+  const results = [];
+  const seen = new Set();
+
+  for (let i = 0; i < 90 && results.length < count; i++) {
+    const d = new Date(fromDate);
+    d.setDate(fromDate.getDate() + i);
+    const ymd = toYMD(d);
+    const day = d.getDate();
+    const dow = d.getDay();
+
+    const events = [];
+    if (day === 1) events.push({ name: 'ファーストデイ', bonus: '+4%', color: 'orange' });
+    if (day === 5 || day === 15 || day === 25) events.push({ name: '5のつく日', bonus: '+4%', color: 'orange' });
+    if (day === 11 || day === 22) events.push({ name: 'ヤフショ感謝デー', bonus: '+4%', color: 'orange' });
+    if (dow === 0) events.push({ name: 'プレミアムな日曜日', bonus: '+5%', color: 'yellow' });
+    if (YAHOO_BONUS_PLUS_DATES.includes(ymd)) events.push({ name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' });
+
+    events.forEach(ev => {
+      const key = `${ymd}-${ev.name}`;
+      if (!seen.has(key) && results.length < count) {
+        seen.add(key);
+        results.push({ ...ev, date: ymd, isToday: ymd === today, dateObj: d });
+      }
+    });
+  }
+
+  return results;
+};
+
 
 // ValueCommerce MyLink: 対象ドメインのURLをアフィリエイトURLにラップ
 const VC_SID = process.env.NEXT_PUBLIC_VC_SID || '3768537';
@@ -488,6 +560,53 @@ const App = () => {
     } catch { }
   };
 
+  // --- 赤ちゃん情報: DBとのsync ---
+  const syncBabyProfileWithDB = async (userId) => {
+    try {
+      const { data: dbProfile } = await supabase
+        .from('baby_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (dbProfile) {
+        // DBにあれば localStorage を上書き
+        setBabyInfo({
+          name: dbProfile.name || '',
+          birthYear: dbProfile.birth_year,
+          birthMonth: dbProfile.birth_month,
+          gender: dbProfile.gender || '',
+        });
+      } else {
+        // DBに無い & localStorageにあれば DB へ push
+        const local = JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null');
+        if (local && local.birthYear) {
+          await supabase.from('baby_profiles').upsert({
+            user_id: userId,
+            name: local.name || null,
+            birth_year: local.birthYear,
+            birth_month: local.birthMonth,
+            gender: local.gender || null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id' });
+        }
+      }
+    } catch { }
+  };
+
+  const saveBabyProfileToDB = async (userId, info) => {
+    try {
+      await supabase.from('baby_profiles').upsert({
+        user_id: userId,
+        name: info.name || null,
+        birth_year: info.birthYear,
+        birth_month: info.birthMonth,
+        gender: info.gender || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+    } catch { }
+  };
+
   const savePriceAlertToDB = async (userId, alert) => {
     try {
       await supabase.from('price_alerts').upsert({
@@ -692,6 +811,7 @@ const App = () => {
       if (u) {
         migrateLocalFavoritesToDB(u.id);
         syncPriceAlertsWithDB(u.id);
+        syncBabyProfileWithDB(u.id);
       }
     });
 
@@ -1007,7 +1127,10 @@ const App = () => {
 
       try {
         const keyword = selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ');
-        const origPrice = selectedProduct.price || getLowestPrice(selectedProduct.shops) || 0;
+        // 中央値を基準価格にすることで、誤データの最安値に引っ張られないようにする
+        const shopPrices = (selectedProduct.shops || []).map(s => s.lowestPrice || s.price || 0).filter(p => p > 0).sort((a, b) => a - b);
+        const medianShopPrice = shopPrices.length > 0 ? shopPrices[Math.floor(shopPrices.length / 2)] : 0;
+        const origPrice = medianShopPrice || selectedProduct.price || 0;
         const priceMin = origPrice > 0 ? origPrice * 0.2 : 0;
         const priceMax = origPrice > 0 ? origPrice * 5 : Infinity;
         const selectedWords = keyword.split(' ').filter(w => w.length >= 2).map(w => w.toLowerCase());
@@ -1019,6 +1142,8 @@ const App = () => {
           return selectedWords.some(w => lower.includes(w));
         };
         const priceInRange = (p) => origPrice === 0 || (p >= priceMin && p <= priceMax);
+        const USED_KEYWORDS = ['中古', 'リユース', '訳あり', 'アウトレット', '中古品', '再生品'];
+        const isNewItem = (name) => !USED_KEYWORDS.some(w => (name || '').includes(w));
 
         // --- 口コミ・SNSレビューの最新データをDBから取得 ---
         const fetchReviewsFromDb = async () => {
@@ -1050,7 +1175,7 @@ const App = () => {
         const newShops = [...cachedShops];
 
         if (rakutenResult.status === 'fulfilled' && rakutenResult.value.products) {
-          const items = rakutenResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          const items = rakutenResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || '楽天市場';
@@ -1065,7 +1190,7 @@ const App = () => {
         }
 
         if (yahooResult.status === 'fulfilled' && yahooResult.value.products) {
-          const items = yahooResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          const items = yahooResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || 'Yahoo!ショッピング';
@@ -1115,7 +1240,7 @@ const App = () => {
       }
     };
     fetchCross();
-  }, [selectedProduct]);
+  }, [selectedProduct?.id]);
 
   // ギフトタブ: DBから取得してフィルタ（クロンが毎朝更新）
   const sceneKeywords = {
@@ -1184,6 +1309,10 @@ const App = () => {
     ];
     const CATEGORY_NG = {
       "おむつ": ["大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用"],
+      "ベビーカー": ["ペット", "犬用", "猫用", "ドッグ", "愛犬", "愛猫", "ペットカート", "ペットバギー"],
+      "抱っこ紐": ["ペット", "犬用", "猫用", "ドッグ", "犬抱っこ"],
+      "車用品": ["犬用", "猫用", "ペット", "ドッグ", "バイク用", "自転車用"],
+      "ウェア": ["大人用", "レディース", "メンズ", "ペット", "犬服", "猫服", "犬用"],
     };
     const mapItems = (items, cat) => items
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
@@ -1256,18 +1385,29 @@ const App = () => {
         const normalizedSubSub = (catName === 'おむつ' && DIAPER_SIZE_MAP[subSubCat])
           ? DIAPER_SIZE_MAP[subSubCat] : subSubCat;
         // おしりふきは「おむつ」を前置するとヒットしないため単独キーワード
+        // ゴミ箱・袋は中黒入りのカテゴリ名をそのまま使うとヒットしないため専用キーワード
+        // ミルク(粉/液体)は授乳グッズジャンルに縛られると食品ジャンルの製品が取れないため単独キーワード+ジャンル除外
+        // 母乳パッドは「ミルク 授乳」を前置すると精度が落ちるため単独キーワード
         // 周辺グッズは商品名に「周辺グッズ」が入らないためカテゴリキーワードのみで検索
         const subKeyword = (catName === 'おむつ' && subCat === 'おしりふき')
           ? 'ベビー おしりふき'
-          : subCat === '周辺グッズ'
-            ? genre.keyword
-            : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
+          : (catName === 'おむつ' && subCat === 'ゴミ箱・袋')
+            ? (normalizedSubSub !== 'すべて' ? `おむつ ${normalizedSubSub}` : 'おむつポット 防臭袋 ゴミ箱')
+            : (catName === 'ミルク・授乳' && subCat === 'ミルク')
+              ? 'ベビー 粉ミルク 液体ミルク'
+              : (catName === 'ミルク・授乳' && subCat === '母乳パッド')
+                ? '母乳パッド 授乳パッド'
+                : subCat === '周辺グッズ'
+                  ? (ACCESSORY_SEARCH_KEYWORDS[catName] || genre.keyword)
+                  : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
         // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
         const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
         const isWipes = catName === 'おむつ' && subCat === 'おしりふき';
+        // ミルク(粉/液体)は食品ジャンルにあるためgenreIdを外して広範囲検索
+        const skipGenreId = isWipes || (catName === 'ミルク・授乳' && subCat === 'ミルク');
         const subFetches = SORTS.flatMap(sort =>
           [1, 2, 3].map(p =>
-            fetch(`${searchUrl(subKeyword, p, sort)}${isWipes ? '' : '&genreId=' + genreId}`)
+            fetch(`${searchUrl(subKeyword, p, sort)}${skipGenreId ? '' : '&genreId=' + genreId}`)
               .then(r => r.ok ? r.json() : { Items: [] })
               .catch(() => ({ Items: [] }))
           )
@@ -1367,6 +1507,17 @@ const App = () => {
       } else {
         const accessoryFiltered = filterAccessories(rawItems);
         if (accessoryFiltered.length > 0) rawItems = accessoryFiltered;
+
+        // subCat=すべて の場合、カテゴリコアワードで非関連商品をソフト除去
+        if (!subCat || subCat === 'すべて') {
+          const coreWords = CATEGORY_CORE_WORDS[catName];
+          if (coreWords?.length > 0) {
+            const coreFiltered = rawItems.filter(p =>
+              coreWords.some(w => (p.name || '').includes(w))
+            );
+            if (coreFiltered.length >= 5) rawItems = coreFiltered;
+          }
+        }
       }
 
       // Step 1: 生データをすぐに表示（ブロック済みは除外）
@@ -1549,8 +1700,18 @@ const App = () => {
         formatted = formatRawItems(allItems);
       }
 
-      setSearchResults(formatted);
-      autoSaveSearchResultsToDb(formatted, keyword);
+      const deduped = dedupeAndMergeShops(formatted);
+      const matchedCat = CATEGORY_TREE.find(cat =>
+        cat.name !== "すべて" && (
+          keyword.includes(cat.name) ||
+          (cat.keyword && keyword.includes(cat.keyword)) ||
+          cat.subs?.some(s => keyword.includes(typeof s === 'string' ? s : s.name))
+        )
+      );
+      const resolvedCategory = matchedCat?.name || keyword;
+      const categorized = deduped.map(p => ({ ...p, category: resolvedCategory }));
+      setSearchResults(categorized);
+      autoSaveSearchResultsToDb(categorized, keyword);
     } catch (err) {
       console.error("Remote Search Error:", err);
       setSearchError(err.message);
@@ -1961,7 +2122,7 @@ ${userText}
         const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
         return matchCat && matchSub && matchSubSub;
       })
-      .sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999));
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
     const showRemote = remoteProducts.length > 0 || isRemoteLoading;
@@ -1991,6 +2152,23 @@ ${userText}
           <div className="absolute right-[-10%] bottom-[-20%] w-48 h-48 bg-[#FFE6E6] rounded-full opacity-50 blur-2xl"></div>
           <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
         </div>
+
+        {/* ─── Yahoo!ショッピング 今日のお得バナー ─── */}
+        {(() => {
+          const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
+          if (!todayEvents.length) return null;
+          const ev = todayEvents[0];
+          return (
+            <div className="mb-6 bg-[#FFF3E8] border border-[#FFD9B5] rounded-[2rem] p-5 flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-[10px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!ショッピング 今日のお得</p>
+                <p className="text-base font-black text-[#5A4C4C]">{ev.name}</p>
+                <p className="text-xs text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+              </div>
+              <span className="text-3xl">🛒</span>
+            </div>
+          );
+        })()}
 
         {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
         {babyInfo && babyAgeMonths != null && (() => {
@@ -2287,7 +2465,8 @@ ${userText}
                   <span className="text-[10px] text-white bg-[#7B8E76] px-2 py-0.5 rounded-md font-bold">{babyInfo.gender}</span>
                 )}
                 <button onClick={() => {
-                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+                  const today = new Date();
+                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
                   setShowBabyModal(true);
                 }} className="text-[10px] text-[#A5A19E] flex items-center gap-0.5 font-bold hover:text-[#5A4C4C] transition-colors">
                   {babyInfo ? '編集' : 'プロフィール登録'} <Edit3 className="w-3 h-3" />
@@ -2306,7 +2485,8 @@ ${userText}
             <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest bg-[#F9F6F3] px-2 py-1 rounded-md">おすすめの最適化</span>
           </div>
           <div onClick={() => {
-            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+            const today = new Date();
+            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
             setShowBabyModal(true);
           }} className="bg-[#FFF5F5] border border-[#FFEBEB] p-5 rounded-[2rem] shadow-sm flex items-center justify-between active:scale-95 transition-transform cursor-pointer relative overflow-hidden group">
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#F2ABAC] rounded-l-[2rem]"></div>
@@ -2770,7 +2950,8 @@ ${userText}
 
             <div className="flex justify-between items-start mb-8 px-1">
               <div className="flex-1 pr-4">
-                <div className="flex gap-2 mb-2">
+                <div className="flex gap-2 mb-2 flex-wrap">
+                  {selectedProduct.brand && <span className="text-[10px] font-black text-[#B8860B] bg-[#FFF9E6] px-2 py-0.5 rounded-md">{selectedProduct.brand}</span>}
                   <span className="text-[10px] font-black text-[#7B8E76] bg-[#7B8E76]/10 px-2 py-0.5 rounded-md uppercase tracking-wider">{selectedProduct.category}</span>
                   {selectedProduct.giftTags && <span className="text-[10px] font-black text-[#F2ABAC] bg-[#F2ABAC]/10 px-2 py-0.5 rounded-md uppercase tracking-wider">Gift</span>}
                 </div>
@@ -2783,6 +2964,23 @@ ${userText}
               <button onClick={(e) => toggleFavorite(e, selectedProduct)} className="p-4 bg-white border border-[#F4EFEB] rounded-full shadow-sm">
                 <Heart className={`w-6 h-6 ${isFavorite(selectedProduct.id) ? 'text-red-500 fill-current' : 'text-[#D4CDC7]'}`} />
               </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-6 px-1">
+              <div className="bg-[#F9F6F3] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">最安値</p>
+                <p className="text-sm font-black text-[#5A4C4C]">
+                  {getLowestPrice(selectedProduct.shops) > 0 ? `¥${getLowestPrice(selectedProduct.shops).toLocaleString()}` : '---'}
+                </p>
+              </div>
+              <div className="bg-[#FFF9E6] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">評価</p>
+                <p className="text-sm font-black text-[#D4AF37]">★ {Number(selectedProduct.rating).toFixed(2)}</p>
+              </div>
+              <div className="bg-[#F0F4EF] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">取扱店舗</p>
+                <p className="text-sm font-black text-[#7B8E76]">{(selectedProduct.shops || []).length}店</p>
+              </div>
             </div>
 
             <div className="flex gap-3 mb-8 px-1">
@@ -2798,7 +2996,14 @@ ${userText}
               </a>
             </div>
 
-            <p className="text-sm text-[#8E8282] leading-relaxed mb-10 px-1 font-medium">{selectedProduct.description}</p>
+            {selectedProduct.description && (
+              <section className="mb-10 bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
+                <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 text-[#7B8E76]" /> 商品について
+                </h3>
+                <p className="text-sm text-[#8E8282] leading-relaxed font-medium">{selectedProduct.description}</p>
+              </section>
+            )}
 
             <section className="mb-10 bg-[#FFF5F5] border border-[#FFEBEB] p-8 rounded-[2.5rem] relative overflow-hidden">
               <div className="flex items-center gap-2 mb-4 relative z-10"><Sparkles className="w-5 h-5 text-[#F2ABAC]" /><h3 className="font-black text-[#5A4C4C] text-lg">AIによる分析</h3></div>
@@ -2839,6 +3044,41 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               </section>
             )}
 
+            {/* Yahoo!ショッピング お得な日 */}
+            {(() => {
+              const hasYahoo =
+                (selectedProduct.shops || []).some(s => (s.name || '').includes('Yahoo')) ||
+                crossPlatformShops.some(s => s.source === 'yahoo');
+              if (!hasYahoo) return null;
+              const events = getYahooSaleEvents(new Date(), 3);
+              if (!events.length) return null;
+              const fmtDate = (d) => {
+                const m = d.getMonth() + 1;
+                const day = d.getDate();
+                const dows = ['日', '月', '火', '水', '木', '金', '土'];
+                return `${m}月${day}日（${dows[d.getDay()]}）`;
+              };
+              return (
+                <section className="mb-8 bg-white border border-[#FFD9B5] rounded-[2rem] p-6 shadow-sm">
+                  <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-4">
+                    <span className="text-base">🛒</span> Yahoo!ショッピングのお得な日
+                  </h3>
+                  <div className="space-y-2">
+                    {events.map((ev, i) => (
+                      <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${ev.isToday ? 'bg-[#FFF3E8] border border-[#FFD9B5]' : 'bg-[#F9F6F3]'}`}>
+                        <div className="flex items-center gap-2">
+                          {ev.isToday && <span className="text-[10px] font-black text-white bg-[#E07A30] px-2 py-0.5 rounded-full">今日</span>}
+                          <span className="text-xs font-bold text-[#5A4C4C]">{fmtDate(ev.dateObj)}</span>
+                          <span className="text-xs font-black text-[#8E8282]">{ev.name}</span>
+                        </div>
+                        <span className="text-xs font-black text-[#E07A30]">{ev.bonus}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
+
             {/* ショップ比較 */}
             <section className="mb-12">
               <div className="flex items-center justify-between mb-6 px-1">
@@ -2857,20 +3097,41 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               <div className="space-y-4">
                 {(() => {
                   const existingShops = selectedProduct.shops || [];
-                  const crossPlatformShops = (selectedProduct.crossPlatformPrices || []).map(p => ({
-                    name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング',
-                    type: 'mall',
-                    lowestPrice: p.price,
-                    url: p.url,
-                    sellers: [{ name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング', price: p.price, url: p.url, shipping: 0, points: 0 }]
-                  }));
-                  
+                  const allCandidates = [...existingShops, ...crossPlatformShops];
+
+                  // 外れ値除去: 中央値の15%未満の価格は別商品の誤マッチとして除外
+                  const nonZero = allCandidates
+                    .map(s => s.lowestPrice || s.price || 0)
+                    .filter(p => p > 0)
+                    .sort((a, b) => a - b);
+                  const median = nonZero.length > 0 ? nonZero[Math.floor(nonZero.length / 2)] : 0;
+                  const isReasonablePrice = (s) => {
+                    const p = s.lowestPrice || s.price || 0;
+                    return !median || p === 0 || p >= median * 0.15;
+                  };
+
                   const shopByKey = new Map();
                   const shopKey = (s) => (s.name || s.shop_name || '').toLowerCase();
-                  
-                  for (const s of [...existingShops, ...crossPlatformShops]) {
+
+                  // crossPlatformShops はAPIから取得した正確なURLを持つため優先
+                  const hasCrossRakuten = crossPlatformShops.some(s => s.source === 'rakuten');
+                  const hasCrossYahoo = crossPlatformShops.some(s => s.source === 'yahoo');
+
+                  for (const s of crossPlatformShops.filter(isReasonablePrice)) {
                     const key = shopKey(s);
                     if (!key) continue;
+                    const cur = shopByKey.get(key);
+                    if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
+                      shopByKey.set(key, s);
+                    }
+                  }
+
+                  for (const s of existingShops.filter(isReasonablePrice)) {
+                    const key = shopKey(s);
+                    if (!key) continue;
+                    // crossPlatformShops が同プラットフォームをカバー済みならDBの古いデータはスキップ
+                    if (hasCrossRakuten && key.includes('楽天')) continue;
+                    if (hasCrossYahoo && (key.includes('yahoo') || key.includes('ヤフー'))) continue;
                     const cur = shopByKey.get(key);
                     if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
                       shopByKey.set(key, s);
@@ -2974,7 +3235,6 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           })}
                       </div>
                     )}
-                    <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.1</p>
               </div>
                 ))}
               </div>
@@ -3009,7 +3269,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center justify-between mb-6 px-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-[#5A4C4C]">{selectedProduct.rating}</span>
+                      <span className="text-3xl font-black text-[#5A4C4C]">{Number(selectedProduct.rating).toFixed(2)}</span>
                       <div className="flex items-center text-[#D4AF37]">
                         {[...Array(5)].map((_, i) => <Star key={i} className={`w-4 h-4 ${i < Math.floor(selectedProduct.rating) ? 'fill-current' : 'text-gray-200'}`} />)}
                       </div>
@@ -3327,7 +3587,12 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   ))}
                 </div>
               </div>
-              <button onClick={() => { setBabyInfo({ ...babyForm }); setShowBabyModal(false); }}
+              <button onClick={() => {
+                const info = { ...babyForm };
+                setBabyInfo(info);
+                if (user) saveBabyProfileToDB(user.id, info);
+                setShowBabyModal(false);
+              }}
                 className="w-full py-4 bg-[#5A4C4C] text-white rounded-full font-black text-sm active:scale-95 transition-transform mt-2">
                 保存する
               </button>
