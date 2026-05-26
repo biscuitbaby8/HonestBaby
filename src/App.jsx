@@ -1721,6 +1721,10 @@ const App = () => {
   };
 
   const handleCategoryChange = (cat) => {
+    if (cat !== 'すべて') {
+      router.push('/category/' + encodeURIComponent(cat));
+      return;
+    }
     setSelectedCategory(cat);
     setSelectedSubCategory("すべて");
     setSelectedSubSubCategory("すべて");
