@@ -54,15 +54,19 @@ export default async function CategoryPage({ params }) {
 
   if (!CATEGORY_NAMES.includes(cat)) notFound();
 
-  const { data } = await supabaseServer
-    .from('products')
-    .select('*, shops:shops_prices(*)')
-    .eq('category', cat)
-    .or('is_blocked.is.null,is_blocked.eq.false')
-    .order('popularity_rank', { ascending: true })
-    .limit(60);
-
-  const products = (data || []).map(formatDbProduct);
+  let products = [];
+  try {
+    const { data, error } = await supabaseServer
+      .from('products')
+      .select('*, shops:shops_prices(*)')
+      .eq('category', cat)
+      .or('is_blocked.is.null,is_blocked.eq.false')
+      .order('popularity_rank', { ascending: true })
+      .limit(60);
+    if (!error && data) products = data.map(formatDbProduct);
+  } catch {
+    // Supabase接続失敗時は空リストで表示（500を防ぐ）
+  }
   const meta = CAT_META[cat];
 
   const jsonLd = {
