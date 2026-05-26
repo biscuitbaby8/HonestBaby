@@ -12,7 +12,7 @@ export default function SiteHeader() {
           href="/"
           className="text-xs font-bold text-white bg-[#7B8E76] px-4 py-2 rounded-full active:scale-95 transition-transform"
         >
-          アプリで探す
+          ホームに戻る
         </Link>
       </div>
     </header>
