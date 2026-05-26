@@ -2,27 +2,21 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { CATEGORY_TREE, CAT_META, formatDbProduct } from '@/src/lib/products';
-import ProductCardLink from '@/src/components/ProductCardLink';
 import SiteHeader from '@/src/components/SiteHeader';
+import CategoryClient from '@/src/components/CategoryClient';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const CATEGORY_NAMES = CATEGORY_TREE.map((c) => c.name).filter((n) => n !== 'すべて');
 
-// ビルド時に全カテゴリページを静的生成（Next.jsがURLエンコードを処理するため生の名前を渡す）
 export function generateStaticParams() {
   return CATEGORY_NAMES.map((name) => ({ name }));
 }
 
 export const dynamicParams = false;
-// 商品データは定期的に再生成（ISR、1時間）
 export const revalidate = 3600;
 
 function resolveName(raw) {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
+  try { return decodeURIComponent(raw); } catch { return raw; }
 }
 
 export async function generateMetadata({ params }) {
@@ -37,13 +31,7 @@ export async function generateMetadata({ params }) {
     title: meta.title,
     description: meta.desc,
     alternates: { canonical: url },
-    openGraph: {
-      title: meta.title,
-      description: meta.desc,
-      url,
-      type: 'website',
-      images: [`${SITE_URL}/logo.png`],
-    },
+    openGraph: { title: meta.title, description: meta.desc, url, type: 'website', images: [`${SITE_URL}/logo.png`] },
     twitter: { card: 'summary_large_image', title: meta.title, description: meta.desc },
   };
 }
@@ -65,10 +53,10 @@ export default async function CategoryPage({ params }) {
       .limit(60);
     if (!error && data) products = data.map(formatDbProduct);
   } catch {
-    // Supabase接続失敗時は空リストで表示（500を防ぐ）
+    // Supabase接続失敗時は空リストで表示
   }
-  const meta = CAT_META[cat];
 
+  const meta = CAT_META[cat];
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -80,47 +68,41 @@ export default async function CategoryPage({ params }) {
   return (
     <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
       <SiteHeader />
-      <main className="max-w-5xl mx-auto px-4 py-8">
+      <main className="px-4 pt-6 pb-32 lg:max-w-7xl lg:mx-auto lg:px-10 lg:pt-8">
+        {/* パンくず */}
         <nav className="text-[11px] text-[#A5A19E] font-bold mb-4">
           <Link href="/" className="hover:text-[#7B8E76]">ホーム</Link>
           <span className="mx-1.5">›</span>
           <span className="text-[#5A4C4C]">{cat}</span>
         </nav>
 
-        {/* カテゴリ横スクロールタブ */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
-          {CATEGORY_NAMES.map((name) => (
+        {/* メインカテゴリ横スクロールタブ（SPA同様のスタイル） */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-2 mb-4 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
+          {CATEGORY_NAMES.map((n) => (
             <Link
-              key={name}
-              href={`/category/${encodeURIComponent(name)}`}
-              className={`flex-shrink-0 whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all ${
-                name === cat
+              key={n}
+              href={`/category/${encodeURIComponent(n)}`}
+              className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 ${
+                n === cat
                   ? 'bg-[#7B8E76] text-white'
                   : 'bg-[#F4EFEB] text-[#8E8282] hover:bg-[#E8E1DC]'
               }`}
             >
-              {name}
+              {n}
             </Link>
           ))}
         </div>
 
-        <h1 className="text-2xl font-black mb-2">{cat}の比較・おすすめ</h1>
-        <p className="text-xs text-[#8E8282] font-bold mb-8 leading-relaxed">
+        {/* タイトル・説明 */}
+        <h1 className="text-xl font-black mb-1 mt-4">
+          {cat === 'すべて' ? 'おすすめピックアップ' : `${cat}の検索結果`}
+        </h1>
+        <p className="text-xs text-[#8E8282] font-bold mb-4 leading-relaxed">
           {meta?.desc || `${cat}のベビー用品を楽天・Yahooの最安値と口コミで比較。`}
         </p>
 
-        {products.length === 0 ? (
-          <div className="text-center py-20 text-[#A5A19E]">
-            <p className="text-sm font-bold mb-4">このカテゴリの商品は準備中です。</p>
-            <Link href="/" className="text-[#7B8E76] font-black underline">アプリで探す</Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {products.map((p) => (
-              <ProductCardLink key={p.id} product={p} />
-            ))}
-          </div>
-        )}
+        {/* クライアント側: サブカテゴリ・ソート・商品グリッド */}
+        <CategoryClient products={products} cat={cat} />
       </main>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
