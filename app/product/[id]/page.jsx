@@ -18,11 +18,15 @@ async function fetchProduct(rawId) {
     id = rawId;
   }
   const select = '*, shops:shops_prices(*), honestReviews:reviews(*), snsReviews:sns_reviews(*)';
-  const query = UUID_RE.test(id)
-    ? supabaseServer.from('products').select(select).eq('id', id)
-    : supabaseServer.from('products').select(select).eq('rakuten_item_code', id);
-  const { data } = await query.maybeSingle();
-  return data ? formatDbProduct(data) : null;
+  try {
+    const query = UUID_RE.test(id)
+      ? supabaseServer.from('products').select(select).eq('id', id)
+      : supabaseServer.from('products').select(select).eq('rakuten_item_code', id);
+    const { data } = await query.maybeSingle();
+    return data ? formatDbProduct(data) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function generateMetadata({ params }) {
