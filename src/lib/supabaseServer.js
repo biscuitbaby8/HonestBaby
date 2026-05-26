@@ -17,6 +17,16 @@ const key =
   process.env.VITE_SUPABASE_ANON_KEY ||
   'placeholder_key';
 
+// Vercelの関数タイムアウト（10s）より短い8sでフェッチを打ち切る
+const fetchWithTimeout = (input, init = {}) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  );
+};
+
 export const supabaseServer = createClient(url, key, {
   auth: { persistSession: false },
+  global: { fetch: fetchWithTimeout },
 });
