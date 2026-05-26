@@ -10,7 +10,6 @@ export const metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
-  manifest: '/manifest.webmanifest',
   icons: {
     icon: [
       { url: '/favicon-32.png?v=3', sizes: '32x32', type: 'image/png' },

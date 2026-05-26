@@ -1844,7 +1844,11 @@ ${userText}
   const openProduct = async (product) => {
     // 1. 画面遷移を最優先で実行（もっさり感を解消）
     setSelectedProduct(product);
-    router.replace(`/product/${encodeURIComponent(product.id)}`);
+    // SPA内ではモーダル表示を維持しつつURLだけ更新（直リンク・共有用）。
+    // /product/[id] への実遷移はSSRページ（Google・直アクセス向け）が担う。
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `/product/${encodeURIComponent(product.id)}`);
+    }
 
     setRecentlyViewed(prev => {
       const filtered = prev.filter(p => p.id !== product.id);
@@ -1905,7 +1909,7 @@ ${userText}
     setExpandedMall(null);
     setReviewTab('honest');
     try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
-    router.replace('/');
+    if (typeof window !== 'undefined') window.history.replaceState(null, '', '/');
   };
 
   // --- 各画面レンダリング ---
