@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import { sendPushNotification, isPushConfigured } from '../lib/web-push.js';
+import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
+
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
 // =============================================
 // 夜間自動同期クローラー (Vercel Cron)
@@ -8,8 +11,8 @@ import { sendPushNotification, isPushConfigured } from '../lib/web-push.js';
 // =============================================
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'placeholder_key'
 );
 
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || process.env.VITE_RAKUTEN_APP_ID;
@@ -675,17 +678,19 @@ async function syncCategory(cat, log, opts = {}) {
 }
 
 // --- Vercel Cron エンドポイント ---
-export default async function handler(req, res) {
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+
   // Cron認証（Vercel Cronは CRON_SECRET ヘッダーを送信する）
   const cronSecret = process.env.CRON_SECRET;
-  const authHeader = req.headers['authorization'];
+  const authHeader = request.headers.get('authorization');
 
   // 手動実行（?manual=1）またはCron認証
-  const isManual = req.query.manual === '1';
+  const isManual = searchParams.get('manual') === '1';
   const isCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`;
 
   if (!isManual && !isCronAuth) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const log = [];
@@ -694,13 +699,13 @@ export default async function handler(req, res) {
   let totalSaved = 0;
 
   let targetCategories = CATEGORIES;
-  const filterCat = req.query.category;
-  const batch = req.query.batch; // '1' or '2'
+  const filterCat = searchParams.get('category');
+  const batch = searchParams.get('batch'); // '1' or '2'
 
   if (filterCat) {
     targetCategories = CATEGORIES.filter(c => c.name === filterCat);
     if (targetCategories.length === 0) {
-      return res.status(400).json({ error: `Category "${filterCat}" not found` });
+      return Response.json({ error: `Category "${filterCat}" not found` }, { status: 400 });
     }
     log.push(`🎯 フィルタ適用: カテゴリ「${filterCat}」のみ同期します`);
   } else if (batch === '1') {
@@ -740,12 +745,12 @@ export default async function handler(req, res) {
     log.push(`⚠️ アラート確認失敗: ${e.message}`);
   }
 
-  return res.status(200).json({
+  return Response.json({
     success: true,
     totalSaved,
     log,
     timestamp: new Date().toISOString()
-  });
+  }, { status: 200 });
 }
 
 // --- 価格アラートをチェックし、トリガーしたらPush通知を送る ---

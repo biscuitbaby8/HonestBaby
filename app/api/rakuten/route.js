@@ -1,11 +1,24 @@
-export default async function handler(req, res) {
-  const { query, noFilter, shopCode } = req.query;
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get('query');
+  const noFilter = searchParams.get('noFilter');
+  const shopCode = searchParams.get('shopCode');
+
   const appId = process.env.RAKUTEN_APP_ID || process.env.VITE_RAKUTEN_APP_ID;
   const affiliateId = process.env.RAKUTEN_AFFILIATE_ID || process.env.VITE_RAKUTEN_AFFILIATE_ID;
   const accessKey = process.env.RAKUTEN_ACCESS_KEY || process.env.VITE_RAKUTEN_ACCESS_KEY;
 
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Cache-Control': 's-maxage=120, stale-while-revalidate=300',
+  };
+
   if (!appId) {
-    return res.status(500).json({ error: 'Missing Rakuten App ID (RAKUTEN_APP_ID or VITE_RAKUTEN_APP_ID) in server environment variables' });
+    return Response.json(
+      { error: 'Missing Rakuten App ID (RAKUTEN_APP_ID or VITE_RAKUTEN_APP_ID) in server environment variables' },
+      { status: 500, headers }
+    );
   }
 
   // 一般検索: ベビー用品ジャンル(566382)に限定 + 価格フィルタ
@@ -14,23 +27,20 @@ export default async function handler(req, res) {
   const shopCodeParam = shopCode ? `&shopCode=${encodeURIComponent(shopCode)}` : '';
   const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1${filterParams}${shopCodeParam}&affiliateId=${affiliateId || ''}`;
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=300');
-
-  const clientReferer = req.headers['referer'] || req.headers['origin'] || 'https://honestbaby-care.com';
+  const clientReferer =
+    request.headers.get('referer') || request.headers.get('origin') || 'https://honestbaby-care.com';
 
   try {
     const response = await fetch(url, {
-      headers: { 'Referer': clientReferer, 'User-Agent': 'Mozilla/5.0' }
+      headers: { Referer: clientReferer, 'User-Agent': 'Mozilla/5.0' },
     });
     if (!response.ok) {
       const errorText = await response.text();
-      return res.status(response.status).json({ error: errorText });
+      return Response.json({ error: errorText }, { status: response.status, headers });
     }
     const data = await response.json();
 
-    const products = (data.Items || []).map(item => ({
+    const products = (data.Items || []).map((item) => ({
       id: `rakuten-${item.Item.itemCode}`,
       name: item.Item.itemName,
       price: item.Item.itemPrice,
@@ -44,11 +54,11 @@ export default async function handler(req, res) {
         price: item.Item.itemPrice,
         url: item.Item.affiliateUrl || item.Item.itemUrl,
         shipping: item.Item.postageFlag === 1 ? 0 : null,
-        points: item.Item.pointRate || 0
-      }]
+        points: item.Item.pointRate || 0,
+      }],
     }));
-    return res.status(200).json({ products });
+    return Response.json({ products }, { status: 200, headers });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return Response.json({ error: error.message }, { status: 500, headers });
   }
 }
