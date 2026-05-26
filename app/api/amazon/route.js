@@ -1,10 +1,7 @@
 import amazonPaapi from 'amazon-paapi';
 
 // Amazon PA-API v5 ラッパー
-// 環境変数:
-//   AMAZON_ACCESS_KEY     - PA-APIのアクセスキー
-//   AMAZON_SECRET_KEY     - PA-APIのシークレットキー
-//   AMAZON_PARTNER_TAG    - アソシエイトタグ（例: honestbaby-22）
+// 環境変数: AMAZON_ACCESS_KEY / AMAZON_SECRET_KEY / AMAZON_PARTNER_TAG
 
 function isConfigured() {
   return !!(process.env.AMAZON_ACCESS_KEY && process.env.AMAZON_SECRET_KEY && process.env.AMAZON_PARTNER_TAG);
@@ -20,24 +17,14 @@ function commonParams() {
   };
 }
 
-/**
- * キーワードで Amazon 商品を検索し、最上位ヒットを返す。
- * @param {string} keyword
- * @returns {Promise<{title, price, url, image}|null>}
- */
-export async function searchAmazonItem(keyword) {
+async function searchAmazonItem(keyword) {
   if (!isConfigured()) return null;
   try {
     const requestParameters = {
       Keywords: keyword,
       SearchIndex: 'All',
       ItemCount: 1,
-      Resources: [
-        'ItemInfo.Title',
-        'Offers.Listings.Price',
-        'Images.Primary.Medium',
-        'Images.Primary.Large',
-      ],
+      Resources: ['ItemInfo.Title', 'Offers.Listings.Price', 'Images.Primary.Medium', 'Images.Primary.Large'],
     };
     const data = await amazonPaapi.SearchItems(commonParams(), requestParameters);
     const item = data?.SearchResult?.Items?.[0];
@@ -54,22 +41,26 @@ export async function searchAmazonItem(keyword) {
   }
 }
 
-// HTTP エンドポイント: GET /api/amazon?keyword=XXX
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+export async function GET(request) {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  };
 
   if (!isConfigured()) {
-    return res.status(503).json({
-      error: 'Amazon PA-API not configured',
-      message: 'Set AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, AMAZON_PARTNER_TAG environment variables.',
-    });
+    return Response.json(
+      {
+        error: 'Amazon PA-API not configured',
+        message: 'Set AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, AMAZON_PARTNER_TAG environment variables.',
+      },
+      { status: 503, headers }
+    );
   }
 
-  const keyword = req.query.keyword;
-  if (!keyword) return res.status(400).json({ error: 'keyword required' });
+  const keyword = new URL(request.url).searchParams.get('keyword');
+  if (!keyword) return Response.json({ error: 'keyword required' }, { status: 400, headers });
 
   const result = await searchAmazonItem(keyword);
-  if (!result) return res.status(404).json({ error: 'No item found' });
-  return res.status(200).json(result);
+  if (!result) return Response.json({ error: 'No item found' }, { status: 404, headers });
+  return Response.json(result, { status: 200, headers });
 }

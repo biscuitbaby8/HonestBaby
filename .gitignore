@@ -1,7 +1,18 @@
 node_modules
 .env
+.env*.local
 dist
+.next
+out
 .vscode
 .DS_Store
 supabase/.temp
 preview-*.html
+
+# next-pwa generated service worker artifacts
+public/sw.js
+public/sw.js.map
+public/swe-worker-*.js
+public/workbox-*.js
+public/worker-*.js
+public/fallback-*.js

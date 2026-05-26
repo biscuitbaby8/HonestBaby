@@ -1,6 +1,6 @@
+'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-// FORCE REBUILD V3 - DEPLOYMENT CHECK - 2026-05-11
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Search, Heart, ExternalLink, X, Star, MessageCircle,
   Instagram, Twitter, TrendingUp, ChevronRight,
@@ -34,8 +34,8 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
     default: return <Package className={className} />;
   }
 };
-import { Helmet } from 'react-helmet-async';
 import { supabase } from './lib/supabaseClient';
+import ProductCard from './components/ProductCard';
 
 // ＝＝＝＝＝ 商品データはSupabaseから取得します ＝＝＝＝＝
 
@@ -266,6 +266,12 @@ const OFFICIAL_RETAILERS = [
   },
 ];
 
+const SPECIALTY_SHOPS = [
+  { shopCode: 'akachan',      name: 'アカチャンホンポ', source: 'akachan',      domain: 'shop.akachan.jp' },
+  { shopCode: 'nishimatsuya', name: '西松屋',           source: 'nishimatsuya', domain: '24028-net.jp' },
+  { shopCode: 'toysrus',      name: 'ベビーザらス',     source: 'toysrus',      domain: 'toysrus.co.jp' },
+];
+
 const detectOfficialShop = (shop) => {
   const target = `${shop?.name || ''} ${shop?.url || ''}`;
   for (const rule of OFFICIAL_SHOP_RULES) {
@@ -324,7 +330,7 @@ const getYahooSaleEvents = (fromDate, count = 5) => {
     d.setDate(fromDate.getDate() + i);
     const ymd = toYMD(d);
     const day = d.getDate();
-    const dow = d.getDay(); // 0=Sun
+    const dow = d.getDay();
 
     const events = [];
     if (day === 1) events.push({ name: 'ファーストデイ', bonus: '+4%', color: 'orange' });
@@ -345,99 +351,15 @@ const getYahooSaleEvents = (fromDate, count = 5) => {
   return results;
 };
 
-const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock }) => (
-  <div
-    className="bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full relative active:scale-95 transition-all cursor-pointer border border-[#F4EFEB]"
-    onClick={(e) => {
-      if (e.target.closest('[data-no-open]')) return;
-      onOpen(product);
-    }}
-  >
-    <div className="relative aspect-square bg-[#F9F6F3] p-4">
-      <img
-        src={getHighResImage(product.image)}
-        onError={(e) => { e.target.onerror = null; e.target.src = product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }}
-        className="w-full h-full object-cover rounded-[1.5rem]"
-        alt={product.name}
-      />
-      <button
-        onClick={(e) => onToggleFavorite(e, product)}
-        className="absolute top-6 right-6 bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-sm z-10 hover:bg-rose-50 transition-colors"
-      >
-        <Heart className={`w-4 h-4 ${favoriteIds.has(product.id) ? 'text-rose-400 fill-current' : 'text-[#D4CDC7]'}`} />
-      </button>
-      {isAdminMode && (
-        <button
-          data-no-open
-          onPointerDown={(e) => { e.stopPropagation(); }}
-          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onBlock(product); }}
-          title="この商品を非表示にする"
-          style={{ touchAction: 'manipulation' }}
-          className="absolute top-2 left-2 bg-red-500 text-white w-14 h-14 rounded-full text-2xl font-black shadow-2xl z-[999] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-4 border-white pointer-events-auto"
-        >×</button>
-      )}
-      <div className="pointer-events-none">
-        {localRank && (
-          <div className="absolute top-6 left-6 bg-[#F9DC5C] text-[#5A4C4C] w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-md border-2 border-white">
-            {localRank}
-          </div>
-        )}
-        {product.isBestSeller && (
-          <div className="absolute top-6 left-6 bg-[#F2ABAC] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
-            <Award className="w-3.5 h-3.5" />
-            <span>BEST SELLER</span>
-          </div>
-        )}
-        {!product.isBestSeller && product.isTopRated && (
-          <div className="absolute top-6 left-6 bg-[#7B8E76] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>TOP RATED</span>
-          </div>
-        )}
-      </div>
-      <div className={`absolute bottom-6 left-6 px-2.5 py-1 rounded-full text-[9px] font-bold tracking-wider ${product.subCategory === '周辺グッズ' ? 'bg-[#FFE8D6] text-[#A67B5B]' : 'bg-[#7B8E76] text-white'}`}>
-        {product.subCategory}
-      </div>
-    </div>
-    <div className="p-4 flex flex-col flex-1">
-      <div className="flex items-center gap-1 mb-2">
-        <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest">{product.category}</span>
-        <div className="flex items-center gap-1 ml-auto bg-[#FFF9E6] px-2 py-0.5 rounded-full text-[#D4AF37]">
-          <Star className="w-3 h-3 fill-current" />
-          <span className="text-[10px] font-black">{Number(product.rating).toFixed(2)}</span>
-        </div>
-      </div>
-      <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{product.name}</h3>
-
-      <div className="mt-auto">
-        {(product.shops?.length || 0) >= 2 && (
-          <p className="text-[9px] text-[#7B8E76] font-black mb-1 uppercase tracking-wider">
-            {product.shops.length}店舗で比較
-          </p>
-        )}
-        {product.unitCount && (
-          <p className="text-[10px] text-[#A5A19E] font-bold mb-1">
-            1{product.unitName}あたり <span className="text-[#F2ABAC]">¥{Math.ceil(getLowestPrice(product.shops) / product.unitCount)}</span>
-          </p>
-        )}
-        <p className="text-xl font-black text-[#7B8E76] leading-none">
-          <span className="text-xs mr-0.5">¥</span>
-          {getLowestPrice(product.shops) > 0 ? getLowestPrice(product.shops).toLocaleString() : "---"}
-          <span className="text-[10px] text-[#A5A19E] ml-1 font-normal">{getLowestPrice(product.shops) > 0 ? "〜" : ""}</span>
-        </p>
-      </div>
-    </div>
-  </div>
-);
 
 // ValueCommerce MyLink: 対象ドメインのURLをアフィリエイトURLにラップ
-const VC_SID = import.meta.env.VITE_VC_SID || '3768537';
+const VC_SID = process.env.NEXT_PUBLIC_VC_SID || '3768537';
 const VC_DOMAIN_PIDS = {
-  'dadway-onlineshop.com': import.meta.env.VITE_VC_PID_DADWAY || '892608374',
-  'ergobaby.jp': import.meta.env.VITE_VC_PID_ERGOBABY || '892609670',
-  'shopping.yahoo.co.jp': import.meta.env.VITE_VC_PID_YAHOO || '892613329',
+  'dadway-onlineshop.com': process.env.NEXT_PUBLIC_VC_PID_DADWAY || '892608374',
+  'ergobaby.jp': process.env.NEXT_PUBLIC_VC_PID_ERGOBABY || '892609670',
+  'shopping.yahoo.co.jp': process.env.NEXT_PUBLIC_VC_PID_YAHOO || '892613329',
 };
-const AMAZON_TAG = import.meta.env.VITE_AMAZON_TAG || 'honestbaby-22';
+const AMAZON_TAG = process.env.NEXT_PUBLIC_AMAZON_TAG || 'honestbaby-22';
 
 // VAPID公開鍵をUint8Arrayに変換（Web Push API用）
 function urlBase64ToUint8Array(base64String) {
@@ -485,8 +407,8 @@ const getAmazonUrl = (keyword) => {
 
 
 const App = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
@@ -519,7 +441,7 @@ const App = () => {
 
   // 管理モード: URLに ?admin=1 が付いているか、セッション中に有効化した場合はON
   const isAdminMode = (() => {
-    if (location.search.includes('admin=1')) {
+    if (typeof window !== 'undefined' && window.location.search.includes('admin=1')) {
       try { sessionStorage.setItem('honestBabyAdminSession', '1'); } catch { }
       return true;
     }
@@ -703,7 +625,7 @@ const App = () => {
   const subscribeToPushNotifications = async (userId) => {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
-      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) return false;
 
       const permission = await Notification.requestPermission();
@@ -938,7 +860,7 @@ const App = () => {
 
   // URL直アクセス対応: sessionStorage → localStorage → Supabase → home
   useEffect(() => {
-    const match = location.pathname.match(/^\/product\/(.+)$/);
+    const match = pathname.match(/^\/product\/(.+)$/);
     if (!match || selectedProduct) return;
     const productId = decodeURIComponent(match[1]);
 
@@ -968,18 +890,28 @@ const App = () => {
       }
 
       // 4. 見つからない → ホームへ
-      navigate('/', { replace: true });
+      router.replace('/');
     };
 
     restore();
-  }, [location.pathname]);
+  }, [pathname]);
 
   // 法的ページ直接URL対応: /privacy /terms /tokushoho /disclaimer
   useEffect(() => {
     const legalRoutes = { '/privacy': 'privacy', '/terms': 'terms', '/tokushoho': 'tokushoho', '/disclaimer': 'disclaimer' };
-    const key = legalRoutes[location.pathname];
-    if (key) { setActiveLegalPage(key); navigate('/', { replace: true }); }
-  }, [location.pathname]);
+    const key = legalRoutes[pathname];
+    if (key) { setActiveLegalPage(key); router.replace('/'); }
+  }, [pathname]);
+
+  // ブラウザタブのタイトルを画面状態に応じて更新（SEO用 meta は SSR ページが担当）
+  useEffect(() => {
+    const title = selectedProduct
+      ? `${selectedProduct.name} の最安値・価格比較 | HonestBaby`
+      : selectedCategory !== 'すべて'
+        ? `${selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby`
+        : 'HonestBaby | 忖度なしのベビー用品比較・最安値検索';
+    if (typeof document !== 'undefined') document.title = title;
+  }, [selectedProduct, selectedCategory]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -1271,6 +1203,35 @@ const App = () => {
           }
         }
 
+        // ベビー専門店: shopCode 検索で在庫確認し、公式URLでカード追加
+        const specialtyResults = await Promise.allSettled(
+          SPECIALTY_SHOPS.map(sp =>
+            fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1&shopCode=${sp.shopCode}`)
+              .then(r => r.json())
+              .then(data => ({ ...sp, data }))
+              .catch(() => ({ ...sp, data: { products: [] } }))
+          )
+        );
+
+        for (const result of specialtyResults) {
+          if (result.status !== 'fulfilled') continue;
+          const { name, source, domain, data } = result.value;
+          if (!data.products?.length) continue;
+          const items = data.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          if (items.length === 0) continue;
+          const best = items.sort((a, b) => a.price - b.price)[0];
+          const retailer = OFFICIAL_RETAILERS.find(r => r.domain === domain);
+          if (!retailer) continue;
+          const officialUrl = retailer.searchUrl(keyword) + retailer.affiliateParam;
+          const idx = newShops.findIndex(s => s.source === source);
+          const shopData = {
+            name, type: 'mall', lowestPrice: best.price, source,
+            url: officialUrl,
+            sellers: [{ name, price: best.price, shipping: 0, points: 0, url: officialUrl, note: '' }]
+          };
+          if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
+        }
+
         setCrossPlatformShops(newShops);
       } catch (e) {
         console.warn('Cross-platform fetch failed:', e);
@@ -1381,10 +1342,10 @@ const App = () => {
       .filter(validateProduct);
 
     try {
-      const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
-      const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
-      const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
-      if (!appId) throw new Error("VITE_RAKUTEN_APP_ID not set");
+      const appId = process.env.NEXT_PUBLIC_RAKUTEN_APP_ID;
+      const accessKey = process.env.NEXT_PUBLIC_RAKUTEN_ACCESS_KEY || '';
+      const affiliateId = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || '';
+      if (!appId) throw new Error("NEXT_PUBLIC_RAKUTEN_APP_ID not set");
 
       const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
       const searchUrl = (keyword, page = 1, sort = '-reviewCount') => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
@@ -1817,10 +1778,10 @@ const App = () => {
           ];
           const matched = categoryGenreMap.find(m => m.keywords.some(k => userText.includes(k)));
           const genreId = matched?.genreId ?? '100533';
-          const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
-          const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
-          const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
-          if (!appId) throw new Error('VITE_RAKUTEN_APP_ID not set');
+          const appId = process.env.NEXT_PUBLIC_RAKUTEN_APP_ID;
+          const accessKey = process.env.NEXT_PUBLIC_RAKUTEN_ACCESS_KEY || '';
+          const affiliateId = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || '';
+          if (!appId) throw new Error('NEXT_PUBLIC_RAKUTEN_APP_ID not set');
           const rankingUrl = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
           const res = await fetch(rankingUrl, { headers: { Referer: 'https://honestbaby-care.com' } });
           const resData = await res.json();
@@ -2044,7 +2005,11 @@ ${userText}
   const openProduct = async (product) => {
     // 1. 画面遷移を最優先で実行（もっさり感を解消）
     setSelectedProduct(product);
-    navigate(`/product/${encodeURIComponent(product.id)}`, { replace: true });
+    // SPA内ではモーダル表示を維持しつつURLだけ更新（直リンク・共有用）。
+    // /product/[id] への実遷移はSSRページ（Google・直アクセス向け）が担う。
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `/product/${encodeURIComponent(product.id)}`);
+    }
 
     setRecentlyViewed(prev => {
       const filtered = prev.filter(p => p.id !== product.id);
@@ -2105,7 +2070,7 @@ ${userText}
     setExpandedMall(null);
     setReviewTab('honest');
     try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
-    navigate('/', { replace: true });
+    if (typeof window !== 'undefined') window.history.replaceState(null, '', '/');
   };
 
   // --- 各画面レンダリング ---
@@ -2666,110 +2631,6 @@ ${userText}
 
   return (
     <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col lg:pl-60' : 'min-h-screen pb-32 lg:pb-0 lg:pl-60'}`}>
-      <Helmet>
-        <meta name="google-site-verification" content="bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI" />
-        {/* タイトル */}
-        {selectedProduct
-          ? <title>{selectedProduct.name} の最安値・価格比較 | HonestBaby</title>
-          : selectedCategory !== "すべて"
-            ? <title>{selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby</title>
-            : <title>HonestBaby | 忖度なしのベビー用品比較・最安値検索</title>
-        }
-
-        {/* meta description */}
-        {selectedProduct
-          ? <meta name="description" content={`${selectedProduct.name}の最安値・価格比較。評価${selectedProduct.rating}★。楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`} />
-          : selectedCategory !== "すべて"
-            ? <meta name="description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。楽天・Yahoo対応。HonestBabyは忖度なしの比較サイトです。`} />
-            : <meta name="description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。忖度なしのリアルレビューも掲載。" />
-        }
-
-        {/* canonical */}
-        {selectedProduct
-          ? <link rel="canonical" href={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
-          : selectedCategory !== "すべて"
-            ? <link rel="canonical" href={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
-            : <link rel="canonical" href="https://honestbaby-care.com/" />
-        }
-
-        {/* OGP */}
-        {selectedProduct
-          ? <meta property="og:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
-          : selectedCategory !== "すべて"
-            ? <meta property="og:title" content={`${selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby`} />
-            : <meta property="og:title" content="HonestBaby | 忖度なしのベビー用品比較・最安値検索" />
-        }
-        {selectedProduct
-          ? <meta property="og:description" content={`${selectedProduct.name}の最安値・価格比較。評価${selectedProduct.rating}★。楽天・Yahoo最安値をまとめてチェック。`} />
-          : selectedCategory !== "すべて"
-            ? <meta property="og:description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。`} />
-            : <meta property="og:description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。" />
-        }
-        <meta property="og:image" content={selectedProduct?.image || "https://honestbaby-care.com/favicon.png"} />
-        {selectedProduct
-          ? <meta property="og:url" content={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
-          : selectedCategory !== "すべて"
-            ? <meta property="og:url" content={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
-            : <meta property="og:url" content="https://honestbaby-care.com/" />
-        }
-        <meta property="og:locale" content="ja_JP" />
-
-        {/* Twitter Card */}
-        {selectedProduct
-          ? <meta name="twitter:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
-          : <meta name="twitter:title" content="HonestBaby | 忖度なしのベビー用品比較" />
-        }
-        <meta name="twitter:image" content={selectedProduct?.image || "https://honestbaby-care.com/favicon.png"} />
-
-        {/* JSON-LD: WebSite + Organization */}
-        <script type="application/ld+json">{JSON.stringify({
-          "@context": "https://schema.org",
-          "@graph": [
-            {
-              "@type": "WebSite",
-              "@id": "https://honestbaby-care.com/#website",
-              "url": "https://honestbaby-care.com/",
-              "name": "HonestBaby",
-              "description": "ベビー用品・育児グッズの忖度なし価格比較サイト",
-              "inLanguage": "ja"
-            },
-            {
-              "@type": "Organization",
-              "@id": "https://honestbaby-care.com/#organization",
-              "name": "HonestBaby",
-              "url": "https://honestbaby-care.com/",
-              "logo": "https://honestbaby-care.com/favicon.png"
-            }
-          ]
-        })}</script>
-
-        {/* JSON-LD: Product（商品詳細ページのみ） */}
-        {selectedProduct && (
-          <script type="application/ld+json">{JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Product",
-            "name": selectedProduct.name,
-            "image": selectedProduct.image,
-            "brand": { "@type": "Brand", "name": selectedProduct.brand || "ベビー用品" },
-            "offers": {
-              "@type": "AggregateOffer",
-              "priceCurrency": "JPY",
-              "lowPrice": selectedProduct.price,
-              "offerCount": (selectedProduct.shops || []).length || 1,
-              "availability": "https://schema.org/InStock"
-            },
-            ...(selectedProduct.rating && {
-              "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": selectedProduct.rating,
-                "reviewCount": selectedProduct.reviewCount || selectedProduct.reviewsCount || 1,
-                "bestRating": 5,
-                "worstRating": 1
-              }
-            })
-          })}</script>
-        )}
-      </Helmet>
       {/* ===== PC左サイドバー (lg以上のみ表示) ===== */}
       <aside className="hidden lg:flex flex-col fixed top-0 left-0 h-screen w-60 bg-white border-r border-[#F4EFEB] z-40">
         {/* ロゴ */}
@@ -3300,10 +3161,15 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       <div className="flex-1 pr-4">
                         <div className="flex items-center flex-wrap gap-2 mb-1.5">
                           <div className="w-5 h-5 rounded-md flex items-center justify-center overflow-hidden border border-[#F4EFEB] bg-white">
-                            {(shop.name || shop.shop_name).includes('楽天') ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> : 
+                            {(shop.name || shop.shop_name).includes('楽天') ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
                              (shop.name || shop.shop_name).includes('Yahoo') ? <img src="https://shopping.yahoo.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
                              (shop.name || shop.shop_name).toLowerCase().includes('amazon') ? <img src="https://www.amazon.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
-                             <Store className="w-3.5 h-3.5 text-[#A5A19E]" />}
+                             (() => {
+                               const sp = SPECIALTY_SHOPS.find(s => s.source === (shop.source || ''));
+                               return sp
+                                 ? <img src={`https://www.google.com/s2/favicons?domain=${sp.domain}&sz=32`} className="w-3.5 h-3.5" onError={e => { e.target.style.display='none'; }} />
+                                 : <Store className="w-3.5 h-3.5 text-[#A5A19E]" />;
+                             })()}
                           </div>
                           <p className="text-base font-black text-[#5A4C4C]">{shop.name || shop.shop_name}</p>
                           {shop.type === 'official' && (
@@ -3371,46 +3237,6 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     )}
               </div>
                 ))}
-              </div>
-            </section>
-
-            {/* ＝＝＝＝＝ ベビー専門店でも探す ＝＝＝＝＝ */}
-            <section className="mb-12">
-              <div className="flex items-center gap-2 mb-4 px-1">
-                <Store className="w-5 h-5 text-[#7B8E76]" />
-                <h3 className="font-black text-[#5A4C4C] text-xl">ベビー専門店でも探す</h3>
-              </div>
-              <p className="text-[10px] text-[#A5A19E] font-bold mb-4 px-1">公式オンラインストアで在庫・セール情報を確認できます</p>
-              <div className="grid grid-cols-2 gap-3">
-                {OFFICIAL_RETAILERS.filter(retailer =>
-                  retailer.domain !== 'mikihouse.co.jp' || selectedProduct.category === 'ウェア'
-                ).map(retailer => {
-                  const searchKw = (selectedProduct.name || '').split(/[\s　]+/).slice(0, 3).join(' ');
-                  const url = retailer.searchUrl(searchKw) + retailer.affiliateParam;
-                  return (
-                    <a
-                      key={retailer.domain}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 bg-white border border-[#F4EFEB] rounded-[1.5rem] px-4 py-4 shadow-sm active:scale-95 transition-transform"
-                    >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-[#F4EFEB]">
-                        <img
-                          src={`https://www.google.com/s2/favicons?domain=${retailer.domain}&sz=32`}
-                          className="w-6 h-6"
-                          onError={e => { e.target.style.display = 'none'; }}
-                          alt={retailer.shortName}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-[#5A4C4C] truncate">{retailer.shortName}</p>
-                        <p className="text-[9px] text-[#A5A19E] font-bold">公式オンラインストア</p>
-                      </div>
-                      <ExternalLink className="w-3.5 h-3.5 text-[#A5A19E] ml-auto shrink-0" />
-                    </a>
-                  );
-                })}
               </div>
             </section>
 
