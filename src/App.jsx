@@ -1,6 +1,6 @@
+'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-// FORCE REBUILD V3 - DEPLOYMENT CHECK - 2026-05-11
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Search, Heart, ExternalLink, X, Star, MessageCircle,
   Instagram, Twitter, TrendingUp, ChevronRight,
@@ -34,7 +34,6 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
     default: return <Package className={className} />;
   }
 };
-import { Helmet } from 'react-helmet-async';
 import { supabase } from './lib/supabaseClient';
 
 // ＝＝＝＝＝ 商品データはSupabaseから取得します ＝＝＝＝＝
@@ -366,13 +365,13 @@ const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favo
 );
 
 // ValueCommerce MyLink: 対象ドメインのURLをアフィリエイトURLにラップ
-const VC_SID = import.meta.env.VITE_VC_SID || '3768537';
+const VC_SID = process.env.NEXT_PUBLIC_VC_SID || '3768537';
 const VC_DOMAIN_PIDS = {
-  'dadway-onlineshop.com': import.meta.env.VITE_VC_PID_DADWAY || '892608374',
-  'ergobaby.jp': import.meta.env.VITE_VC_PID_ERGOBABY || '892609670',
-  'shopping.yahoo.co.jp': import.meta.env.VITE_VC_PID_YAHOO || '892613329',
+  'dadway-onlineshop.com': process.env.NEXT_PUBLIC_VC_PID_DADWAY || '892608374',
+  'ergobaby.jp': process.env.NEXT_PUBLIC_VC_PID_ERGOBABY || '892609670',
+  'shopping.yahoo.co.jp': process.env.NEXT_PUBLIC_VC_PID_YAHOO || '892613329',
 };
-const AMAZON_TAG = import.meta.env.VITE_AMAZON_TAG || 'honestbaby-22';
+const AMAZON_TAG = process.env.NEXT_PUBLIC_AMAZON_TAG || 'honestbaby-22';
 
 // VAPID公開鍵をUint8Arrayに変換（Web Push API用）
 function urlBase64ToUint8Array(base64String) {
@@ -420,8 +419,8 @@ const getAmazonUrl = (keyword) => {
 
 
 const App = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
@@ -454,7 +453,7 @@ const App = () => {
 
   // 管理モード: URLに ?admin=1 が付いているか、セッション中に有効化した場合はON
   const isAdminMode = (() => {
-    if (location.search.includes('admin=1')) {
+    if (typeof window !== 'undefined' && window.location.search.includes('admin=1')) {
       try { sessionStorage.setItem('honestBabyAdminSession', '1'); } catch { }
       return true;
     }
@@ -591,7 +590,7 @@ const App = () => {
   const subscribeToPushNotifications = async (userId) => {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
-      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) return false;
 
       const permission = await Notification.requestPermission();
@@ -825,7 +824,7 @@ const App = () => {
 
   // URL直アクセス対応: sessionStorage → localStorage → Supabase → home
   useEffect(() => {
-    const match = location.pathname.match(/^\/product\/(.+)$/);
+    const match = pathname.match(/^\/product\/(.+)$/);
     if (!match || selectedProduct) return;
     const productId = decodeURIComponent(match[1]);
 
@@ -855,18 +854,28 @@ const App = () => {
       }
 
       // 4. 見つからない → ホームへ
-      navigate('/', { replace: true });
+      router.replace('/');
     };
 
     restore();
-  }, [location.pathname]);
+  }, [pathname]);
 
   // 法的ページ直接URL対応: /privacy /terms /tokushoho /disclaimer
   useEffect(() => {
     const legalRoutes = { '/privacy': 'privacy', '/terms': 'terms', '/tokushoho': 'tokushoho', '/disclaimer': 'disclaimer' };
-    const key = legalRoutes[location.pathname];
-    if (key) { setActiveLegalPage(key); navigate('/', { replace: true }); }
-  }, [location.pathname]);
+    const key = legalRoutes[pathname];
+    if (key) { setActiveLegalPage(key); router.replace('/'); }
+  }, [pathname]);
+
+  // ブラウザタブのタイトルを画面状態に応じて更新（SEO用 meta は SSR ページが担当）
+  useEffect(() => {
+    const title = selectedProduct
+      ? `${selectedProduct.name} の最安値・価格比較 | HonestBaby`
+      : selectedCategory !== 'すべて'
+        ? `${selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby`
+        : 'HonestBaby | 忖度なしのベビー用品比較・最安値検索';
+    if (typeof document !== 'undefined') document.title = title;
+  }, [selectedProduct, selectedCategory]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -1288,10 +1297,10 @@ const App = () => {
       .filter(validateProduct);
 
     try {
-      const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
-      const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
-      const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
-      if (!appId) throw new Error("VITE_RAKUTEN_APP_ID not set");
+      const appId = process.env.NEXT_PUBLIC_RAKUTEN_APP_ID;
+      const accessKey = process.env.NEXT_PUBLIC_RAKUTEN_ACCESS_KEY || '';
+      const affiliateId = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || '';
+      if (!appId) throw new Error("NEXT_PUBLIC_RAKUTEN_APP_ID not set");
 
       const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
       const searchUrl = (keyword, page = 1, sort = '-reviewCount') => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
@@ -1692,10 +1701,10 @@ const App = () => {
           ];
           const matched = categoryGenreMap.find(m => m.keywords.some(k => userText.includes(k)));
           const genreId = matched?.genreId ?? '100533';
-          const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
-          const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
-          const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
-          if (!appId) throw new Error('VITE_RAKUTEN_APP_ID not set');
+          const appId = process.env.NEXT_PUBLIC_RAKUTEN_APP_ID;
+          const accessKey = process.env.NEXT_PUBLIC_RAKUTEN_ACCESS_KEY || '';
+          const affiliateId = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || '';
+          if (!appId) throw new Error('NEXT_PUBLIC_RAKUTEN_APP_ID not set');
           const rankingUrl = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
           const res = await fetch(rankingUrl, { headers: { Referer: 'https://honestbaby-care.com' } });
           const resData = await res.json();
@@ -1919,7 +1928,7 @@ ${userText}
   const openProduct = async (product) => {
     // 1. 画面遷移を最優先で実行（もっさり感を解消）
     setSelectedProduct(product);
-    navigate(`/product/${encodeURIComponent(product.id)}`, { replace: true });
+    router.replace(`/product/${encodeURIComponent(product.id)}`);
 
     setRecentlyViewed(prev => {
       const filtered = prev.filter(p => p.id !== product.id);
@@ -1980,7 +1989,7 @@ ${userText}
     setExpandedMall(null);
     setReviewTab('honest');
     try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
-    navigate('/', { replace: true });
+    router.replace('/');
   };
 
   // --- 各画面レンダリング ---
@@ -2522,110 +2531,6 @@ ${userText}
 
   return (
     <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col lg:pl-60' : 'min-h-screen pb-32 lg:pb-0 lg:pl-60'}`}>
-      <Helmet>
-        <meta name="google-site-verification" content="bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI" />
-        {/* タイトル */}
-        {selectedProduct
-          ? <title>{selectedProduct.name} の最安値・価格比較 | HonestBaby</title>
-          : selectedCategory !== "すべて"
-            ? <title>{selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby</title>
-            : <title>HonestBaby | 忖度なしのベビー用品比較・最安値検索</title>
-        }
-
-        {/* meta description */}
-        {selectedProduct
-          ? <meta name="description" content={`${selectedProduct.name}の最安値・価格比較。評価${selectedProduct.rating}★。楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`} />
-          : selectedCategory !== "すべて"
-            ? <meta name="description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。楽天・Yahoo対応。HonestBabyは忖度なしの比較サイトです。`} />
-            : <meta name="description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。忖度なしのリアルレビューも掲載。" />
-        }
-
-        {/* canonical */}
-        {selectedProduct
-          ? <link rel="canonical" href={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
-          : selectedCategory !== "すべて"
-            ? <link rel="canonical" href={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
-            : <link rel="canonical" href="https://honestbaby-care.com/" />
-        }
-
-        {/* OGP */}
-        {selectedProduct
-          ? <meta property="og:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
-          : selectedCategory !== "すべて"
-            ? <meta property="og:title" content={`${selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby`} />
-            : <meta property="og:title" content="HonestBaby | 忖度なしのベビー用品比較・最安値検索" />
-        }
-        {selectedProduct
-          ? <meta property="og:description" content={`${selectedProduct.name}の最安値・価格比較。評価${selectedProduct.rating}★。楽天・Yahoo最安値をまとめてチェック。`} />
-          : selectedCategory !== "すべて"
-            ? <meta property="og:description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。`} />
-            : <meta property="og:description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。" />
-        }
-        <meta property="og:image" content={selectedProduct?.image || "https://honestbaby-care.com/favicon.png"} />
-        {selectedProduct
-          ? <meta property="og:url" content={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
-          : selectedCategory !== "すべて"
-            ? <meta property="og:url" content={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
-            : <meta property="og:url" content="https://honestbaby-care.com/" />
-        }
-        <meta property="og:locale" content="ja_JP" />
-
-        {/* Twitter Card */}
-        {selectedProduct
-          ? <meta name="twitter:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
-          : <meta name="twitter:title" content="HonestBaby | 忖度なしのベビー用品比較" />
-        }
-        <meta name="twitter:image" content={selectedProduct?.image || "https://honestbaby-care.com/favicon.png"} />
-
-        {/* JSON-LD: WebSite + Organization */}
-        <script type="application/ld+json">{JSON.stringify({
-          "@context": "https://schema.org",
-          "@graph": [
-            {
-              "@type": "WebSite",
-              "@id": "https://honestbaby-care.com/#website",
-              "url": "https://honestbaby-care.com/",
-              "name": "HonestBaby",
-              "description": "ベビー用品・育児グッズの忖度なし価格比較サイト",
-              "inLanguage": "ja"
-            },
-            {
-              "@type": "Organization",
-              "@id": "https://honestbaby-care.com/#organization",
-              "name": "HonestBaby",
-              "url": "https://honestbaby-care.com/",
-              "logo": "https://honestbaby-care.com/favicon.png"
-            }
-          ]
-        })}</script>
-
-        {/* JSON-LD: Product（商品詳細ページのみ） */}
-        {selectedProduct && (
-          <script type="application/ld+json">{JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Product",
-            "name": selectedProduct.name,
-            "image": selectedProduct.image,
-            "brand": { "@type": "Brand", "name": selectedProduct.brand || "ベビー用品" },
-            "offers": {
-              "@type": "AggregateOffer",
-              "priceCurrency": "JPY",
-              "lowPrice": selectedProduct.price,
-              "offerCount": (selectedProduct.shops || []).length || 1,
-              "availability": "https://schema.org/InStock"
-            },
-            ...(selectedProduct.rating && {
-              "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": selectedProduct.rating,
-                "reviewCount": selectedProduct.reviewCount || selectedProduct.reviewsCount || 1,
-                "bestRating": 5,
-                "worstRating": 1
-              }
-            })
-          })}</script>
-        )}
-      </Helmet>
       {/* ===== PC左サイドバー (lg以上のみ表示) ===== */}
       <aside className="hidden lg:flex flex-col fixed top-0 left-0 h-screen w-60 bg-white border-r border-[#F4EFEB] z-40">
         {/* ロゴ */}
