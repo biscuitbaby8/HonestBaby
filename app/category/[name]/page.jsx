@@ -83,6 +83,23 @@ export default async function CategoryPage({ params }) {
           <span className="text-[#5A4C4C]">{cat}</span>
         </nav>
 
+        {/* カテゴリ横スクロールタブ */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
+          {CATEGORY_NAMES.map((name) => (
+            <Link
+              key={name}
+              href={`/category/${encodeURIComponent(name)}`}
+              className={`flex-shrink-0 whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                name === cat
+                  ? 'bg-[#7B8E76] text-white'
+                  : 'bg-[#F4EFEB] text-[#8E8282] hover:bg-[#E8E1DC]'
+              }`}
+            >
+              {name}
+            </Link>
+          ))}
+        </div>
+
         <h1 className="text-2xl font-black mb-2">{cat}の比較・おすすめ</h1>
         <p className="text-xs text-[#8E8282] font-bold mb-8 leading-relaxed">
           {meta?.desc || `${cat}のベビー用品を楽天・Yahooの最安値と口コミで比較。`}
