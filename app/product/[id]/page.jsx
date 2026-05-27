@@ -4,6 +4,7 @@ import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META } from '@/src/lib/products';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
+import SpaRedirect from './SpaRedirect';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -60,7 +61,14 @@ export default async function ProductPage({ params }) {
 
   const price = getLowestPrice(product.shops);
   const shops = (product.shops || [])
-    .filter((s) => Number(s.lowestPrice) > 0)
+    .filter((s) => {
+      if (Number(s.lowestPrice) <= 0) return false;
+      // 楽天市場名でYahoo URLが入っている古いDBデータを除外
+      const name = (s.name || '').toLowerCase();
+      const url = (s.url || '').toLowerCase();
+      if (name.includes('楽天') && url && !url.includes('rakuten')) return false;
+      return true;
+    })
     .sort((a, b) => Number(a.lowestPrice) - Number(b.lowestPrice));
   const reviews = (product.honestReviews || []).slice(0, 5);
 
@@ -92,6 +100,7 @@ export default async function ProductPage({ params }) {
 
   return (
     <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
+      <SpaRedirect productId={product.id} />
       <SiteHeader />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <nav className="text-[11px] text-[#A5A19E] font-bold mb-4">
