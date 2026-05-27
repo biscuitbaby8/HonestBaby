@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Search, Heart, ExternalLink, X, Star, MessageCircle,
   Instagram, Twitter, TrendingUp, ChevronRight,
@@ -409,7 +409,6 @@ const getAmazonUrl = (keyword) => {
 const App = () => {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
@@ -904,12 +903,14 @@ const App = () => {
     if (key) { setActiveLegalPage(key); }
   }, [pathname]);
 
-  // SSRページのボトムナビから ?tab= でタブを開く
+  // SSRページのボトムナビから ?tab= でタブを開く（マウント時に一度だけ読み取る）
   useEffect(() => {
-    const tab = searchParams.get('tab');
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
     const validTabs = ['home', 'search', 'ai', 'gift', 'user'];
     if (tab && validTabs.includes(tab)) setActiveTab(tab);
-  }, [searchParams]);
+  }, []);
 
   // ブラウザタブのタイトルを画面状態に応じて更新（SEO用 meta は SSR ページが担当）
   useEffect(() => {
@@ -3123,7 +3124,12 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   };
 
                   const shopByKey = new Map();
-                  const shopKey = (s) => (s.name || s.shop_name || '').toLowerCase();
+                  // source を含めることで楽天とYahooの同名ショップが別エントリになる
+                  const shopKey = (s) => {
+                    const name = (s.name || s.shop_name || '').toLowerCase();
+                    const src = s.source || '';
+                    return src ? `${src}:${name}` : name;
+                  };
 
                   // crossPlatformShops はAPIから取得した正確なURLを持つため優先
                   const hasCrossRakuten = crossPlatformShops.some(s => s.source === 'rakuten');
