@@ -900,7 +900,7 @@ const App = () => {
   useEffect(() => {
     const legalRoutes = { '/privacy': 'privacy', '/terms': 'terms', '/tokushoho': 'tokushoho', '/disclaimer': 'disclaimer' };
     const key = legalRoutes[pathname];
-    if (key) { setActiveLegalPage(key); router.replace('/'); }
+    if (key) { setActiveLegalPage(key); }
   }, [pathname]);
 
   // ブラウザタブのタイトルを画面状態に応じて更新（SEO用 meta は SSR ページが担当）
