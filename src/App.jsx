@@ -3147,13 +3147,8 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   for (const s of existingShops.filter(isReasonablePrice)) {
                     const key = shopKey(s);
                     if (!key) continue;
-                    // crossPlatformShops が同プラットフォームをカバー済みならDBの古いデータはスキップ
-                    if (hasCrossRakuten && key.includes('楽天')) continue;
-                    if (hasCrossYahoo && (key.includes('yahoo') || key.includes('ヤフー'))) continue;
-                    // DBに楽天名でYahoo URLが入っているケースを除外（データ不整合）
-                    const dbUrl = (s.url || s.sellers?.[0]?.url || '').toLowerCase();
-                    if (key.includes('楽天') && dbUrl && dbUrl.includes('yahoo.co.jp')) continue;
-                    if ((key.includes('yahoo') || key.includes('ヤフー')) && dbUrl && dbUrl.includes('rakuten.co.jp')) continue;
+                    // 楽天・Yahoo はDBに古いURLが入っているため常にスキップし、APIの新鮮データのみ使う
+                    if (key.includes('楽天') || key.includes('yahoo') || key.includes('ヤフー')) continue;
                     const cur = shopByKey.get(key);
                     if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
                       shopByKey.set(key, s);
