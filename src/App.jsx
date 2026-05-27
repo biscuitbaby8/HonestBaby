@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   Search, Heart, ExternalLink, X, Star, MessageCircle,
-  Instagram, Twitter, TrendingUp, ChevronRight,
+  TrendingUp, ChevronRight,
   Home, User, Bell, ArrowLeft, Share2, Award,
   Settings, History, Bookmark, Sparkles, Send, Bot,
   Package, Layers, ChevronDown, ChevronUp, Calculator,
@@ -746,7 +746,7 @@ const App = () => {
   const [contactSent, setContactSent] = useState(false);
 
   // --- 新機能: 口コミ関連 States ---
-  const [reviewTab, setReviewTab] = useState('honest'); // 'honest' or 'sns'
+
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [reviewForm, setReviewForm] = useState({ rating: 5, content: "" });
   const [reviewPhotoFile, setReviewPhotoFile] = useState(null);
@@ -857,8 +857,7 @@ const App = () => {
       }
       return { ...s, name: s.shop_name, type: s.shop_type, lowestPrice: s.lowest_price, sellers: Array.isArray(sellers) ? sellers : [] };
     }),
-    honestReviews: (p.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
-    snsReviews: (p.snsReviews || []).map(r => ({ ...r, user: r.user_handle }))
+    honestReviews: (p.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() }))
   });
 
   // URL直アクセス対応: sessionStorage → localStorage → Supabase → home
@@ -885,7 +884,7 @@ const App = () => {
         try {
           const { data } = await supabase
             .from('products')
-            .select('*, shops:shops_prices(*), honestReviews:reviews(*), snsReviews:sns_reviews(*)')
+            .select('*, shops:shops_prices(*), honestReviews:reviews(*)')
             .eq('id', productId)
             .single();
           if (data) { setSelectedProduct(formatDbProduct(data)); return; }
@@ -931,7 +930,7 @@ const App = () => {
         try {
           const { data } = await supabase
             .from('products')
-            .select('*, shops:shops_prices(*), honestReviews:reviews(*), snsReviews:sns_reviews(*)')
+            .select('*, shops:shops_prices(*), honestReviews:reviews(*)')
             .eq('id', productParam)
             .maybeSingle();
           if (data) { setSelectedProduct(formatDbProduct(data)); return; }
@@ -961,8 +960,7 @@ const App = () => {
           .select(`
             *,
             shops:shops_prices(*),
-            honestReviews:reviews(*),
-            snsReviews:sns_reviews(*)
+            honestReviews:reviews(*)
           `)
           .or('is_blocked.is.null,is_blocked.eq.false');
 
@@ -997,10 +995,6 @@ const App = () => {
               ...r,
               user: r.user_name,
               date: new Date(r.created_at).toLocaleDateString()
-            })),
-            snsReviews: (p.snsReviews || []).map(r => ({
-              ...r,
-              user: r.user_handle
             }))
           }));
           setDbProducts(formatted);
@@ -1193,7 +1187,7 @@ const App = () => {
         const fetchReviewsFromDb = async () => {
           const { data: dbProd } = await supabase
             .from('products')
-            .select('id, reviews(*), sns_reviews(*)')
+            .select('id, reviews(*)')
             .or(`id.eq.${selectedProduct.id},rakuten_item_code.eq.${selectedProduct.id}`)
             .single();
 
@@ -1203,8 +1197,7 @@ const App = () => {
               return {
                 ...prev,
                 id: dbProd.id, // UUIDがあればそれに差し替え
-                honestReviews: (dbProd.reviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
-                snsReviews: dbProd.sns_reviews || []
+                honestReviews: (dbProd.reviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() }))
               };
             });
           }
@@ -2079,7 +2072,7 @@ ${userText}
       const query = nameParts.length > 1 ? `${nameParts[0]} ${nameParts[1]}` : nameParts[0];
       const { data } = await supabase
         .from('products')
-        .select('*, honestReviews:reviews(*), snsReviews:sns_reviews(*)')
+        .select('*, honestReviews:reviews(*)')
         .ilike('name', `%${query}%`)
         .limit(1)
         .single();
@@ -2089,8 +2082,7 @@ ${userText}
           if (!prev || prev.id !== product.id) return prev;
           return {
             ...prev,
-            honestReviews: (data.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
-            snsReviews: data.snsReviews || []
+            honestReviews: (data.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() }))
           };
         });
       }
@@ -3313,33 +3305,14 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               </div>
             </section>
 
-            {/* ＝＝＝＝＝ 口コミセクション (ネイティブ＆SNS統合) ＝＝＝＝＝ */}
+            {/* ＝＝＝＝＝ 口コミセクション ＝＝＝＝＝ */}
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-6 px-1">
                 <MessageCircle className="w-5 h-5 text-[#F2ABAC]" />
                 <h3 className="font-black text-[#5A4C4C] text-xl">口コミ・レビュー</h3>
               </div>
 
-              {/* タブ切り替え */}
-              <div className="flex p-1 bg-[#F9F6F3] rounded-full mb-6 relative">
-                <button
-                  onClick={() => setReviewTab('honest')}
-                  className={`flex-1 py-3 text-xs font-black rounded-full transition-all z-10 ${reviewTab === 'honest' ? 'text-[#5A4C4C]' : 'text-[#A5A19E]'}`}
-                >
-                  ユーザーの口コミ
-                </button>
-                <button
-                  onClick={() => setReviewTab('sns')}
-                  className={`flex-1 py-3 text-xs font-black rounded-full transition-all z-10 ${reviewTab === 'sns' ? 'text-[#5A4C4C]' : 'text-[#A5A19E]'}`}
-                >
-                  SNSでの評判
-                </button>
-                <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-out pointer-events-none ${reviewTab === 'sns' ? 'translate-x-full' : 'translate-x-0'}`}></div>
-              </div>
-
-              {/* Honest レビュー (ネイティブ) */}
-              {reviewTab === 'honest' && (
-                <div className="animate-in fade-in duration-300">
+              <div>
                   <div className="flex items-center justify-between mb-6 px-1">
                     <div className="flex items-baseline gap-2">
                       <span className="text-3xl font-black text-[#5A4C4C]">{Number(selectedProduct.rating).toFixed(2)}</span>
@@ -3407,52 +3380,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-
-              {/* SNS レビュー */}
-              {reviewTab === 'sns' && (
-                <div className="animate-in fade-in duration-300">
-                  {selectedProduct.snsReviews && selectedProduct.snsReviews.length > 0 ? (
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-6 px-6 pb-4">
-                      {selectedProduct.snsReviews.map(review => (
-                        <div key={review.id} className="min-w-[280px] bg-[#F9F6F3] border border-[#F4EFEB] p-6 rounded-[2rem] shadow-[0_4px_20px_rgb(0,0,0,0.02)]">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#A5A58D] to-[#E2D5C3] shadow-inner" />
-                            <div className="flex-1">
-                              <p className="text-xs font-black text-[#5A4C4C]">@{review.user}</p>
-                              <div className="flex items-center gap-1 text-[9px] text-[#A5A19E] font-bold uppercase tracking-tighter mt-0.5">
-                                {review.platform === 'instagram' ? <Instagram className="w-2.5 h-2.5" /> : <Twitter className="w-2.5 h-2.5" />}
-                                {review.platform}
-                              </div>
-                            </div>
-                          </div>
-                          <p className="text-xs text-[#8E8282] leading-relaxed italic line-clamp-4">"{review.content}"</p>
-                          <div className="mt-4 text-[10px] text-[#A5A19E] flex items-center gap-1 font-bold">
-                            <Heart className="w-3 h-3 fill-current text-rose-300" /> {review.likes} Likes
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="bg-[#FFF5F5] border border-[#FFEBEB] p-6 rounded-[2rem] shadow-sm">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Sparkles className="w-4 h-4 text-[#F2ABAC]" />
-                        <h4 className="text-xs font-black text-[#5A4C4C]">AIによるSNS評判まとめ</h4>
-                      </div>
-                      <p className="text-xs text-[#8E8282] leading-relaxed font-medium">
-                        {selectedProduct.aiAnalysis ? 
-                          `${selectedProduct.name}はSNS上では「${selectedProduct.aiAnalysis.slice(0, 50)}...」といった声が多く、特にデザイン性と実用性のバランスが高く評価されています。` : 
-                          "現在SNSでのリアルな評判を解析中です。一般的には、使い勝手の良さとブランドの信頼性で多くのママ・パパに選ばれているアイテムです。"}
-                      </p>
-                      <div className="mt-4 flex gap-2">
-                        <span className="text-[9px] font-bold bg-white text-[#F2ABAC] px-2 py-1 rounded-md border border-[#F2ABAC]/20">#SNSで話題</span>
-                        <span className="text-[9px] font-bold bg-white text-[#F2ABAC] px-2 py-1 rounded-md border border-[#F2ABAC]/20">#口コミ高評価</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              </div>
             </section>
           </div>
           </div>
