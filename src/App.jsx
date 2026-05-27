@@ -133,6 +133,9 @@ const ACCESSORY_EXCLUDE_WORDS = [
   'おむつポーチ', 'おむつバッグ', 'おむつストッカー',
   // その他
   'シューズクリップ', 'ファンシート', '抜け出し防止',
+  // ベビーカー・抱っこ紐の掛け物・周辺グッズ
+  'ブランケット', 'ひざ掛け', '膝掛け', 'ひざかけ', '膝かけ', 'ひざかけ',
+  'ナーシングカバー', '授乳ケープ', 'ストールケープ',
 ];
 
 // 周辺グッズ検索時はカテゴリ別に "アクセサリー" を付加して精度向上
@@ -912,6 +915,32 @@ const App = () => {
     if (tab && validTabs.includes(tab)) setActiveTab(tab);
   }, []);
 
+  // SSR商品ページ（/product/[id]）からのリダイレクト: ?product= で商品モーダルを開く
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const productParam = params.get('product');
+    if (!productParam) return;
+    window.history.replaceState({}, '', '/');
+    const openByParam = async () => {
+      try {
+        const cache = JSON.parse(localStorage.getItem('honestBabyProductCache') || '{}');
+        if (cache[productParam]) { setSelectedProduct(cache[productParam]); return; }
+      } catch {}
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productParam)) {
+        try {
+          const { data } = await supabase
+            .from('products')
+            .select('*, shops:shops_prices(*), honestReviews:reviews(*), snsReviews:sns_reviews(*)')
+            .eq('id', productParam)
+            .maybeSingle();
+          if (data) { setSelectedProduct(formatDbProduct(data)); return; }
+        } catch {}
+      }
+    };
+    openByParam();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ブラウザタブのタイトルを画面状態に応じて更新（SEO用 meta は SSR ページが担当）
   useEffect(() => {
     const title = selectedProduct
@@ -1127,7 +1156,13 @@ const App = () => {
     if (!selectedProduct) { setCrossPlatformShops([]); return; }
 
     // --- 高速化の鍵: まずDBに保存されている既知の価格をセットする ---
-    const cachedShops = normalizeShops(selectedProduct.shops || []);
+    // 楽天/YahooはDBのURLが古くなりやすいため初期キャッシュから除外し、APIで上書きする
+    const cachedShops = normalizeShops(
+      (selectedProduct.shops || []).filter(s => {
+        const n = (s.name || s.shop_name || '').toLowerCase();
+        return !n.includes('楽天') && !n.includes('yahoo') && !n.includes('ヤフー');
+      })
+    );
     setCrossPlatformShops(cachedShops);
 
     const fetchCross = async () => {
@@ -1799,7 +1834,15 @@ const App = () => {
           const res = await fetch(rankingUrl, { headers: { Referer: 'https://honestbaby-care.com' } });
           const resData = await res.json();
           const allItems = (resData.Items || []).map(i => i.Item).filter(Boolean);
-          const filtered = filterAccessories(allItems, item => item.itemName || '');
+          let filtered = filterAccessories(allItems, item => item.itemName || '');
+          // カテゴリ固有語でさらに絞り込み（例: ベビーカー → ひざ掛け・ブランケットを除外）
+          if (matched) {
+            const coreWords = CATEGORY_CORE_WORDS[matched.keywords[0]] || [];
+            if (coreWords.length > 0) {
+              const strict = filtered.filter(item => coreWords.some(w => (item.itemName || '').includes(w)));
+              if (strict.length >= 2) filtered = strict;
+            }
+          }
           contextProducts = (filtered.length > 0 ? filtered : allItems)
             .slice(0, 6)
             .map((item, i) => ({
