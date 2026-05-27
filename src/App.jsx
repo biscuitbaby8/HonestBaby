@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Search, Heart, ExternalLink, X, Star, MessageCircle,
   Instagram, Twitter, TrendingUp, ChevronRight,
@@ -409,7 +409,6 @@ const getAmazonUrl = (keyword) => {
 const App = () => {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
@@ -904,12 +903,14 @@ const App = () => {
     if (key) { setActiveLegalPage(key); }
   }, [pathname]);
 
-  // SSRページのボトムナビから ?tab= でタブを開く
+  // SSRページのボトムナビから ?tab= でタブを開く（マウント時に一度だけ読み取る）
   useEffect(() => {
-    const tab = searchParams.get('tab');
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
     const validTabs = ['home', 'search', 'ai', 'gift', 'user'];
     if (tab && validTabs.includes(tab)) setActiveTab(tab);
-  }, [searchParams]);
+  }, []);
 
   // ブラウザタブのタイトルを画面状態に応じて更新（SEO用 meta は SSR ページが担当）
   useEffect(() => {
@@ -1296,6 +1297,30 @@ const App = () => {
     return () => window.visualViewport.removeEventListener('resize', handleResize);
   }, []);
 
+  // 重複排除ヘルパー（fetchRankingsWithAI・fetchRemoteProductsWithAI 共用）
+  const imageKey = (url) => (url || '').replace(/[?&]_ex=\d+x\d+/g, '').replace(/[?&].*$/, '');
+  const nameKey = (name) => (name || '').replace(/[\s　]/g, '').toLowerCase().slice(0, 20);
+  const dedupeAndMergeShops = (items) => {
+    const map = new Map();
+    for (const item of items) {
+      const key = imageKey(item.image) || nameKey(item.name);
+      if (!key) continue;
+      if (!map.has(key)) {
+        map.set(key, { ...item, shops: [...item.shops] });
+      } else {
+        const existing = map.get(key);
+        const newShops = item.shops.filter(s => !existing.shops.some(es => es.url === s.url));
+        existing.shops.push(...newShops);
+        if (item.price < existing.price) {
+          existing.price = item.price;
+          existing.image = item.image;
+          existing.name = item.name;
+        }
+      }
+    }
+    return Array.from(map.values());
+  };
+
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
   const fetchRankingsWithAI = async (catName, subCat = "すべて", subSubCat = "すべて") => {
     const genre = CATEGORY_TREE.find(c => c.name === catName) || CATEGORY_TREE[0];
@@ -1357,30 +1382,6 @@ const App = () => {
 
       const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
       const searchUrl = (keyword, page = 1, sort = '-reviewCount') => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
-
-      // 重複排除キー: 画像URL（サイズパラメータ除去）優先 → 名前先頭20文字
-      const imageKey = (url) => (url || '').replace(/[?&]_ex=\d+x\d+/g, '').replace(/[?&].*$/, '');
-      const nameKey = (name) => (name || '').replace(/[\s　]/g, '').toLowerCase().slice(0, 20);
-      const dedupeAndMergeShops = (items) => {
-        const map = new Map();
-        for (const item of items) {
-          const key = imageKey(item.image) || nameKey(item.name);
-          if (!key) continue;
-          if (!map.has(key)) {
-            map.set(key, { ...item, shops: [...item.shops] });
-          } else {
-            const existing = map.get(key);
-            const newShops = item.shops.filter(s => !existing.shops.some(es => es.url === s.url));
-            existing.shops.push(...newShops);
-            if (item.price < existing.price) {
-              existing.price = item.price;
-              existing.image = item.image;
-              existing.name = item.name;
-            }
-          }
-        }
-        return Array.from(map.values());
-      };
 
       // メインカテゴリー表示はRanking API（genreId指定 → ジャンル外商品が構造的に混入しない）
       // サブカテゴリー選択時のみ Search API（genreId + サブキーワードで絞り込み）
@@ -3123,7 +3124,12 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   };
 
                   const shopByKey = new Map();
-                  const shopKey = (s) => (s.name || s.shop_name || '').toLowerCase();
+                  // source を含めることで楽天とYahooの同名ショップが別エントリになる
+                  const shopKey = (s) => {
+                    const name = (s.name || s.shop_name || '').toLowerCase();
+                    const src = s.source || '';
+                    return src ? `${src}:${name}` : name;
+                  };
 
                   // crossPlatformShops はAPIから取得した正確なURLを持つため優先
                   const hasCrossRakuten = crossPlatformShops.some(s => s.source === 'rakuten');
@@ -3144,6 +3150,10 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     // crossPlatformShops が同プラットフォームをカバー済みならDBの古いデータはスキップ
                     if (hasCrossRakuten && key.includes('楽天')) continue;
                     if (hasCrossYahoo && (key.includes('yahoo') || key.includes('ヤフー'))) continue;
+                    // DBに楽天名でYahoo URLが入っているケースを除外（データ不整合）
+                    const dbUrl = (s.url || s.sellers?.[0]?.url || '').toLowerCase();
+                    if (key.includes('楽天') && dbUrl && dbUrl.includes('yahoo.co.jp')) continue;
+                    if ((key.includes('yahoo') || key.includes('ヤフー')) && dbUrl && dbUrl.includes('rakuten.co.jp')) continue;
                     const cur = shopByKey.get(key);
                     if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
                       shopByKey.set(key, s);
