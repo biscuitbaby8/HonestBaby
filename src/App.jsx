@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   Search, Heart, ExternalLink, X, Star, MessageCircle,
   Instagram, Twitter, TrendingUp, ChevronRight,
@@ -409,6 +409,7 @@ const getAmazonUrl = (keyword) => {
 const App = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
@@ -902,6 +903,13 @@ const App = () => {
     const key = legalRoutes[pathname];
     if (key) { setActiveLegalPage(key); }
   }, [pathname]);
+
+  // SSRページのボトムナビから ?tab= でタブを開く
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const validTabs = ['home', 'search', 'ai', 'gift', 'user'];
+    if (tab && validTabs.includes(tab)) setActiveTab(tab);
+  }, [searchParams]);
 
   // ブラウザタブのタイトルを画面状態に応じて更新（SEO用 meta は SSR ページが担当）
   useEffect(() => {
@@ -1720,8 +1728,8 @@ const App = () => {
     }
   };
 
-  const handleCategoryChange = (cat) => {
-    if (cat !== 'すべて') {
+  const handleCategoryChange = (cat, keepInSPA = false) => {
+    if (cat !== 'すべて' && !keepInSPA) {
       router.push('/category/' + encodeURIComponent(cat));
       return;
     }
@@ -2608,7 +2616,7 @@ ${userText}
             <div className="flex flex-wrap gap-2">
               {savedSearches.map(s => (
                 <div key={s.id} className="flex items-center gap-1 bg-[#EBF0EA] rounded-full pl-3 pr-1 py-1">
-                  <button onClick={() => { handleCategoryChange(s.category); if (s.subCategory && s.subCategory !== 'すべて') handleSubCategoryChange(s.subCategory); setActiveTab('home'); }}
+                  <button onClick={() => { handleCategoryChange(s.category, true); if (s.subCategory && s.subCategory !== 'すべて') handleSubCategoryChange(s.subCategory); setActiveTab('home'); }}
                     className="text-[11px] font-black text-[#5A4C4C]">{s.label}</button>
                   <button onClick={() => setSavedSearches(prev => prev.filter(x => x.id !== s.id))} className="w-5 h-5 bg-white rounded-full flex items-center justify-center text-[#A5A19E]">
                     <X className="w-3 h-3" />
