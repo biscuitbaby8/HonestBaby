@@ -3209,11 +3209,19 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     });
                   }
 
-                  return Array.from(shopByKey.values()).sort((a, b) => {
-                    if (a.lowestPrice === 0) return 1;
-                    if (b.lowestPrice === 0) return -1;
-                    return (a.lowestPrice || a.price) - (b.lowestPrice || b.price);
-                  });
+                  const RENTAL_KW = ['レンタル', 'rental', 'レンタ', 'リース'];
+                  const checkRental = (s) => {
+                    const targets = [s.name || '', s.shop_name || '', ...(s.sellers || []).flatMap(sel => [sel.name || '', sel.note || ''])];
+                    return targets.some(t => RENTAL_KW.some(k => t.toLowerCase().includes(k)));
+                  };
+                  return Array.from(shopByKey.values())
+                    .map(s => ({ ...s, _isRental: checkRental(s) }))
+                    .sort((a, b) => {
+                      if (a._isRental !== b._isRental) return a._isRental ? 1 : -1;
+                      if (a.lowestPrice === 0) return 1;
+                      if (b.lowestPrice === 0) return -1;
+                      return (a.lowestPrice || a.price) - (b.lowestPrice || b.price);
+                    });
                 })().map((shop, idx) => (
                   <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
                     <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`} 
@@ -3237,9 +3245,14 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                               <ShieldCheck className="w-2.5 h-2.5" /> 公式
                             </span>
                           )}
+                          {shop._isRental && (
+                            <span className="bg-[#7BA7CC] text-white text-[9px] font-black px-2.5 py-1 rounded-md">
+                              レンタル
+                            </span>
+                          )}
                         </div>
                         <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">
-                          {shop.lowestPrice > 0 ? `出品者: ${Math.max(1, (shop.sellers || []).length)}店舗` : "最新の価格・在庫をチェック"}
+                          {shop._isRental ? 'レンタル料金（新品購入ではありません）' : shop.lowestPrice > 0 ? `出品者: ${Math.max(1, (shop.sellers || []).length)}店舗` : "最新の価格・在庫をチェック"}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
