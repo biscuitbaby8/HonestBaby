@@ -4,6 +4,7 @@ import { supabaseServer } from '@/src/lib/supabaseServer';
 import { CATEGORY_TREE, CAT_META, formatDbProduct } from '@/src/lib/products';
 import SiteHeader from '@/src/components/SiteHeader';
 import CategoryClient from '@/src/components/CategoryClient';
+import SpaBottomNav from '@/src/components/SpaBottomNav';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const CATEGORY_NAMES = CATEGORY_TREE.map((c) => c.name).filter((n) => n !== 'すべて');
@@ -106,6 +107,7 @@ export default async function CategoryPage({ params }) {
       </main>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <SpaBottomNav />
     </div>
   );
 }
