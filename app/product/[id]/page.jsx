@@ -39,6 +39,12 @@ export async function generateMetadata({ params }) {
   const title = `${product.name} の最安値・価格比較 | HonestBaby`;
   const desc = `${product.name}の最安値・価格比較。評価${product.rating || ''}★。楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`;
   const url = `${SITE_URL}/product/${encodeURIComponent(product.id)}`;
+  const lowestPrice = getLowestPrice(product.shops);
+  const ogParams = new URLSearchParams({ type: 'product', name: product.name });
+  if (lowestPrice > 0) ogParams.set('price', lowestPrice);
+  if (product.rating) ogParams.set('rating', product.rating);
+  if (product.reviewsCount) ogParams.set('reviews', product.reviewsCount);
+  const ogImage = { url: `/api/og?${ogParams}`, width: 1200, height: 630 };
   return {
     title,
     description: desc,
@@ -48,9 +54,9 @@ export async function generateMetadata({ params }) {
       description: desc,
       url,
       type: 'website',
-      images: [product.image || `${SITE_URL}/logo.png`],
+      images: [ogImage],
     },
-    twitter: { card: 'summary_large_image', title, description: desc, images: [product.image] },
+    twitter: { card: 'summary_large_image', title, description: desc, images: [`/api/og?${ogParams}`] },
   };
 }
 

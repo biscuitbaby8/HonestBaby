@@ -23,14 +23,14 @@ export const metadata = {
     title: TITLE,
     description:
       'パパ・ママのリアルな口コミと価格比較で、本当に良いベビー用品が見つかるAIコンサルタントアプリ。',
-    images: ['/favicon.png'],
+    images: [{ url: '/api/og?type=default', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: TITLE,
     description:
       'パパ・ママのリアルな口コミと価格比較で、本当に良いベビー用品が見つかるAIコンサルタントアプリ。',
-    images: ['/favicon.png'],
+    images: ['/api/og?type=default'],
   },
   verification: {
     google: 'bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI',
