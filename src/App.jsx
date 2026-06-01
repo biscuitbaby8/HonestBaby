@@ -465,6 +465,16 @@ const App = () => {
   const [blockedProducts, setBlockedProducts] = useState([]);
   const [isLoadingBlocked, setIsLoadingBlocked] = useState(false);
 
+  // 記事管理モーダル
+  const [showArticleAdmin, setShowArticleAdmin] = useState(false);
+  const [articleAdminPassword, setArticleAdminPassword] = useState('');
+  const [articleAdminAuthed, setArticleAdminAuthed] = useState(false);
+  const [articleAdminError, setArticleAdminError] = useState('');
+  const [articleList, setArticleList] = useState([]);
+  const [articleAdminView, setArticleAdminView] = useState('list'); // 'list' | 'edit'
+  const [articleForm, setArticleForm] = useState({ slug: '', title: '', meta_description: '', content: '', published: true });
+  const [articleSaving, setArticleSaving] = useState(false);
+
   // User Data States
   const [favorites, setFavorites] = useState(() => {
     try {
@@ -1863,6 +1873,71 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
     }
   };
 
+  // --- 記事管理ハンドラ ---
+  const articleAdminCall = async (action, params = {}) => {
+    const res = await fetch('/api/admin-article', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, password: articleAdminPassword, ...params })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'エラー');
+    return data;
+  };
+
+  const openArticleAdmin = async () => {
+    setShowArticleAdmin(true);
+    setArticleAdminAuthed(false);
+    setArticleAdminPassword('');
+    setArticleAdminError('');
+    setArticleAdminView('list');
+  };
+
+  const handleArticleAuth = async () => {
+    try {
+      const data = await articleAdminCall('list');
+      setArticleList(data.articles || []);
+      setArticleAdminAuthed(true);
+      setArticleAdminError('');
+    } catch (e) {
+      setArticleAdminError(e.message);
+    }
+  };
+
+  const handleArticleSave = async (published) => {
+    setArticleSaving(true);
+    try {
+      await articleAdminCall('save', { ...articleForm, published });
+      const data = await articleAdminCall('list');
+      setArticleList(data.articles || []);
+      setArticleAdminView('list');
+      setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true });
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setArticleSaving(false);
+    }
+  };
+
+  const handleArticleToggle = async (id, published) => {
+    try {
+      await articleAdminCall('toggle', { id, published });
+      setArticleList(prev => prev.map(a => a.id === id ? { ...a, published } : a));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleArticleDelete = async (id) => {
+    if (!window.confirm('この記事を削除しますか？')) return;
+    try {
+      await articleAdminCall('delete', { id });
+      setArticleList(prev => prev.filter(a => a.id !== id));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
   // --- 新機能: レビュー投稿ハンドラ ---
   const submitReview = async () => {
     if (!reviewForm.content.trim() || !selectedProduct) return;
@@ -2992,12 +3067,136 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
         </div>
       )}
 
-      {/* ＝＝＝＝＝ 管理者: 非表示リスト浮きボタン ＝＝＝＝＝ */}
+      {/* ＝＝＝＝＝ 管理者: 浮きボタン群 ＝＝＝＝＝ */}
       {isAdminMode && !showUndoToast && (
-        <button
-          onClick={() => { setShowBlockedList(true); fetchBlockedProducts(); }}
-          className="fixed bottom-28 right-4 z-[200] bg-red-500 text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
-        >🚫 非表示リスト</button>
+        <div className="fixed bottom-28 right-4 z-[200] flex flex-col gap-2">
+          <button
+            onClick={openArticleAdmin}
+            className="bg-[#7B8E76] text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+          >📝 記事管理</button>
+          <button
+            onClick={() => { setShowBlockedList(true); fetchBlockedProducts(); }}
+            className="bg-red-500 text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+          >🚫 非表示リスト</button>
+        </div>
+      )}
+
+      {/* ＝＝＝＝＝ 管理者: 記事管理モーダル ＝＝＝＝＝ */}
+      {showArticleAdmin && (
+        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end sm:items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) setShowArticleAdmin(false); }}>
+          <div className="bg-[#FFFDFB] w-full max-w-lg rounded-t-[2rem] sm:rounded-[2rem] max-h-[92svh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-[#FFFDFB] px-6 pt-5 pb-4 flex items-center justify-between border-b border-[#F4EFEB]">
+              <span className="font-black text-[#5A4C4C]">📝 記事管理</span>
+              <button onClick={() => setShowArticleAdmin(false)} className="w-8 h-8 bg-[#F9F6F3] rounded-full flex items-center justify-center"><X className="w-4 h-4 text-[#A5A19E]" /></button>
+            </div>
+
+            <div className="px-6 py-6 flex-1">
+              {/* パスワード認証 */}
+              {!articleAdminAuthed && (
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm font-bold text-[#5A4C4C]">管理者パスワードを入力してください</p>
+                  <input
+                    type="password"
+                    value={articleAdminPassword}
+                    onChange={e => setArticleAdminPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleArticleAuth()}
+                    placeholder="パスワード"
+                    className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76]"
+                    autoFocus
+                  />
+                  {articleAdminError && <p className="text-xs text-red-500 font-bold">{articleAdminError}</p>}
+                  <button onClick={handleArticleAuth} className="w-full py-3 bg-[#7B8E76] text-white rounded-2xl font-black text-sm active:scale-95 transition-transform">
+                    ログイン
+                  </button>
+                </div>
+              )}
+
+              {/* 記事一覧 */}
+              {articleAdminAuthed && articleAdminView === 'list' && (
+                <div>
+                  <button
+                    onClick={() => { setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true }); setArticleAdminView('edit'); }}
+                    className="w-full py-3 border-2 border-dashed border-[#D4DDD2] rounded-2xl text-sm font-black text-[#7B8E76] mb-5 active:scale-95 transition-transform"
+                  >＋ 新規記事を追加</button>
+                  {articleList.length === 0 && (
+                    <p className="text-xs text-center text-[#A5A19E] font-bold py-8">記事がまだありません</p>
+                  )}
+                  <div className="flex flex-col gap-3">
+                    {articleList.map(a => (
+                      <div key={a.id} className="border border-[#F4EFEB] rounded-2xl p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black text-[#5A4C4C] text-sm truncate">{a.title}</p>
+                            <p className="text-[10px] text-[#A5A19E] font-bold">/article/{a.slug}</p>
+                          </div>
+                          <span className={`text-[9px] font-black px-2 py-1 rounded-full flex-shrink-0 ${a.published ? 'bg-[#EBF0EA] text-[#7B8E76]' : 'bg-[#F4EFEB] text-[#A5A19E]'}`}>
+                            {a.published ? '公開中' : '下書き'}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleArticleToggle(a.id, !a.published)}
+                            className="flex-1 py-2 text-[11px] font-black border border-[#F4EFEB] rounded-xl text-[#7B8E76] active:scale-95 transition-transform"
+                          >{a.published ? '非公開にする' : '公開する'}</button>
+                          <button
+                            onClick={() => handleArticleDelete(a.id)}
+                            className="px-4 py-2 text-[11px] font-black border border-[#FFEBEB] rounded-xl text-[#F2ABAC] active:scale-95 transition-transform"
+                          >削除</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 記事編集フォーム */}
+              {articleAdminAuthed && articleAdminView === 'edit' && (
+                <div className="flex flex-col gap-4">
+                  <button onClick={() => setArticleAdminView('list')} className="flex items-center gap-1 text-xs text-[#A5A19E] font-bold mb-1">
+                    <ChevronLeft className="w-4 h-4" /> 一覧に戻る
+                  </button>
+                  {[
+                    { key: 'slug', label: 'スラッグ（URL）', placeholder: 'babycara-hikaku' },
+                    { key: 'title', label: 'タイトル', placeholder: 'ベビーカーの選び方...' },
+                    { key: 'meta_description', label: 'meta description（〜110文字）', placeholder: 'Google検索に表示される説明文' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <label className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-1 block">{f.label}</label>
+                      <input
+                        value={articleForm[f.key]}
+                        onChange={e => setArticleForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76]"
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-1 block">本文（Markdown）</label>
+                    <textarea
+                      value={articleForm.content}
+                      onChange={e => setArticleForm(prev => ({ ...prev, content: e.target.value }))}
+                      placeholder="## 見出し&#10;&#10;本文をMarkdownで入力..."
+                      rows={12}
+                      className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76] resize-none font-mono"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleArticleSave(false)}
+                      disabled={articleSaving}
+                      className="flex-1 py-3.5 border-2 border-[#D4DDD2] rounded-2xl text-sm font-black text-[#7B8E76] active:scale-95 transition-transform disabled:opacity-50"
+                    >下書き保存</button>
+                    <button
+                      onClick={() => handleArticleSave(true)}
+                      disabled={articleSaving}
+                      className="flex-1 py-3.5 bg-[#7B8E76] text-white rounded-2xl text-sm font-black active:scale-95 transition-transform disabled:opacity-50"
+                    >{articleSaving ? '保存中...' : '公開する'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ＝＝＝＝＝ 管理者: ブロック済み商品モーダル ＝＝＝＝＝ */}
