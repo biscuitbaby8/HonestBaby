@@ -1992,38 +1992,67 @@ ${userText}
     }
   ];
 
+  const buildDiagCategories = (answers) => {
+    const { timing, siblings, home, budget } = answers;
+    const items = [];
+    const add = (category, priority, reason) => items.push({ category, priority, reason });
+
+    // 常に必須
+    add('おむつ', '必須', '退院直後から必要。まず1〜2パック購入を');
+    add('ウェア', '必須', '肌着・カバーオールを3〜5枚ずつ準備');
+    add('お風呂用品', '必須', '退院翌日から沐浴が始まる');
+    add('寝具・ベッド', '必須', '安全な睡眠環境は最優先');
+    add('ミルク・授乳', '必須', '授乳方法が決まる前から哺乳瓶を備えて');
+
+    // マタニティ（出産前なら）
+    if (timing && timing.includes('妊娠中')) {
+      add('マタニティ', '必須', '妊娠中の体をサポートするグッズ');
+    }
+
+    // 抱っこ紐
+    const needsCarrier = !siblings || siblings.includes('第1子') || siblings.includes('第2子');
+    add('抱っこ紐', '必須', '外出・寝かしつけ両方で大活躍');
+
+    // ベビーカー（住環境による）
+    if (home && (home.includes('一戸建て') || home.includes('マンション'))) {
+      add('ベビーカー', '必須', '外出時の移動に不可欠');
+    } else {
+      add('ベビーカー', 'あると便利', '実家帰省時は一時レンタルも◎');
+    }
+
+    // 安全グッズ（第2子以降 or 一戸建て）
+    if ((siblings && siblings.includes('第2子')) || (home && home.includes('一戸建て'))) {
+      add('安全グッズ', '必須', '上の子・階段があるなら早めに準備');
+    } else {
+      add('安全グッズ', 'あると便利', '動き始める前に準備しておくと◎');
+    }
+
+    // 離乳食（0〜6ヶ月以降 or 余裕のある予算）
+    if ((timing && timing.includes('6ヶ月')) || (budget && !budget.includes('10万円'))) {
+      add('離乳食・食器', 'あると便利', '5〜6ヶ月から離乳食が始まる');
+    }
+
+    // おもちゃ（予算あり or 第1子）
+    if (budget && (budget.includes('20万円') || budget.includes('10〜20'))) {
+      add('おもちゃ', 'あると便利', '知育・感覚を育てるファーストトイ');
+    }
+
+    // 車用品（一戸建て）
+    if (home && home.includes('一戸建て')) {
+      add('車用品', '必須', 'チャイルドシートは法律上義務');
+    }
+
+    return items;
+  };
+
   const runDiagnosis = async (answers) => {
     setIsDiagLoading(true);
     setDiagResult(null);
     try {
-      const prompt = `あなたはベビー用品の専門家です。以下の回答から、必要なベビー用品カテゴリを優先度順にJSONで返してください。
-回答: 出産時期=${answers.timing}, 上の子=${answers.siblings}, 住環境=${answers.home}, 予算=${answers.budget}
+      const categories = buildDiagCategories(answers);
 
-以下のカテゴリのみ使用: おむつ, ベビーカー, 抱っこ紐, ウェア, ミルク・授乳, 離乳食・食器, 寝具・ベッド, おもちゃ, 安全グッズ, お風呂用品, 車用品, マタニティ
-
-JSON形式で5〜8項目返してください（コードブロックなし）:
-[{"category":"カテゴリ名","priority":"必須 or あると便利","reason":"20文字以内の理由"}]`;
-
-      const res = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
-      const data = await res.json();
-      let categories = [];
-      try {
-        const json = data.text.match(/\[[\s\S]*\]/)?.[0];
-        if (json) categories = JSON.parse(json);
-      } catch { categories = []; }
-
-      if (categories.length === 0) {
-        setDiagResult([]);
-        return;
-      }
-
-      // 各カテゴリのTOP3商品をDBから取得
       const results = await Promise.all(
-        categories.slice(0, 8).map(async (item) => {
+        categories.map(async (item) => {
           const { data: products } = await supabase
             .from('products')
             .select('id, name, image, price, rating, shops')
@@ -3856,22 +3885,38 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               {isDiagLoading && (
                 <div className="flex flex-col items-center py-16 gap-4">
                   <div className="w-10 h-10 border-4 border-[#7B8E76]/20 border-t-[#7B8E76] rounded-full animate-spin"></div>
-                  <p className="text-sm font-bold text-[#A5A19E]">AIが準備リストを生成中...</p>
+                  <p className="text-sm font-bold text-[#A5A19E]">準備リストを作成中...</p>
                 </div>
               )}
 
               {/* 結果 */}
               {diagResult !== null && !isDiagLoading && (
                 <div>
-                  <div className="flex items-center gap-2 mb-5">
-                    <Sparkles className="w-5 h-5 text-[#7B8E76]" />
-                    <span className="font-black text-[#5A4C4C]">あなたの出産準備リスト</span>
-                  </div>
                   {diagResult.length === 0 ? (
                     <p className="text-sm text-[#A5A19E] text-center py-8">リストの生成に失敗しました。もう一度お試しください。</p>
                   ) : (
-                    <div className="flex flex-col gap-5">
-                      {diagResult.map((item) => (
+                    <>
+                      {/* パーソナライズ要約 */}
+                      <div className="bg-[#EBF0EA] rounded-[1.5rem] px-5 py-4 mb-5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Sparkles className="w-4 h-4 text-[#7B8E76]" />
+                          <span className="text-xs font-black text-[#7B8E76] uppercase tracking-widest">あなたの診断結果</span>
+                        </div>
+                        <p className="text-sm font-bold text-[#5A4C4C] leading-relaxed">
+                          {diagAnswers.siblings?.includes('第2子') ? '2人目のご準備' : 'はじめての出産準備'}、
+                          {diagAnswers.timing?.includes('妊娠中') ? '妊娠中から' : '今から'}計画的に揃えていきましょう！
+                          <br />
+                          <span className="text-xs text-[#8E8282] font-medium">
+                            {diagResult.filter(i => i.priority === '必須').length}カテゴリが「必須」、{diagResult.filter(i => i.priority === 'あると便利').length}カテゴリが「あると便利」です。
+                          </span>
+                        </p>
+                      </div>
+                      {/* 必須リスト */}
+                      <p className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#F2ABAC] inline-block"></span>必須アイテム
+                      </p>
+                      <div className="flex flex-col gap-4 mb-6">
+                      {diagResult.filter(i => i.priority === '必須').map((item) => (
                         <div key={item.category} className="border border-[#F4EFEB] rounded-[1.5rem] overflow-hidden">
                           <div className="px-4 py-3 flex items-center justify-between" style={{ background: item.priority === '必須' ? '#FFF5F5' : '#EBF0EA' }}>
                             <div className="flex items-center gap-2">
@@ -3907,14 +3952,61 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           </button>
                         </div>
                       ))}
-                    </div>
-                  )}
-                  <button
-                    className="mt-6 w-full py-4 rounded-[1.5rem] text-sm font-black bg-[#7B8E76] text-white active:scale-95 transition-transform"
-                    onClick={() => { setDiagStep(0); setDiagAnswers({}); setDiagResult(null); }}
-                  >
-                    もう一度診断する
-                  </button>
+                      </div>
+                    {/* あると便利リスト */}
+                    {diagResult.filter(i => i.priority === 'あると便利').length > 0 && (
+                      <>
+                        <p className="text-[10px] font-black text-[#7B8E76] uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[#7B8E76] inline-block"></span>あると便利なアイテム
+                        </p>
+                        <div className="flex flex-col gap-4 mb-6">
+                          {diagResult.filter(i => i.priority === 'あると便利').map((item) => (
+                            <div key={item.category} className="border border-[#F4EFEB] rounded-[1.5rem] overflow-hidden">
+                              <div className="px-4 py-3 flex items-center justify-between bg-[#EBF0EA]">
+                                <div className="flex items-center gap-2">
+                                  <CategoryIcon name={item.category} className="w-4 h-4 text-[#5A4C4C]" />
+                                  <span className="font-black text-[#5A4C4C] text-sm">{item.category}</span>
+                                </div>
+                                <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-[#7B8E76] text-white">{item.priority}</span>
+                              </div>
+                              {item.reason && <p className="px-4 py-2 text-[11px] text-[#8E8282] font-bold border-b border-[#F4EFEB]">{item.reason}</p>}
+                              {item.products && item.products.length > 0 && (
+                                <div className="divide-y divide-[#F4EFEB]">
+                                  {item.products.map(p => (
+                                    <button
+                                      key={p.id}
+                                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F9F6F3] active:scale-[0.99] transition-all text-left"
+                                      onClick={() => { setSelectedProduct(p); setShowDiagModal(false); }}
+                                    >
+                                      {p.image && <img src={p.image} alt={p.name} className="w-10 h-10 object-contain rounded-xl bg-white flex-shrink-0" />}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-[#5A4C4C] truncate">{cleanName(p.name)}</p>
+                                        {p.price && <p className="text-[11px] text-[#F2ABAC] font-black">¥{p.price.toLocaleString()}</p>}
+                                      </div>
+                                      <ChevronRight className="w-4 h-4 text-[#D4CDC7] flex-shrink-0" />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              <button
+                                className="w-full py-3 text-[11px] font-black text-[#7B8E76] border-t border-[#F4EFEB] hover:bg-[#EBF0EA] transition-colors"
+                                onClick={() => { handleCategoryChange(item.category); setShowDiagModal(false); setActiveTab('home'); }}
+                              >
+                                {item.category}をもっと見る →
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    <button
+                      className="mt-2 w-full py-4 rounded-[1.5rem] text-sm font-black bg-[#7B8E76] text-white active:scale-95 transition-transform"
+                      onClick={() => { setDiagStep(0); setDiagAnswers({}); setDiagResult(null); }}
+                    >
+                      もう一度診断する
+                    </button>
+                  </>
+                )}
                 </div>
               )}
             </div>
