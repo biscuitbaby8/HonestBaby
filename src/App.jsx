@@ -461,6 +461,16 @@ const App = () => {
   const [blockedProducts, setBlockedProducts] = useState([]);
   const [isLoadingBlocked, setIsLoadingBlocked] = useState(false);
 
+  // 記事管理モーダル
+  const [showArticleAdmin, setShowArticleAdmin] = useState(false);
+  const [articleAdminPassword, setArticleAdminPassword] = useState('');
+  const [articleAdminAuthed, setArticleAdminAuthed] = useState(false);
+  const [articleAdminError, setArticleAdminError] = useState('');
+  const [articleList, setArticleList] = useState([]);
+  const [articleAdminView, setArticleAdminView] = useState('list'); // 'list' | 'edit'
+  const [articleForm, setArticleForm] = useState({ slug: '', title: '', meta_description: '', content: '', published: true });
+  const [articleSaving, setArticleSaving] = useState(false);
+
   // User Data States
   const [favorites, setFavorites] = useState(() => {
     try {
@@ -764,6 +774,13 @@ const App = () => {
   const [userInput, setUserInput] = useState("");
   const [isAiTyping, setIsAiTyping] = useState(false);
   const chatEndRef = useRef(null);
+
+  // 出産準備診断 States
+  const [showDiagModal, setShowDiagModal] = useState(false);
+  const [diagStep, setDiagStep] = useState(0);
+  const [diagAnswers, setDiagAnswers] = useState({});
+  const [diagResult, setDiagResult] = useState(null);
+  const [isDiagLoading, setIsDiagLoading] = useState(false);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1951,6 +1968,146 @@ ${userText}
     }
   };
 
+  // --- 出産準備診断ハンドラ ---
+  const DIAG_QUESTIONS = [
+    {
+      key: 'timing',
+      question: 'お子さまはいつ頃生まれる予定ですか？',
+      options: ['妊娠中（〜3ヶ月）', '妊娠中（3〜6ヶ月）', '妊娠中（6ヶ月〜）', 'すでに生まれた（0〜6ヶ月）', 'すでに生まれた（6ヶ月〜）']
+    },
+    {
+      key: 'siblings',
+      question: '上のお子さまはいますか？',
+      options: ['いない（第1子）', 'いる（第2子以降）']
+    },
+    {
+      key: 'home',
+      question: 'ご自宅の環境はどちらですか？',
+      options: ['マンション・アパート（エレベーターあり）', 'マンション・アパート（階段のみ）', '一戸建て', '実家に帰省予定']
+    },
+    {
+      key: 'budget',
+      question: 'ベビー用品の総予算感はどのくらいですか？',
+      options: ['〜10万円（最小限で揃えたい）', '10〜20万円（標準的に揃えたい）', '20万円以上（しっかり揃えたい）']
+    }
+  ];
+
+  const runDiagnosis = async (answers) => {
+    setIsDiagLoading(true);
+    setDiagResult(null);
+    try {
+      const prompt = `あなたはベビー用品の専門家です。以下の回答から、必要なベビー用品カテゴリを優先度順にJSONで返してください。
+回答: 出産時期=${answers.timing}, 上の子=${answers.siblings}, 住環境=${answers.home}, 予算=${answers.budget}
+
+以下のカテゴリのみ使用: おむつ, ベビーカー, 抱っこ紐, ウェア, ミルク・授乳, 離乳食・食器, 寝具・ベッド, おもちゃ, 安全グッズ, お風呂用品, 車用品, マタニティ
+
+JSON形式で5〜8項目返してください（コードブロックなし）:
+[{"category":"カテゴリ名","priority":"必須 or あると便利","reason":"20文字以内の理由"}]`;
+
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await res.json();
+      let categories = [];
+      try {
+        const json = data.text.match(/\[[\s\S]*\]/)?.[0];
+        if (json) categories = JSON.parse(json);
+      } catch { categories = []; }
+
+      if (categories.length === 0) {
+        setDiagResult([]);
+        return;
+      }
+
+      // 各カテゴリのTOP3商品をDBから取得
+      const results = await Promise.all(
+        categories.slice(0, 8).map(async (item) => {
+          const { data: products } = await supabase
+            .from('products')
+            .select('id, name, image, price, rating, shops')
+            .eq('category', item.category)
+            .or('is_blocked.is.null,is_blocked.eq.false')
+            .order('popularity_rank', { ascending: true })
+            .limit(3);
+          return { ...item, products: products || [] };
+        })
+      );
+      setDiagResult(results);
+    } catch (e) {
+      console.error('Diagnosis error:', e);
+      setDiagResult([]);
+    } finally {
+      setIsDiagLoading(false);
+    }
+  };
+
+  // --- 記事管理ハンドラ ---
+  const articleAdminCall = async (action, params = {}) => {
+    const res = await fetch('/api/admin-article', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, password: articleAdminPassword, ...params })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'エラー');
+    return data;
+  };
+
+  const openArticleAdmin = async () => {
+    setShowArticleAdmin(true);
+    setArticleAdminAuthed(false);
+    setArticleAdminPassword('');
+    setArticleAdminError('');
+    setArticleAdminView('list');
+  };
+
+  const handleArticleAuth = async () => {
+    try {
+      const data = await articleAdminCall('list');
+      setArticleList(data.articles || []);
+      setArticleAdminAuthed(true);
+      setArticleAdminError('');
+    } catch (e) {
+      setArticleAdminError(e.message);
+    }
+  };
+
+  const handleArticleSave = async (published) => {
+    setArticleSaving(true);
+    try {
+      await articleAdminCall('save', { ...articleForm, published });
+      const data = await articleAdminCall('list');
+      setArticleList(data.articles || []);
+      setArticleAdminView('list');
+      setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true });
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setArticleSaving(false);
+    }
+  };
+
+  const handleArticleToggle = async (id, published) => {
+    try {
+      await articleAdminCall('toggle', { id, published });
+      setArticleList(prev => prev.map(a => a.id === id ? { ...a, published } : a));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleArticleDelete = async (id) => {
+    if (!window.confirm('この記事を削除しますか？')) return;
+    try {
+      await articleAdminCall('delete', { id });
+      setArticleList(prev => prev.filter(a => a.id !== id));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
   // --- 新機能: レビュー投稿ハンドラ ---
   const submitReview = async () => {
     if (!reviewForm.content.trim() || !selectedProduct) return;
@@ -2201,6 +2358,22 @@ ${userText}
           <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
         </div>
 
+        {/* ─── 出産準備リスト診断バナー ─── */}
+        <div
+          className="w-full bg-[#EBF0EA] rounded-[2.5rem] p-6 mb-6 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform border border-[#D4DDD2]"
+          onClick={() => { setShowDiagModal(true); setDiagStep(0); setDiagAnswers({}); setDiagResult(null); }}
+        >
+          <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
+            <Baby className="w-7 h-7 text-[#7B8E76]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] font-black uppercase tracking-widest text-[#7B8E76] mb-0.5">診断機能</div>
+            <div className="text-base font-black text-[#5A4C4C] leading-tight">出産準備リストを自動生成</div>
+            <div className="text-[11px] text-[#8E8282] font-bold mt-0.5">4つの質問に答えるだけ ·  AI が必要なものをリストアップ</div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-[#A5A19E] flex-shrink-0" />
+        </div>
+
         {/* ─── Yahoo!ショッピング 今日のお得バナー ─── */}
         {(() => {
           const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
@@ -2410,6 +2583,31 @@ ${userText}
             <div className="col-span-2 py-20 text-center text-[#A5A19E] text-xs font-bold uppercase tracking-widest leading-loose">該当する商品は見つかりませんでした</div>
           )}
         </div>
+
+        {/* ─── レンタル・サブスクサービス ─── */}
+        {selectedCategory === 'すべて' && (
+          <div className="mt-10 mb-4">
+            <div className="flex items-center gap-2 mb-4 px-1">
+              <span className="text-[10px] font-black text-[#7B8E76] uppercase tracking-widest">Services</span>
+              <span className="text-xs font-bold text-[#5A4C4C]">レンタル・サブスクで賢く育児</span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-2">
+              {[
+                { name: 'ベビレンタ', desc: 'ベビーカー・チャイルドシートなど', tag: 'レンタル', color: '#FFF5F5', tagColor: '#F2ABAC', url: 'https://babyrenta.com/' },
+                { name: 'Toysub！', desc: 'おもちゃのサブスク 月額3,980円〜', tag: 'サブスク', color: '#EBF0EA', tagColor: '#7B8E76', url: 'https://toysub.net/' },
+                { name: 'ナイスベビー', desc: 'ベビー用品レンタル専門店', tag: 'レンタル', color: '#FFF5F5', tagColor: '#F2ABAC', url: 'https://www.nicebaby.co.jp/' },
+              ].map(s => (
+                <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer nofollow"
+                  className="flex-shrink-0 w-44 rounded-[1.5rem] p-4 border border-[#F4EFEB] shadow-sm active:scale-95 transition-transform"
+                  style={{ background: s.color }}>
+                  <span className="text-[9px] font-black rounded-full px-2 py-0.5" style={{ background: s.tagColor, color: '#fff' }}>{s.tag}</span>
+                  <div className="font-black text-[#5A4C4C] text-sm mt-2 mb-1">{s.name}</div>
+                  <div className="text-[10px] text-[#8E8282] font-bold leading-snug">{s.desc}</div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 自律成長型プラットフォーム・フッター */}
         <div className="text-center py-10 opacity-30">
@@ -2666,6 +2864,22 @@ ${userText}
         {/* 法的リンク */}
         <div className="px-2 border-t border-[#F4EFEB] pt-8">
           <div className="flex flex-col gap-4">
+            <div className="mb-2">
+              <p className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-3">記事・ガイド</p>
+              <div className="flex flex-col gap-2">
+                {[
+                  { slug: 'babycara-hikaku', label: 'ベビーカー選び方・比較ガイド' },
+                  { slug: 'syussan-junbi-list', label: '出産準備リスト（月齢別チェックリスト）' },
+                  { slug: 'omutsu-hikaku', label: 'おむつ比較・おすすめランキング' },
+                ].map(a => (
+                  <div key={a.slug} className="flex items-center gap-2 text-xs font-bold text-[#D4CDC7] cursor-default">
+                    <FileText className="w-4 h-4 flex-shrink-0" />
+                    <span>{a.label}</span>
+                    <span className="text-[9px] font-black bg-[#F4EFEB] text-[#C0B8B2] px-2 py-0.5 rounded-full uppercase tracking-wider">Coming Soon</span>
+                  </div>
+                ))}
+              </div>
+            </div>
             <button onClick={() => { setShowContactModal(true); setContactSent(false); setContactContent(''); setContactCategory('商品について'); }} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Mail className="w-4 h-4 mr-2" /> お問い合わせ</button>
             <button onClick={() => setActiveLegalPage('terms')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 利用規約</button>
             <button onClick={() => setActiveLegalPage('privacy')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Shield className="w-4 h-4 mr-2" /> プライバシーポリシー</button>
@@ -2941,12 +3155,136 @@ ${userText}
         </div>
       )}
 
-      {/* ＝＝＝＝＝ 管理者: 非表示リスト浮きボタン ＝＝＝＝＝ */}
+      {/* ＝＝＝＝＝ 管理者: 浮きボタン群 ＝＝＝＝＝ */}
       {isAdminMode && !showUndoToast && (
-        <button
-          onClick={() => { setShowBlockedList(true); fetchBlockedProducts(); }}
-          className="fixed bottom-28 right-4 z-[200] bg-red-500 text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
-        >🚫 非表示リスト</button>
+        <div className="fixed bottom-28 right-4 z-[200] flex flex-col gap-2">
+          <button
+            onClick={openArticleAdmin}
+            className="bg-[#7B8E76] text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+          >📝 記事管理</button>
+          <button
+            onClick={() => { setShowBlockedList(true); fetchBlockedProducts(); }}
+            className="bg-red-500 text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+          >🚫 非表示リスト</button>
+        </div>
+      )}
+
+      {/* ＝＝＝＝＝ 管理者: 記事管理モーダル ＝＝＝＝＝ */}
+      {showArticleAdmin && (
+        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end sm:items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) setShowArticleAdmin(false); }}>
+          <div className="bg-[#FFFDFB] w-full max-w-lg rounded-t-[2rem] sm:rounded-[2rem] max-h-[92svh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-[#FFFDFB] px-6 pt-5 pb-4 flex items-center justify-between border-b border-[#F4EFEB]">
+              <span className="font-black text-[#5A4C4C]">📝 記事管理</span>
+              <button onClick={() => setShowArticleAdmin(false)} className="w-8 h-8 bg-[#F9F6F3] rounded-full flex items-center justify-center"><X className="w-4 h-4 text-[#A5A19E]" /></button>
+            </div>
+
+            <div className="px-6 py-6 flex-1">
+              {/* パスワード認証 */}
+              {!articleAdminAuthed && (
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm font-bold text-[#5A4C4C]">管理者パスワードを入力してください</p>
+                  <input
+                    type="password"
+                    value={articleAdminPassword}
+                    onChange={e => setArticleAdminPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleArticleAuth()}
+                    placeholder="パスワード"
+                    className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76]"
+                    autoFocus
+                  />
+                  {articleAdminError && <p className="text-xs text-red-500 font-bold">{articleAdminError}</p>}
+                  <button onClick={handleArticleAuth} className="w-full py-3 bg-[#7B8E76] text-white rounded-2xl font-black text-sm active:scale-95 transition-transform">
+                    ログイン
+                  </button>
+                </div>
+              )}
+
+              {/* 記事一覧 */}
+              {articleAdminAuthed && articleAdminView === 'list' && (
+                <div>
+                  <button
+                    onClick={() => { setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true }); setArticleAdminView('edit'); }}
+                    className="w-full py-3 border-2 border-dashed border-[#D4DDD2] rounded-2xl text-sm font-black text-[#7B8E76] mb-5 active:scale-95 transition-transform"
+                  >＋ 新規記事を追加</button>
+                  {articleList.length === 0 && (
+                    <p className="text-xs text-center text-[#A5A19E] font-bold py-8">記事がまだありません</p>
+                  )}
+                  <div className="flex flex-col gap-3">
+                    {articleList.map(a => (
+                      <div key={a.id} className="border border-[#F4EFEB] rounded-2xl p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black text-[#5A4C4C] text-sm truncate">{a.title}</p>
+                            <p className="text-[10px] text-[#A5A19E] font-bold">/article/{a.slug}</p>
+                          </div>
+                          <span className={`text-[9px] font-black px-2 py-1 rounded-full flex-shrink-0 ${a.published ? 'bg-[#EBF0EA] text-[#7B8E76]' : 'bg-[#F4EFEB] text-[#A5A19E]'}`}>
+                            {a.published ? '公開中' : '下書き'}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleArticleToggle(a.id, !a.published)}
+                            className="flex-1 py-2 text-[11px] font-black border border-[#F4EFEB] rounded-xl text-[#7B8E76] active:scale-95 transition-transform"
+                          >{a.published ? '非公開にする' : '公開する'}</button>
+                          <button
+                            onClick={() => handleArticleDelete(a.id)}
+                            className="px-4 py-2 text-[11px] font-black border border-[#FFEBEB] rounded-xl text-[#F2ABAC] active:scale-95 transition-transform"
+                          >削除</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 記事編集フォーム */}
+              {articleAdminAuthed && articleAdminView === 'edit' && (
+                <div className="flex flex-col gap-4">
+                  <button onClick={() => setArticleAdminView('list')} className="flex items-center gap-1 text-xs text-[#A5A19E] font-bold mb-1">
+                    <ChevronLeft className="w-4 h-4" /> 一覧に戻る
+                  </button>
+                  {[
+                    { key: 'slug', label: 'スラッグ（URL）', placeholder: 'babycara-hikaku' },
+                    { key: 'title', label: 'タイトル', placeholder: 'ベビーカーの選び方...' },
+                    { key: 'meta_description', label: 'meta description（〜110文字）', placeholder: 'Google検索に表示される説明文' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <label className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-1 block">{f.label}</label>
+                      <input
+                        value={articleForm[f.key]}
+                        onChange={e => setArticleForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76]"
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-1 block">本文（Markdown）</label>
+                    <textarea
+                      value={articleForm.content}
+                      onChange={e => setArticleForm(prev => ({ ...prev, content: e.target.value }))}
+                      placeholder="## 見出し&#10;&#10;本文をMarkdownで入力..."
+                      rows={12}
+                      className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76] resize-none font-mono"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleArticleSave(false)}
+                      disabled={articleSaving}
+                      className="flex-1 py-3.5 border-2 border-[#D4DDD2] rounded-2xl text-sm font-black text-[#7B8E76] active:scale-95 transition-transform disabled:opacity-50"
+                    >下書き保存</button>
+                    <button
+                      onClick={() => handleArticleSave(true)}
+                      disabled={articleSaving}
+                      className="flex-1 py-3.5 bg-[#7B8E76] text-white rounded-2xl text-sm font-black active:scale-95 transition-transform disabled:opacity-50"
+                    >{articleSaving ? '保存中...' : '公開する'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ＝＝＝＝＝ 管理者: ブロック済み商品モーダル ＝＝＝＝＝ */}
@@ -3455,6 +3793,131 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
             >
               {isSubmittingReview ? "送信中..." : "投稿する"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ＝＝＝＝＝ 出産準備リスト診断モーダル ＝＝＝＝＝ */}
+      {showDiagModal && (
+        <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowDiagModal(false); }}>
+          <div className="bg-[#FFFDFB] w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] max-h-[90svh] overflow-y-auto">
+            <div className="sticky top-0 bg-[#FFFDFB] px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#F4EFEB]">
+              <div className="flex items-center gap-2">
+                <Baby className="w-5 h-5 text-[#7B8E76]" />
+                <span className="font-black text-[#5A4C4C]">出産準備リスト診断</span>
+              </div>
+              <button onClick={() => setShowDiagModal(false)} className="w-8 h-8 bg-[#F9F6F3] rounded-full flex items-center justify-center"><X className="w-4 h-4 text-[#A5A19E]" /></button>
+            </div>
+
+            <div className="px-6 py-6">
+              {/* 質問ステップ */}
+              {diagResult === null && !isDiagLoading && (
+                <div>
+                  <div className="flex gap-1 mb-6">
+                    {DIAG_QUESTIONS.map((_, i) => (
+                      <div key={i} className={`h-1 flex-1 rounded-full ${i <= diagStep ? 'bg-[#7B8E76]' : 'bg-[#F4EFEB]'}`} />
+                    ))}
+                  </div>
+                  <p className="text-xs font-black text-[#7B8E76] uppercase tracking-widest mb-2">質問 {diagStep + 1} / {DIAG_QUESTIONS.length}</p>
+                  <h3 className="text-lg font-black text-[#5A4C4C] mb-6 leading-snug">{DIAG_QUESTIONS[diagStep].question}</h3>
+                  <div className="flex flex-col gap-3">
+                    {DIAG_QUESTIONS[diagStep].options.map(opt => {
+                      const isSelected = diagAnswers[DIAG_QUESTIONS[diagStep].key] === opt;
+                      return (
+                        <button
+                          key={opt}
+                          className={`w-full text-left px-5 py-4 rounded-[1.5rem] text-sm font-bold border-2 transition-all active:scale-95 ${isSelected ? 'border-[#7B8E76] bg-[#EBF0EA] text-[#5A4C4C]' : 'border-[#F4EFEB] bg-white text-[#5A4C4C] hover:border-[#D4DDD2]'}`}
+                          onClick={() => {
+                            const key = DIAG_QUESTIONS[diagStep].key;
+                            const newAnswers = { ...diagAnswers, [key]: opt };
+                            setDiagAnswers(newAnswers);
+                            if (diagStep < DIAG_QUESTIONS.length - 1) {
+                              setDiagStep(diagStep + 1);
+                            } else {
+                              setDiagStep(DIAG_QUESTIONS.length);
+                              runDiagnosis(newAnswers);
+                            }
+                          }}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {diagStep > 0 && (
+                    <button onClick={() => setDiagStep(diagStep - 1)} className="mt-4 text-xs text-[#A5A19E] font-bold flex items-center gap-1">
+                      <ChevronLeft className="w-4 h-4" /> 前の質問に戻る
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* ローディング */}
+              {isDiagLoading && (
+                <div className="flex flex-col items-center py-16 gap-4">
+                  <div className="w-10 h-10 border-4 border-[#7B8E76]/20 border-t-[#7B8E76] rounded-full animate-spin"></div>
+                  <p className="text-sm font-bold text-[#A5A19E]">AIが準備リストを生成中...</p>
+                </div>
+              )}
+
+              {/* 結果 */}
+              {diagResult !== null && !isDiagLoading && (
+                <div>
+                  <div className="flex items-center gap-2 mb-5">
+                    <Sparkles className="w-5 h-5 text-[#7B8E76]" />
+                    <span className="font-black text-[#5A4C4C]">あなたの出産準備リスト</span>
+                  </div>
+                  {diagResult.length === 0 ? (
+                    <p className="text-sm text-[#A5A19E] text-center py-8">リストの生成に失敗しました。もう一度お試しください。</p>
+                  ) : (
+                    <div className="flex flex-col gap-5">
+                      {diagResult.map((item) => (
+                        <div key={item.category} className="border border-[#F4EFEB] rounded-[1.5rem] overflow-hidden">
+                          <div className="px-4 py-3 flex items-center justify-between" style={{ background: item.priority === '必須' ? '#FFF5F5' : '#EBF0EA' }}>
+                            <div className="flex items-center gap-2">
+                              <CategoryIcon name={item.category} className="w-4 h-4 text-[#5A4C4C]" />
+                              <span className="font-black text-[#5A4C4C] text-sm">{item.category}</span>
+                            </div>
+                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${item.priority === '必須' ? 'bg-[#F2ABAC] text-white' : 'bg-[#7B8E76] text-white'}`}>{item.priority}</span>
+                          </div>
+                          {item.reason && <p className="px-4 py-2 text-[11px] text-[#8E8282] font-bold border-b border-[#F4EFEB]">{item.reason}</p>}
+                          {item.products && item.products.length > 0 && (
+                            <div className="divide-y divide-[#F4EFEB]">
+                              {item.products.map(p => (
+                                <button
+                                  key={p.id}
+                                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F9F6F3] active:scale-[0.99] transition-all text-left"
+                                  onClick={() => { setSelectedProduct(p); setShowDiagModal(false); }}
+                                >
+                                  {p.image && <img src={p.image} alt={p.name} className="w-10 h-10 object-contain rounded-xl bg-white flex-shrink-0" />}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-[#5A4C4C] truncate">{cleanName(p.name)}</p>
+                                    {p.price && <p className="text-[11px] text-[#F2ABAC] font-black">¥{p.price.toLocaleString()}</p>}
+                                  </div>
+                                  <ChevronRight className="w-4 h-4 text-[#D4CDC7] flex-shrink-0" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            className="w-full py-3 text-[11px] font-black text-[#7B8E76] border-t border-[#F4EFEB] hover:bg-[#EBF0EA] transition-colors"
+                            onClick={() => { handleCategoryChange(item.category); setShowDiagModal(false); setActiveTab('home'); }}
+                          >
+                            {item.category}をもっと見る →
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    className="mt-6 w-full py-4 rounded-[1.5rem] text-sm font-black bg-[#7B8E76] text-white active:scale-95 transition-transform"
+                    onClick={() => { setDiagStep(0); setDiagAnswers({}); setDiagResult(null); }}
+                  >
+                    もう一度診断する
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
