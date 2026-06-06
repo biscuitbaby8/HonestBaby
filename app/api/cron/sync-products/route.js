@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
+import { extractSubCategory } from '@/src/lib/subcategory';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -165,56 +166,7 @@ function parseDiaperCount(name) {
   return m ? parseInt(m[1]) : null;
 }
 
-// サブカテゴリ推定ロジック
-function extractSubCategory(category, itemName) {
-  const rules = {
-    "おむつ": [
-      { match: /パンツ/, sub: "パンツタイプ" },
-      { match: /テープ/, sub: "テープタイプ" },
-      { match: /おしりふき/, sub: "おしりふき" },
-    ],
-    "ベビーカー": [
-      // 周辺グッズを先に判定（本体より優先）
-      { match: /レインカバー|雨カバー|防雨カバー/, sub: "周辺グッズ" },
-      { match: /ドリンクホルダー|カップホルダー|スマホホルダー|スマートフォンホルダー/, sub: "周辺グッズ" },
-      { match: /フットマフ|ハンドルカバー|バンパーバー|サンキャノピー|サンシェード/, sub: "周辺グッズ" },
-      { match: /フック|収納ポーチ|サイドバッグ|アームバー/, sub: "周辺グッズ" },
-      { match: /よだれカバー|防寒ケープ|ベビーカーシート|シートカバー/, sub: "周辺グッズ" },
-      { match: /AB型|ＡＢ型/, sub: "AB型" },
-      { match: /[AＡ]型/, sub: "A型" },
-      { match: /[BＢ]型/, sub: "B型" },
-      { match: /バギー/, sub: "バギー" },
-    ],
-    "抱っこ紐": [
-      // 周辺グッズを先に判定
-      { match: /よだれパッド|ケープ|抱っこ紐カバー|防寒カバー/, sub: "周辺グッズ" },
-      { match: /スリング/, sub: "スリング" },
-      { match: /ヒップシート/, sub: "ヒップシート" },
-    ],
-    "車用品": [
-      // 周辺グッズを先に判定（本体より優先）
-      { match: /シートプロテクター|座席保護|シート保護|保護シート|保護マット|チェアプロテクター/, sub: "周辺グッズ" },
-      { match: /シートカバー|チェアカバー|座席カバー/, sub: "周辺グッズ" },
-      { match: /ミラー|カーミラー|後部座席ミラー/, sub: "周辺グッズ" },
-      { match: /サンシェード|日よけ|UVカット|車用遮光|車用日除け/, sub: "周辺グッズ" },
-      { match: /シートベルトカバー|シートベルトパッド|ベルトパッド/, sub: "周辺グッズ" },
-      { match: /ネックピロー|ヘッドサポート|ヘッドレスト/, sub: "周辺グッズ" },
-      { match: /収納|ポーチ|トレイ|バック|オーガナイザー/, sub: "周辺グッズ" },
-      // 本体を判定
-      { match: /ジュニアシート/, sub: "ジュニアシート" },
-      { match: /新生児/, sub: "新生児用" },
-      { match: /2way|2ウェイ|二way|コンバーチブル/, sub: "2wayタイプ" },
-    ]
-  };
-
-  const catRules = rules[category];
-  if (catRules) {
-    for (const r of catRules) {
-      if (r.match.test(itemName)) return r.sub;
-    }
-  }
-  return "本体"; // デフォルト
-}
+// サブカテゴリ推定ロジックは src/lib/subcategory.js に集約（importで取得）
 
 // --- 楽天API呼び出し（リトライ付き） ---
 async function fetchWithRetry(url, maxRetries = 1) {
