@@ -1,14 +1,19 @@
-export default async function handler(req, res) {
-  const { query, noFilter } = req.query;
-  const clientId = process.env.YAHOO_CLIENT_ID || process.env.VITE_YAHOO_CLIENT_ID;
-  const vcSid = process.env.VITE_VC_SID || '3768537';
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get('query');
+  const noFilter = searchParams.get('noFilter');
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=300');
+  const clientId = process.env.YAHOO_CLIENT_ID || process.env.VITE_YAHOO_CLIENT_ID;
+  const vcSid = process.env.VITE_VC_SID || process.env.NEXT_PUBLIC_VC_SID || '3768537';
+
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Cache-Control': 's-maxage=120, stale-while-revalidate=300',
+  };
 
   if (!clientId) {
-    return res.status(500).json({ error: 'Missing Yahoo Client ID (YAHOO_CLIENT_ID)' });
+    return Response.json({ error: 'Missing Yahoo Client ID (YAHOO_CLIENT_ID)' }, { status: 500, headers });
   }
 
   // noFilter=1 のときはジャンル/価格フィルタを外す（クロスプラットフォーム比較用）
@@ -22,19 +27,20 @@ export default async function handler(req, res) {
       if (!/yahoo\.co\.jp/.test(rawUrl)) return rawUrl;
       const sep = rawUrl.includes('?') ? '&' : '?';
       return `${rawUrl}${sep}sc_e=afvc_shp_${vcSid}`;
-    } catch { return rawUrl; }
+    } catch {
+      return rawUrl;
+    }
   };
 
   try {
     const response = await fetch(url);
     if (!response.ok) {
       const errorText = await response.text();
-      return res.status(response.status).json({ error: errorText });
+      return Response.json({ error: errorText }, { status: response.status, headers });
     }
     const data = await response.json();
 
-    // フロントエンドが扱いやすい共通フォーマットに変換
-    const products = (data.hits || []).map(item => ({
+    const products = (data.hits || []).map((item) => ({
       id: `yahoo-${item.code || Math.random()}`,
       name: item.name,
       price: item.price,
@@ -48,12 +54,12 @@ export default async function handler(req, res) {
         price: item.price,
         url: addAffiliate(item.url),
         shipping: item.shipping?.code === 0 ? 0 : (item.shipping?.name || ''),
-        points: item.point?.amount || 0
-      }]
+        points: item.point?.amount || 0,
+      }],
     }));
 
-    return res.status(200).json({ products });
+    return Response.json({ products }, { status: 200, headers });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return Response.json({ error: error.message }, { status: 500, headers });
   }
 }

@@ -1,7 +1,4 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install",
   "crons": [
     {
       "path": "/api/cron/sync-products?manual=1&batch=1",
@@ -52,14 +49,6 @@
     {
       "source": "/article/:slug",
       "destination": "/api/article?slug=:slug"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
     }
   ],
   "functions": {

@@ -1,14 +1,5 @@
-// HonestBaby カスタム Service Worker
-// vite-plugin-pwa の injectManifest 戦略で使われる
-// このファイル内で `self.__WB_MANIFEST` を参照することで Workbox precache が有効になる
-
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
-import { clientsClaim } from 'workbox-core';
-
-self.skipWaiting();
-clientsClaim();
-cleanupOutdatedCaches();
-precacheAndRoute(self.__WB_MANIFEST || []);
+// HonestBaby カスタム Service Worker ロジック
+// next-pwa が自動生成する Workbox SW にこのコードが取り込まれる（precache 等は next-pwa が担当）
 
 // === Web Push 受信ハンドラ ===
 self.addEventListener('push', (event) => {

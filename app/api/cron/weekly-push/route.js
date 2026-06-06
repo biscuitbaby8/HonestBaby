@@ -1,15 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
-import { sendPushNotification, isPushConfigured } from '../lib/web-push.js';
+import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
+  process.env.SUPABASE_SERVICE_KEY || 'placeholder_key'
+);
 
 // 今週の人気ランキング上位3件を取得してPush通知を全購読者に送る
-export default async function handler(req, res) {
+export async function GET() {
   if (!isPushConfigured()) {
-    return res.status(200).json({ ok: false, reason: 'VAPID keys not configured' });
+    return Response.json({ ok: false, reason: 'VAPID keys not configured' }, { status: 200 });
   }
 
-  // 人気商品上位3件取得
   const { data: topProducts } = await supabase
     .from('products')
     .select('id, name, image_url, price')
@@ -18,22 +20,17 @@ export default async function handler(req, res) {
     .limit(3);
 
   if (!topProducts || topProducts.length === 0) {
-    return res.status(200).json({ ok: false, reason: 'no products' });
+    return Response.json({ ok: false, reason: 'no products' }, { status: 200 });
   }
 
   const top = topProducts[0];
-  const others = topProducts.slice(1).map(p => p.name).join('・');
-  const body = others
-    ? `1位: ${top.name}、他にも${others}など`
-    : `1位: ${top.name}`;
+  const others = topProducts.slice(1).map((p) => p.name).join('・');
+  const body = others ? `1位: ${top.name}、他にも${others}など` : `1位: ${top.name}`;
 
-  // 全購読者に送信
-  const { data: subs } = await supabase
-    .from('push_subscriptions')
-    .select('*');
+  const { data: subs } = await supabase.from('push_subscriptions').select('*');
 
   if (!subs || subs.length === 0) {
-    return res.status(200).json({ ok: true, sent: 0 });
+    return Response.json({ ok: true, sent: 0 }, { status: 200 });
   }
 
   let sent = 0;
@@ -56,10 +53,9 @@ export default async function handler(req, res) {
     }
   }
 
-  // 期限切れ購読を削除
   for (const endpoint of expired) {
     await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
   }
 
-  return res.status(200).json({ ok: true, sent, expired: expired.length });
+  return Response.json({ ok: true, sent, expired: expired.length }, { status: 200 });
 }

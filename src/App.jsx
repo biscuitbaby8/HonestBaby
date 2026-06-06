@@ -1,9 +1,9 @@
+'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-// FORCE REBUILD V3 - DEPLOYMENT CHECK - 2026-05-11
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Search, Heart, ExternalLink, X, Star, MessageCircle,
-  Instagram, Twitter, TrendingUp, ChevronRight,
+  TrendingUp, ChevronRight,
   Home, User, Bell, ArrowLeft, Share2, Award,
   Settings, History, Bookmark, Sparkles, Send, Bot,
   Package, Layers, ChevronDown, ChevronUp, Calculator,
@@ -34,8 +34,8 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
     default: return <Package className={className} />;
   }
 };
-import { Helmet } from 'react-helmet-async';
 import { supabase } from './lib/supabaseClient';
+import ProductCard from './components/ProductCard';
 
 // ＝＝＝＝＝ 商品データはSupabaseから取得します ＝＝＝＝＝
 
@@ -49,12 +49,12 @@ const CATEGORY_TREE = [
       { name: "パンツタイプ", subsubs: ["S", "M", "L", "BIG", "BIGより大きい"] },
       { name: "夜用おむつ", subsubs: ["M", "L", "BIG", "BIGより大きい"] },
       { name: "おしりふき" },
+      { name: "ゴミ箱・袋", subsubs: ["おむつポット", "防臭袋"] },
     ]
   },
-  { name: "ゴミ箱・袋", id: "101070", keyword: "おむつ ゴミ箱 防臭", subs: ["おむつポット", "防臭袋", "サニタリーボックス"] },
   { name: "ベビーカー", id: "200833", keyword: "ベビーカー", subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
   { name: "抱っこ紐", id: "412209", keyword: "抱っこ紐", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
-  { name: "ウェア", id: "111102", keyword: "ベビー服", subs: ["ロンパース", "カバーオール", "肌着", "アウター"] },
+  { name: "ウェア", id: "111102", keyword: "ベビー服", subs: ["ロンパース", "カバーオール", "肌着", "アウター", "スタイ"] },
   { name: "ミルク・授乳", id: "205208", keyword: "ミルク 授乳", subs: ["ミルク", "哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
   { name: "離乳食・食器", id: "213980", keyword: "離乳食", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
   { name: "寝具・ベッド", id: "200822", keyword: "ベビーベッド", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
@@ -115,16 +115,47 @@ const ACCESSORY_EXCLUDE_WORDS = [
   '延長ベルト', 'アームバー', 'ベビーカード', 'タイヤ交換', 'シート生地', '車輪のみ',
   'ペットボトルホルダー', 'スマホスタンド', 'アクセサリーセット', '収納ポーチ',
   'よだれカバー', 'サンシェード単品', 'フック単品',
+  'ベビーカーシート', 'ベビーカーボード', 'ステップボード',
+  'ベビーカーフック', 'ベビーカーバッグ', 'ベビーカー用バッグ',
+  'ハンドルグリップ', 'グリップカバー',
+  'サンシェード', 'UVカバー', '日よけカバー',
+  'リュック取付', 'カバーのみ',
+  // 抱っこ紐アクセサリー
+  'よだれパッド', 'ヘッドサポート', 'よだれよけ',
+  'ベビーキャリア用', '抱っこひも用', '抱っこ紐用',
+  'ウエストポーチ', '抱っこ紐ケープ', '防寒ケープ', 'ハグウォーマー',
+  'ヒップシートカバー',
   // チャイルドシートアクセサリー
   'シートベルトカバー', 'シートプロテクター', 'ミラー取付',
-  // 抱っこ紐アクセサリー
-  'よだれパッド',
+  'チャイルドシート用', 'カーシート用',
+  'シートカバー取付', 'ヘッドレストカバー', '車用シート保護',
   // おむつ関連（おむつカテゴリ以外での混入防止）
   'おむつポーチ', 'おむつバッグ', 'おむつストッカー',
-  // ベビーカー・チャイルドシート・抱っこ紐アクセサリー追加
-  'シューズクリップ', 'ファンシート', '抜け出し防止', 'ベビーカーシート',
-  '防寒ケープ', '抱っこ紐ケープ', 'ハグウォーマー',
+  // その他
+  'シューズクリップ', 'ファンシート', '抜け出し防止',
+  // ベビーカー・抱っこ紐の掛け物・周辺グッズ
+  'ブランケット', 'ひざ掛け', '膝掛け', 'ひざかけ', '膝かけ', 'ひざかけ',
+  'ナーシングカバー', '授乳ケープ', 'ストールケープ',
 ];
+
+// 周辺グッズ検索時はカテゴリ別に "アクセサリー" を付加して精度向上
+const ACCESSORY_SEARCH_KEYWORDS = {
+  "ベビーカー": "ベビーカー アクセサリー",
+  "抱っこ紐": "抱っこ紐 アクセサリー",
+  "車用品": "チャイルドシート アクセサリー",
+};
+
+// subCat=すべて 時のソフトフィルタ: カテゴリ固有語が含まれない商品を除外
+// 5件以上残る場合のみ適用（空表示防止）
+const CATEGORY_CORE_WORDS = {
+  "ベビーカー": ["ベビーカー", "バギー", "ストローラー"],
+  "抱っこ紐": ["抱っこ紐", "抱っこひも", "だっこひも", "スリング", "ヒップシート", "キャリア", "おんぶ紐"],
+  "車用品": ["チャイルドシート", "カーシート", "ジュニアシート"],
+  "ウェア": ["ロンパース", "カバーオール", "肌着", "ベビー服", "アウター", "スタイ", "パジャマ", "ウェア"],
+  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー", "ベビー布団"],
+  "おもちゃ": ["おもちゃ", "玩具", "知育", "ガラガラ", "メリー", "ぬいぐるみ"],
+  "安全グッズ": ["ゲート", "ガード", "ロック", "モニター", "転倒防止", "ベビーサークル"],
+};
 
 // おむつサイズマッピング（検索精度向上用）
 const DIAPER_SIZE_MAP = {
@@ -238,6 +269,12 @@ const OFFICIAL_RETAILERS = [
   },
 ];
 
+const SPECIALTY_SHOPS = [
+  { shopCode: 'akachan',      name: 'アカチャンホンポ', source: 'akachan',      domain: 'shop.akachan.jp' },
+  { shopCode: 'nishimatsuya', name: '西松屋',           source: 'nishimatsuya', domain: '24028-net.jp' },
+  { shopCode: 'toysrus',      name: 'ベビーザらス',     source: 'toysrus',      domain: 'toysrus.co.jp' },
+];
+
 const detectOfficialShop = (shop) => {
   const target = `${shop?.name || ''} ${shop?.url || ''}`;
   for (const rule of OFFICIAL_SHOP_RULES) {
@@ -274,99 +311,58 @@ const getLowestPrice = (shops) => {
   return prices.length > 0 ? Math.min(...prices) : 0;
 };
 
-const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock }) => (
-  <div
-    className="bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full relative active:scale-95 transition-all cursor-pointer border border-[#F4EFEB]"
-    onClick={(e) => {
-      if (e.target.closest('[data-no-open]')) return;
-      onOpen(product);
-    }}
-  >
-    <div className="relative aspect-square bg-[#F9F6F3] p-4">
-      <img
-        src={getHighResImage(product.image)}
-        onError={(e) => { e.target.onerror = null; e.target.src = product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }}
-        className="w-full h-full object-cover rounded-[1.5rem]"
-        alt={product.name}
-      />
-      <button
-        onClick={(e) => onToggleFavorite(e, product)}
-        className="absolute top-6 right-6 bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-sm z-10 hover:bg-rose-50 transition-colors"
-      >
-        <Heart className={`w-4 h-4 ${favoriteIds.has(product.id) ? 'text-rose-400 fill-current' : 'text-[#D4CDC7]'}`} />
-      </button>
-      {isAdminMode && (
-        <button
-          data-no-open
-          onPointerDown={(e) => { e.stopPropagation(); }}
-          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onBlock(product); }}
-          title="この商品を非表示にする"
-          style={{ touchAction: 'manipulation' }}
-          className="absolute top-2 left-2 bg-red-500 text-white w-14 h-14 rounded-full text-2xl font-black shadow-2xl z-[999] flex items-center justify-center hover:bg-red-600 active:scale-90 transition-all border-4 border-white pointer-events-auto"
-        >×</button>
-      )}
-      <div className="pointer-events-none">
-        {localRank && (
-          <div className="absolute top-6 left-6 bg-[#F9DC5C] text-[#5A4C4C] w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-md border-2 border-white">
-            {localRank}
-          </div>
-        )}
-        {product.isBestSeller && (
-          <div className="absolute top-6 left-6 bg-[#F2ABAC] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
-            <Award className="w-3.5 h-3.5" />
-            <span>BEST SELLER</span>
-          </div>
-        )}
-        {!product.isBestSeller && product.isTopRated && (
-          <div className="absolute top-6 left-6 bg-[#7B8E76] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] font-black shadow-lg border-2 border-white z-20">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>TOP RATED</span>
-          </div>
-        )}
-      </div>
-      <div className={`absolute bottom-6 left-6 px-2.5 py-1 rounded-full text-[9px] font-bold tracking-wider ${product.subCategory === '周辺グッズ' ? 'bg-[#FFE8D6] text-[#A67B5B]' : 'bg-[#7B8E76] text-white'}`}>
-        {product.subCategory}
-      </div>
-    </div>
-    <div className="p-4 flex flex-col flex-1">
-      <div className="flex items-center gap-1 mb-2">
-        <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest">{product.category}</span>
-        <div className="flex items-center gap-1 ml-auto bg-[#FFF9E6] px-2 py-0.5 rounded-full text-[#D4AF37]">
-          <Star className="w-3 h-3 fill-current" />
-          <span className="text-[10px] font-black">{product.rating}</span>
-        </div>
-      </div>
-      <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{product.name}</h3>
+// Yahoo!ショッピング BONUS+優良ストア日（不定期のため毎月更新）
+const YAHOO_BONUS_PLUS_DATES = [
+  '2026-06-04',
+  '2026-06-08',
+  '2026-06-17',
+  '2026-06-23',
+  '2026-06-27',
+  '2026-06-29',
+];
 
-      <div className="mt-auto">
-        {(product.shops?.length || 0) >= 2 && (
-          <p className="text-[9px] text-[#7B8E76] font-black mb-1 uppercase tracking-wider">
-            {product.shops.length}店舗で比較
-          </p>
-        )}
-        {product.unitCount && (
-          <p className="text-[10px] text-[#A5A19E] font-bold mb-1">
-            1{product.unitName}あたり <span className="text-[#F2ABAC]">¥{Math.ceil(getLowestPrice(product.shops) / product.unitCount)}</span>
-          </p>
-        )}
-        <p className="text-xl font-black text-[#7B8E76] leading-none">
-          <span className="text-xs mr-0.5">¥</span>
-          {getLowestPrice(product.shops) > 0 ? getLowestPrice(product.shops).toLocaleString() : "---"}
-          <span className="text-[10px] text-[#A5A19E] ml-1 font-normal">{getLowestPrice(product.shops) > 0 ? "〜" : ""}</span>
-        </p>
-      </div>
-    </div>
-  </div>
-);
+const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const getYahooSaleEvents = (fromDate, count = 5) => {
+  const today = toYMD(fromDate);
+  const results = [];
+  const seen = new Set();
+
+  for (let i = 0; i < 90 && results.length < count; i++) {
+    const d = new Date(fromDate);
+    d.setDate(fromDate.getDate() + i);
+    const ymd = toYMD(d);
+    const day = d.getDate();
+    const dow = d.getDay();
+
+    const events = [];
+    if (day === 1) events.push({ name: 'ファーストデイ', bonus: '+4%', color: 'orange' });
+    if (day === 5 || day === 15 || day === 25) events.push({ name: '5のつく日', bonus: '+4%', color: 'orange' });
+    if (day === 11 || day === 22) events.push({ name: 'ヤフショ感謝デー', bonus: '+4%', color: 'orange' });
+    if (dow === 0) events.push({ name: 'プレミアムな日曜日', bonus: '+5%', color: 'yellow' });
+    if (YAHOO_BONUS_PLUS_DATES.includes(ymd)) events.push({ name: 'BONUS+優良ストア', bonus: '+3%', color: 'green' });
+
+    events.forEach(ev => {
+      const key = `${ymd}-${ev.name}`;
+      if (!seen.has(key) && results.length < count) {
+        seen.add(key);
+        results.push({ ...ev, date: ymd, isToday: ymd === today, dateObj: d });
+      }
+    });
+  }
+
+  return results;
+};
+
 
 // ValueCommerce MyLink: 対象ドメインのURLをアフィリエイトURLにラップ
-const VC_SID = import.meta.env.VITE_VC_SID || '3768537';
+const VC_SID = process.env.NEXT_PUBLIC_VC_SID || '3768537';
 const VC_DOMAIN_PIDS = {
-  'dadway-onlineshop.com': import.meta.env.VITE_VC_PID_DADWAY || '892608374',
-  'ergobaby.jp': import.meta.env.VITE_VC_PID_ERGOBABY || '892609670',
-  'shopping.yahoo.co.jp': import.meta.env.VITE_VC_PID_YAHOO || '892613329',
+  'dadway-onlineshop.com': process.env.NEXT_PUBLIC_VC_PID_DADWAY || '892608374',
+  'ergobaby.jp': process.env.NEXT_PUBLIC_VC_PID_ERGOBABY || '892609670',
+  'shopping.yahoo.co.jp': process.env.NEXT_PUBLIC_VC_PID_YAHOO || '892613329',
 };
-const AMAZON_TAG = import.meta.env.VITE_AMAZON_TAG || 'honestbaby-22';
+const AMAZON_TAG = process.env.NEXT_PUBLIC_AMAZON_TAG || 'honestbaby-22';
 
 // VAPID公開鍵をUint8Arrayに変換（Web Push API用）
 function urlBase64ToUint8Array(base64String) {
@@ -414,8 +410,8 @@ const getAmazonUrl = (keyword) => {
 
 
 const App = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [dbProducts, setDbProducts] = useState([]);
   const [dbLoading, setDbLoading] = useState(true);
@@ -448,7 +444,7 @@ const App = () => {
 
   // 管理モード: URLに ?admin=1 が付いているか、セッション中に有効化した場合はON
   const isAdminMode = (() => {
-    if (location.search.includes('admin=1')) {
+    if (typeof window !== 'undefined' && window.location.search.includes('admin=1')) {
       try { sessionStorage.setItem('honestBabyAdminSession', '1'); } catch { }
       return true;
     }
@@ -577,6 +573,53 @@ const App = () => {
     } catch { }
   };
 
+  // --- 赤ちゃん情報: DBとのsync ---
+  const syncBabyProfileWithDB = async (userId) => {
+    try {
+      const { data: dbProfile } = await supabase
+        .from('baby_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (dbProfile) {
+        // DBにあれば localStorage を上書き
+        setBabyInfo({
+          name: dbProfile.name || '',
+          birthYear: dbProfile.birth_year,
+          birthMonth: dbProfile.birth_month,
+          gender: dbProfile.gender || '',
+        });
+      } else {
+        // DBに無い & localStorageにあれば DB へ push
+        const local = JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null');
+        if (local && local.birthYear) {
+          await supabase.from('baby_profiles').upsert({
+            user_id: userId,
+            name: local.name || null,
+            birth_year: local.birthYear,
+            birth_month: local.birthMonth,
+            gender: local.gender || null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id' });
+        }
+      }
+    } catch { }
+  };
+
+  const saveBabyProfileToDB = async (userId, info) => {
+    try {
+      await supabase.from('baby_profiles').upsert({
+        user_id: userId,
+        name: info.name || null,
+        birth_year: info.birthYear,
+        birth_month: info.birthMonth,
+        gender: info.gender || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+    } catch { }
+  };
+
   const savePriceAlertToDB = async (userId, alert) => {
     try {
       await supabase.from('price_alerts').upsert({
@@ -595,7 +638,7 @@ const App = () => {
   const subscribeToPushNotifications = async (userId) => {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
-      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) return false;
 
       const permission = await Notification.requestPermission();
@@ -713,7 +756,7 @@ const App = () => {
   const [contactSent, setContactSent] = useState(false);
 
   // --- 新機能: 口コミ関連 States ---
-  const [reviewTab, setReviewTab] = useState('honest'); // 'honest' or 'sns'
+
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [reviewForm, setReviewForm] = useState({ rating: 5, content: "" });
   const [reviewPhotoFile, setReviewPhotoFile] = useState(null);
@@ -788,6 +831,7 @@ const App = () => {
       if (u) {
         migrateLocalFavoritesToDB(u.id);
         syncPriceAlertsWithDB(u.id);
+        syncBabyProfileWithDB(u.id);
       }
     });
 
@@ -830,13 +874,12 @@ const App = () => {
       }
       return { ...s, name: s.shop_name, type: s.shop_type, lowestPrice: s.lowest_price, sellers: Array.isArray(sellers) ? sellers : [] };
     }),
-    honestReviews: (p.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
-    snsReviews: (p.snsReviews || []).map(r => ({ ...r, user: r.user_handle }))
+    honestReviews: (p.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() }))
   });
 
   // URL直アクセス対応: sessionStorage → localStorage → Supabase → home
   useEffect(() => {
-    const match = location.pathname.match(/^\/product\/(.+)$/);
+    const match = pathname.match(/^\/product\/(.+)$/);
     if (!match || selectedProduct) return;
     const productId = decodeURIComponent(match[1]);
 
@@ -858,7 +901,7 @@ const App = () => {
         try {
           const { data } = await supabase
             .from('products')
-            .select('*, shops:shops_prices(*), honestReviews:reviews(*), snsReviews:sns_reviews(*)')
+            .select('*, shops:shops_prices(*), honestReviews:reviews(*)')
             .eq('id', productId)
             .single();
           if (data) { setSelectedProduct(formatDbProduct(data)); return; }
@@ -866,18 +909,63 @@ const App = () => {
       }
 
       // 4. 見つからない → ホームへ
-      navigate('/', { replace: true });
+      router.replace('/');
     };
 
     restore();
-  }, [location.pathname]);
+  }, [pathname]);
 
   // 法的ページ直接URL対応: /privacy /terms /tokushoho /disclaimer
   useEffect(() => {
     const legalRoutes = { '/privacy': 'privacy', '/terms': 'terms', '/tokushoho': 'tokushoho', '/disclaimer': 'disclaimer' };
-    const key = legalRoutes[location.pathname];
-    if (key) { setActiveLegalPage(key); navigate('/', { replace: true }); }
-  }, [location.pathname]);
+    const key = legalRoutes[pathname];
+    if (key) { setActiveLegalPage(key); }
+  }, [pathname]);
+
+  // SSRページのボトムナビから ?tab= でタブを開く（マウント時に一度だけ読み取る）
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    const validTabs = ['home', 'search', 'ai', 'gift', 'user'];
+    if (tab && validTabs.includes(tab)) setActiveTab(tab);
+  }, []);
+
+  // SSR商品ページ（/product/[id]）からのリダイレクト: ?product= で商品モーダルを開く
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const productParam = params.get('product');
+    if (!productParam) return;
+    window.history.replaceState({}, '', '/');
+    const openByParam = async () => {
+      try {
+        const cache = JSON.parse(localStorage.getItem('honestBabyProductCache') || '{}');
+        if (cache[productParam]) { setSelectedProduct(cache[productParam]); return; }
+      } catch {}
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productParam)) {
+        try {
+          const { data } = await supabase
+            .from('products')
+            .select('*, shops:shops_prices(*), honestReviews:reviews(*)')
+            .eq('id', productParam)
+            .maybeSingle();
+          if (data) { setSelectedProduct(formatDbProduct(data)); return; }
+        } catch {}
+      }
+    };
+    openByParam();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ブラウザタブのタイトルを画面状態に応じて更新（SEO用 meta は SSR ページが担当）
+  useEffect(() => {
+    const title = selectedProduct
+      ? `${selectedProduct.name} の最安値・価格比較 | HonestBaby`
+      : selectedCategory !== 'すべて'
+        ? `${selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby`
+        : 'HonestBaby | 忖度なしのベビー用品比較・最安値検索';
+    if (typeof document !== 'undefined') document.title = title;
+  }, [selectedProduct, selectedCategory]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -889,8 +977,7 @@ const App = () => {
           .select(`
             *,
             shops:shops_prices(*),
-            honestReviews:reviews(*),
-            snsReviews:sns_reviews(*)
+            honestReviews:reviews(*)
           `)
           .or('is_blocked.is.null,is_blocked.eq.false');
 
@@ -925,10 +1012,6 @@ const App = () => {
               ...r,
               user: r.user_name,
               date: new Date(r.created_at).toLocaleDateString()
-            })),
-            snsReviews: (p.snsReviews || []).map(r => ({
-              ...r,
-              user: r.user_handle
             }))
           }));
           setDbProducts(formatted);
@@ -1084,7 +1167,13 @@ const App = () => {
     if (!selectedProduct) { setCrossPlatformShops([]); return; }
 
     // --- 高速化の鍵: まずDBに保存されている既知の価格をセットする ---
-    const cachedShops = normalizeShops(selectedProduct.shops || []);
+    // 楽天/YahooはDBのURLが古くなりやすいため初期キャッシュから除外し、APIで上書きする
+    const cachedShops = normalizeShops(
+      (selectedProduct.shops || []).filter(s => {
+        const n = (s.name || s.shop_name || '').toLowerCase();
+        return !n.includes('楽天') && !n.includes('yahoo') && !n.includes('ヤフー');
+      })
+    );
     setCrossPlatformShops(cachedShops);
 
     const fetchCross = async () => {
@@ -1093,7 +1182,10 @@ const App = () => {
 
       try {
         const keyword = selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ');
-        const origPrice = selectedProduct.price || getLowestPrice(selectedProduct.shops) || 0;
+        // 中央値を基準価格にすることで、誤データの最安値に引っ張られないようにする
+        const shopPrices = (selectedProduct.shops || []).map(s => s.lowestPrice || s.price || 0).filter(p => p > 0).sort((a, b) => a - b);
+        const medianShopPrice = shopPrices.length > 0 ? shopPrices[Math.floor(shopPrices.length / 2)] : 0;
+        const origPrice = medianShopPrice || selectedProduct.price || 0;
         const priceMin = origPrice > 0 ? origPrice * 0.2 : 0;
         const priceMax = origPrice > 0 ? origPrice * 5 : Infinity;
         const selectedWords = keyword.split(' ').filter(w => w.length >= 2).map(w => w.toLowerCase());
@@ -1105,12 +1197,14 @@ const App = () => {
           return selectedWords.some(w => lower.includes(w));
         };
         const priceInRange = (p) => origPrice === 0 || (p >= priceMin && p <= priceMax);
+        const USED_KEYWORDS = ['中古', 'リユース', '訳あり', 'アウトレット', '中古品', '再生品'];
+        const isNewItem = (name) => !USED_KEYWORDS.some(w => (name || '').includes(w));
 
         // --- 口コミ・SNSレビューの最新データをDBから取得 ---
         const fetchReviewsFromDb = async () => {
           const { data: dbProd } = await supabase
             .from('products')
-            .select('id, reviews(*), sns_reviews(*)')
+            .select('id, reviews(*)')
             .or(`id.eq.${selectedProduct.id},rakuten_item_code.eq.${selectedProduct.id}`)
             .single();
 
@@ -1120,8 +1214,7 @@ const App = () => {
               return {
                 ...prev,
                 id: dbProd.id, // UUIDがあればそれに差し替え
-                honestReviews: (dbProd.reviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
-                snsReviews: dbProd.sns_reviews || []
+                honestReviews: (dbProd.reviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() }))
               };
             });
           }
@@ -1136,7 +1229,7 @@ const App = () => {
         const newShops = [...cachedShops];
 
         if (rakutenResult.status === 'fulfilled' && rakutenResult.value.products) {
-          const items = rakutenResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          const items = rakutenResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || '楽天市場';
@@ -1151,7 +1244,7 @@ const App = () => {
         }
 
         if (yahooResult.status === 'fulfilled' && yahooResult.value.products) {
-          const items = yahooResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          const items = yahooResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || 'Yahoo!ショッピング';
@@ -1164,6 +1257,35 @@ const App = () => {
           }
         }
 
+        // ベビー専門店: shopCode 検索で在庫確認し、公式URLでカード追加
+        const specialtyResults = await Promise.allSettled(
+          SPECIALTY_SHOPS.map(sp =>
+            fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1&shopCode=${sp.shopCode}`)
+              .then(r => r.json())
+              .then(data => ({ ...sp, data }))
+              .catch(() => ({ ...sp, data: { products: [] } }))
+          )
+        );
+
+        for (const result of specialtyResults) {
+          if (result.status !== 'fulfilled') continue;
+          const { name, source, domain, data } = result.value;
+          if (!data.products?.length) continue;
+          const items = data.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          if (items.length === 0) continue;
+          const best = items.sort((a, b) => a.price - b.price)[0];
+          const retailer = OFFICIAL_RETAILERS.find(r => r.domain === domain);
+          if (!retailer) continue;
+          const officialUrl = retailer.searchUrl(keyword) + retailer.affiliateParam;
+          const idx = newShops.findIndex(s => s.source === source);
+          const shopData = {
+            name, type: 'mall', lowestPrice: best.price, source,
+            url: officialUrl,
+            sellers: [{ name, price: best.price, shipping: 0, points: 0, url: officialUrl, note: '' }]
+          };
+          if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
+        }
+
         setCrossPlatformShops(newShops);
       } catch (e) {
         console.warn('Cross-platform fetch failed:', e);
@@ -1172,7 +1294,7 @@ const App = () => {
       }
     };
     fetchCross();
-  }, [selectedProduct]);
+  }, [selectedProduct?.id]);
 
   // ギフトタブ: DBから取得してフィルタ（クロンが毎朝更新）
   const sceneKeywords = {
@@ -1220,6 +1342,30 @@ const App = () => {
     return () => window.visualViewport.removeEventListener('resize', handleResize);
   }, []);
 
+  // 重複排除ヘルパー（fetchRankingsWithAI・fetchRemoteProductsWithAI 共用）
+  const imageKey = (url) => (url || '').replace(/[?&]_ex=\d+x\d+/g, '').replace(/[?&].*$/, '');
+  const nameKey = (name) => (name || '').replace(/[\s　]/g, '').toLowerCase().slice(0, 20);
+  const dedupeAndMergeShops = (items) => {
+    const map = new Map();
+    for (const item of items) {
+      const key = imageKey(item.image) || nameKey(item.name);
+      if (!key) continue;
+      if (!map.has(key)) {
+        map.set(key, { ...item, shops: [...item.shops] });
+      } else {
+        const existing = map.get(key);
+        const newShops = item.shops.filter(s => !existing.shops.some(es => es.url === s.url));
+        existing.shops.push(...newShops);
+        if (item.price < existing.price) {
+          existing.price = item.price;
+          existing.image = item.image;
+          existing.name = item.name;
+        }
+      }
+    }
+    return Array.from(map.values());
+  };
+
   // --- 新機能: 市場網羅型ランキング取得エンジン ---
   const fetchRankingsWithAI = async (catName, subCat = "すべて", subSubCat = "すべて") => {
     const genre = CATEGORY_TREE.find(c => c.name === catName) || CATEGORY_TREE[0];
@@ -1241,6 +1387,10 @@ const App = () => {
     ];
     const CATEGORY_NG = {
       "おむつ": ["大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用"],
+      "ベビーカー": ["ペット", "犬用", "猫用", "ドッグ", "愛犬", "愛猫", "ペットカート", "ペットバギー"],
+      "抱っこ紐": ["ペット", "犬用", "猫用", "ドッグ", "犬抱っこ"],
+      "車用品": ["犬用", "猫用", "ペット", "ドッグ", "バイク用", "自転車用"],
+      "ウェア": ["大人用", "レディース", "メンズ", "ペット", "犬服", "猫服", "犬用"],
     };
     const mapItems = (items, cat) => items
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
@@ -1270,37 +1420,13 @@ const App = () => {
       .filter(validateProduct);
 
     try {
-      const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
-      const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
-      const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
-      if (!appId) throw new Error("VITE_RAKUTEN_APP_ID not set");
+      const appId = process.env.NEXT_PUBLIC_RAKUTEN_APP_ID;
+      const accessKey = process.env.NEXT_PUBLIC_RAKUTEN_ACCESS_KEY || '';
+      const affiliateId = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || '';
+      if (!appId) throw new Error("NEXT_PUBLIC_RAKUTEN_APP_ID not set");
 
       const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
       const searchUrl = (keyword, page = 1, sort = '-reviewCount') => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
-
-      // 重複排除キー: 画像URL（サイズパラメータ除去）優先 → 名前先頭20文字
-      const imageKey = (url) => (url || '').replace(/[?&]_ex=\d+x\d+/g, '').replace(/[?&].*$/, '');
-      const nameKey = (name) => (name || '').replace(/[\s　]/g, '').toLowerCase().slice(0, 20);
-      const dedupeAndMergeShops = (items) => {
-        const map = new Map();
-        for (const item of items) {
-          const key = imageKey(item.image) || nameKey(item.name);
-          if (!key) continue;
-          if (!map.has(key)) {
-            map.set(key, { ...item, shops: [...item.shops] });
-          } else {
-            const existing = map.get(key);
-            const newShops = item.shops.filter(s => !existing.shops.some(es => es.url === s.url));
-            existing.shops.push(...newShops);
-            if (item.price < existing.price) {
-              existing.price = item.price;
-              existing.image = item.image;
-              existing.name = item.name;
-            }
-          }
-        }
-        return Array.from(map.values());
-      };
 
       // メインカテゴリー表示はRanking API（genreId指定 → ジャンル外商品が構造的に混入しない）
       // サブカテゴリー選択時のみ Search API（genreId + サブキーワードで絞り込み）
@@ -1313,18 +1439,29 @@ const App = () => {
         const normalizedSubSub = (catName === 'おむつ' && DIAPER_SIZE_MAP[subSubCat])
           ? DIAPER_SIZE_MAP[subSubCat] : subSubCat;
         // おしりふきは「おむつ」を前置するとヒットしないため単独キーワード
+        // ゴミ箱・袋は中黒入りのカテゴリ名をそのまま使うとヒットしないため専用キーワード
+        // ミルク(粉/液体)は授乳グッズジャンルに縛られると食品ジャンルの製品が取れないため単独キーワード+ジャンル除外
+        // 母乳パッドは「ミルク 授乳」を前置すると精度が落ちるため単独キーワード
         // 周辺グッズは商品名に「周辺グッズ」が入らないためカテゴリキーワードのみで検索
         const subKeyword = (catName === 'おむつ' && subCat === 'おしりふき')
           ? 'ベビー おしりふき'
-          : subCat === '周辺グッズ'
-            ? genre.keyword
-            : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
+          : (catName === 'おむつ' && subCat === 'ゴミ箱・袋')
+            ? (normalizedSubSub !== 'すべて' ? `おむつ ${normalizedSubSub}` : 'おむつポット 防臭袋 ゴミ箱')
+            : (catName === 'ミルク・授乳' && subCat === 'ミルク')
+              ? 'ベビー 粉ミルク 液体ミルク'
+              : (catName === 'ミルク・授乳' && subCat === '母乳パッド')
+                ? '母乳パッド 授乳パッド'
+                : subCat === '周辺グッズ'
+                  ? (ACCESSORY_SEARCH_KEYWORDS[catName] || genre.keyword)
+                  : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
         // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
         const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
         const isWipes = catName === 'おむつ' && subCat === 'おしりふき';
+        // ミルク(粉/液体)は食品ジャンルにあるためgenreIdを外して広範囲検索
+        const skipGenreId = isWipes || (catName === 'ミルク・授乳' && subCat === 'ミルク');
         const subFetches = SORTS.flatMap(sort =>
           [1, 2, 3].map(p =>
-            fetch(`${searchUrl(subKeyword, p, sort)}${isWipes ? '' : '&genreId=' + genreId}`)
+            fetch(`${searchUrl(subKeyword, p, sort)}${skipGenreId ? '' : '&genreId=' + genreId}`)
               .then(r => r.ok ? r.json() : { Items: [] })
               .catch(() => ({ Items: [] }))
           )
@@ -1424,6 +1561,17 @@ const App = () => {
       } else {
         const accessoryFiltered = filterAccessories(rawItems);
         if (accessoryFiltered.length > 0) rawItems = accessoryFiltered;
+
+        // subCat=すべて の場合、カテゴリコアワードで非関連商品をソフト除去
+        if (!subCat || subCat === 'すべて') {
+          const coreWords = CATEGORY_CORE_WORDS[catName];
+          if (coreWords?.length > 0) {
+            const coreFiltered = rawItems.filter(p =>
+              coreWords.some(w => (p.name || '').includes(w))
+            );
+            if (coreFiltered.length >= 5) rawItems = coreFiltered;
+          }
+        }
       }
 
       // Step 1: 生データをすぐに表示（ブロック済みは除外）
@@ -1606,8 +1754,18 @@ const App = () => {
         formatted = formatRawItems(allItems);
       }
 
-      setSearchResults(formatted);
-      autoSaveSearchResultsToDb(formatted, keyword);
+      const deduped = dedupeAndMergeShops(formatted);
+      const matchedCat = CATEGORY_TREE.find(cat =>
+        cat.name !== "すべて" && (
+          keyword.includes(cat.name) ||
+          (cat.keyword && keyword.includes(cat.keyword)) ||
+          cat.subs?.some(s => keyword.includes(typeof s === 'string' ? s : s.name))
+        )
+      );
+      const resolvedCategory = matchedCat?.name || keyword;
+      const categorized = deduped.map(p => ({ ...p, category: resolvedCategory }));
+      setSearchResults(categorized);
+      autoSaveSearchResultsToDb(categorized, keyword);
     } catch (err) {
       console.error("Remote Search Error:", err);
       setSearchError(err.message);
@@ -1616,7 +1774,11 @@ const App = () => {
     }
   };
 
-  const handleCategoryChange = (cat) => {
+  const handleCategoryChange = (cat, keepInSPA = false) => {
+    if (cat !== 'すべて' && !keepInSPA) {
+      router.push('/category/' + encodeURIComponent(cat));
+      return;
+    }
     setSelectedCategory(cat);
     setSelectedSubCategory("すべて");
     setSelectedSubSubCategory("すべて");
@@ -1674,15 +1836,23 @@ const App = () => {
           ];
           const matched = categoryGenreMap.find(m => m.keywords.some(k => userText.includes(k)));
           const genreId = matched?.genreId ?? '100533';
-          const appId = import.meta.env.VITE_RAKUTEN_APP_ID;
-          const accessKey = import.meta.env.VITE_RAKUTEN_ACCESS_KEY || '';
-          const affiliateId = import.meta.env.VITE_RAKUTEN_AFFILIATE_ID || '';
-          if (!appId) throw new Error('VITE_RAKUTEN_APP_ID not set');
+          const appId = process.env.NEXT_PUBLIC_RAKUTEN_APP_ID;
+          const accessKey = process.env.NEXT_PUBLIC_RAKUTEN_ACCESS_KEY || '';
+          const affiliateId = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || '';
+          if (!appId) throw new Error('NEXT_PUBLIC_RAKUTEN_APP_ID not set');
           const rankingUrl = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
           const res = await fetch(rankingUrl, { headers: { Referer: 'https://honestbaby-care.com' } });
           const resData = await res.json();
           const allItems = (resData.Items || []).map(i => i.Item).filter(Boolean);
-          const filtered = filterAccessories(allItems, item => item.itemName || '');
+          let filtered = filterAccessories(allItems, item => item.itemName || '');
+          // カテゴリ固有語でさらに絞り込み（例: ベビーカー → ひざ掛け・ブランケットを除外）
+          if (matched) {
+            const coreWords = CATEGORY_CORE_WORDS[matched.keywords[0]] || [];
+            if (coreWords.length > 0) {
+              const strict = filtered.filter(item => coreWords.some(w => (item.itemName || '').includes(w)));
+              if (strict.length >= 2) filtered = strict;
+            }
+          }
           contextProducts = (filtered.length > 0 ? filtered : allItems)
             .slice(0, 6)
             .map((item, i) => ({
@@ -2041,7 +2211,11 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
   const openProduct = async (product) => {
     // 1. 画面遷移を最優先で実行（もっさり感を解消）
     setSelectedProduct(product);
-    navigate(`/product/${encodeURIComponent(product.id)}`, { replace: true });
+    // SPA内ではモーダル表示を維持しつつURLだけ更新（直リンク・共有用）。
+    // /product/[id] への実遷移はSSRページ（Google・直アクセス向け）が担う。
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `/product/${encodeURIComponent(product.id)}`);
+    }
 
     setRecentlyViewed(prev => {
       const filtered = prev.filter(p => p.id !== product.id);
@@ -2055,7 +2229,7 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
       const query = nameParts.length > 1 ? `${nameParts[0]} ${nameParts[1]}` : nameParts[0];
       const { data } = await supabase
         .from('products')
-        .select('*, honestReviews:reviews(*), snsReviews:sns_reviews(*)')
+        .select('*, honestReviews:reviews(*)')
         .ilike('name', `%${query}%`)
         .limit(1)
         .single();
@@ -2065,8 +2239,7 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
           if (!prev || prev.id !== product.id) return prev;
           return {
             ...prev,
-            honestReviews: (data.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() })),
-            snsReviews: data.snsReviews || []
+            honestReviews: (data.honestReviews || []).map(r => ({ ...r, user: r.user_name, date: new Date(r.created_at).toLocaleDateString() }))
           };
         });
       }
@@ -2102,7 +2275,7 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
     setExpandedMall(null);
     setReviewTab('honest');
     try { sessionStorage.removeItem('honestBabyOpenProduct'); } catch { }
-    navigate('/', { replace: true });
+    if (typeof window !== 'undefined') window.history.replaceState(null, '', '/');
   };
 
   // --- 各画面レンダリング ---
@@ -2154,7 +2327,7 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
         const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
         return matchCat && matchSub && matchSubSub;
       })
-      .sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999));
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
     const showRemote = remoteProducts.length > 0 || isRemoteLoading;
@@ -2200,6 +2373,23 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
           </div>
           <ChevronRight className="w-5 h-5 text-[#A5A19E] flex-shrink-0" />
         </div>
+
+        {/* ─── Yahoo!ショッピング 今日のお得バナー ─── */}
+        {(() => {
+          const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
+          if (!todayEvents.length) return null;
+          const ev = todayEvents[0];
+          return (
+            <div className="mb-6 bg-[#FFF3E8] border border-[#FFD9B5] rounded-[2rem] p-5 flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-[10px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!ショッピング 今日のお得</p>
+                <p className="text-base font-black text-[#5A4C4C]">{ev.name}</p>
+                <p className="text-xs text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+              </div>
+              <span className="text-3xl">🛒</span>
+            </div>
+          );
+        })()}
 
         {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
         {babyInfo && babyAgeMonths != null && (() => {
@@ -2521,7 +2711,8 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
                   <span className="text-[10px] text-white bg-[#7B8E76] px-2 py-0.5 rounded-md font-bold">{babyInfo.gender}</span>
                 )}
                 <button onClick={() => {
-                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+                  const today = new Date();
+                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
                   setShowBabyModal(true);
                 }} className="text-[10px] text-[#A5A19E] flex items-center gap-0.5 font-bold hover:text-[#5A4C4C] transition-colors">
                   {babyInfo ? '編集' : 'プロフィール登録'} <Edit3 className="w-3 h-3" />
@@ -2540,7 +2731,8 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
             <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest bg-[#F9F6F3] px-2 py-1 rounded-md">おすすめの最適化</span>
           </div>
           <div onClick={() => {
-            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: now.getFullYear(), birthMonth: now.getMonth() + 1, gender: '' });
+            const today = new Date();
+            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
             setShowBabyModal(true);
           }} className="bg-[#FFF5F5] border border-[#FFEBEB] p-5 rounded-[2rem] shadow-sm flex items-center justify-between active:scale-95 transition-transform cursor-pointer relative overflow-hidden group">
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#F2ABAC] rounded-l-[2rem]"></div>
@@ -2658,7 +2850,7 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
             <div className="flex flex-wrap gap-2">
               {savedSearches.map(s => (
                 <div key={s.id} className="flex items-center gap-1 bg-[#EBF0EA] rounded-full pl-3 pr-1 py-1">
-                  <button onClick={() => { handleCategoryChange(s.category); if (s.subCategory && s.subCategory !== 'すべて') handleSubCategoryChange(s.subCategory); setActiveTab('home'); }}
+                  <button onClick={() => { handleCategoryChange(s.category, true); if (s.subCategory && s.subCategory !== 'すべて') handleSubCategoryChange(s.subCategory); setActiveTab('home'); }}
                     className="text-[11px] font-black text-[#5A4C4C]">{s.label}</button>
                   <button onClick={() => setSavedSearches(prev => prev.filter(x => x.id !== s.id))} className="w-5 h-5 bg-white rounded-full flex items-center justify-center text-[#A5A19E]">
                     <X className="w-3 h-3" />
@@ -2701,110 +2893,6 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
 
   return (
     <div className={`bg-[#FFFDFB] font-sans text-[#5A4C4C] selection:bg-[#F2ABAC] selection:text-white ${activeTab === 'ai' ? 'h-[100svh] overflow-hidden flex flex-col lg:pl-60' : 'min-h-screen pb-32 lg:pb-0 lg:pl-60'}`}>
-      <Helmet>
-        <meta name="google-site-verification" content="bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI" />
-        {/* タイトル */}
-        {selectedProduct
-          ? <title>{selectedProduct.name} の最安値・価格比較 | HonestBaby</title>
-          : selectedCategory !== "すべて"
-            ? <title>{selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby</title>
-            : <title>HonestBaby | 忖度なしのベビー用品比較・最安値検索</title>
-        }
-
-        {/* meta description */}
-        {selectedProduct
-          ? <meta name="description" content={`${selectedProduct.name}の最安値・価格比較。評価${selectedProduct.rating}★。楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`} />
-          : selectedCategory !== "すべて"
-            ? <meta name="description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。楽天・Yahoo対応。HonestBabyは忖度なしの比較サイトです。`} />
-            : <meta name="description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。忖度なしのリアルレビューも掲載。" />
-        }
-
-        {/* canonical */}
-        {selectedProduct
-          ? <link rel="canonical" href={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
-          : selectedCategory !== "すべて"
-            ? <link rel="canonical" href={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
-            : <link rel="canonical" href="https://honestbaby-care.com/" />
-        }
-
-        {/* OGP */}
-        {selectedProduct
-          ? <meta property="og:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
-          : selectedCategory !== "すべて"
-            ? <meta property="og:title" content={`${selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby`} />
-            : <meta property="og:title" content="HonestBaby | 忖度なしのベビー用品比較・最安値検索" />
-        }
-        {selectedProduct
-          ? <meta property="og:description" content={`${selectedProduct.name}の最安値・価格比較。評価${selectedProduct.rating}★。楽天・Yahoo最安値をまとめてチェック。`} />
-          : selectedCategory !== "すべて"
-            ? <meta property="og:description" content={`${selectedCategory}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。`} />
-            : <meta property="og:description" content="ベビー用品・育児グッズの価格比較サイト。おむつ・ベビーカー・抱っこ紐など、楽天・Yahooの最安値を比較。" />
-        }
-        <meta property="og:image" content={selectedProduct?.image || "https://honestbaby-care.com/logo.png"} />
-        {selectedProduct
-          ? <meta property="og:url" content={`https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`} />
-          : selectedCategory !== "すべて"
-            ? <meta property="og:url" content={`https://honestbaby-care.com/?cat=${encodeURIComponent(selectedCategory)}`} />
-            : <meta property="og:url" content="https://honestbaby-care.com/" />
-        }
-        <meta property="og:locale" content="ja_JP" />
-
-        {/* Twitter Card */}
-        {selectedProduct
-          ? <meta name="twitter:title" content={`${selectedProduct.name} の最安値・価格比較 | HonestBaby`} />
-          : <meta name="twitter:title" content="HonestBaby | 忖度なしのベビー用品比較" />
-        }
-        <meta name="twitter:image" content={selectedProduct?.image || "https://honestbaby-care.com/logo.png"} />
-
-        {/* JSON-LD: WebSite + Organization */}
-        <script type="application/ld+json">{JSON.stringify({
-          "@context": "https://schema.org",
-          "@graph": [
-            {
-              "@type": "WebSite",
-              "@id": "https://honestbaby-care.com/#website",
-              "url": "https://honestbaby-care.com/",
-              "name": "HonestBaby",
-              "description": "ベビー用品・育児グッズの忖度なし価格比較サイト",
-              "inLanguage": "ja"
-            },
-            {
-              "@type": "Organization",
-              "@id": "https://honestbaby-care.com/#organization",
-              "name": "HonestBaby",
-              "url": "https://honestbaby-care.com/",
-              "logo": "https://honestbaby-care.com/logo.png"
-            }
-          ]
-        })}</script>
-
-        {/* JSON-LD: Product（商品詳細ページのみ） */}
-        {selectedProduct && (
-          <script type="application/ld+json">{JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Product",
-            "name": selectedProduct.name,
-            "image": selectedProduct.image,
-            "brand": { "@type": "Brand", "name": selectedProduct.brand || "ベビー用品" },
-            "offers": {
-              "@type": "AggregateOffer",
-              "priceCurrency": "JPY",
-              "lowPrice": selectedProduct.price,
-              "offerCount": (selectedProduct.shops || []).length || 1,
-              "availability": "https://schema.org/InStock"
-            },
-            ...(selectedProduct.rating && {
-              "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": selectedProduct.rating,
-                "reviewCount": selectedProduct.reviewCount || selectedProduct.reviewsCount || 1,
-                "bestRating": 5,
-                "worstRating": 1
-              }
-            })
-          })}</script>
-        )}
-      </Helmet>
       {/* ===== PC左サイドバー (lg以上のみ表示) ===== */}
       <aside className="hidden lg:flex flex-col fixed top-0 left-0 h-screen w-60 bg-white border-r border-[#F4EFEB] z-40">
         {/* ロゴ */}
@@ -3248,7 +3336,8 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
 
             <div className="flex justify-between items-start mb-8 px-1">
               <div className="flex-1 pr-4">
-                <div className="flex gap-2 mb-2">
+                <div className="flex gap-2 mb-2 flex-wrap">
+                  {selectedProduct.brand && <span className="text-[10px] font-black text-[#B8860B] bg-[#FFF9E6] px-2 py-0.5 rounded-md">{selectedProduct.brand}</span>}
                   <span className="text-[10px] font-black text-[#7B8E76] bg-[#7B8E76]/10 px-2 py-0.5 rounded-md uppercase tracking-wider">{selectedProduct.category}</span>
                   {selectedProduct.giftTags && <span className="text-[10px] font-black text-[#F2ABAC] bg-[#F2ABAC]/10 px-2 py-0.5 rounded-md uppercase tracking-wider">Gift</span>}
                 </div>
@@ -3261,6 +3350,23 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
               <button onClick={(e) => toggleFavorite(e, selectedProduct)} className="p-4 bg-white border border-[#F4EFEB] rounded-full shadow-sm">
                 <Heart className={`w-6 h-6 ${isFavorite(selectedProduct.id) ? 'text-red-500 fill-current' : 'text-[#D4CDC7]'}`} />
               </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-6 px-1">
+              <div className="bg-[#F9F6F3] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">最安値</p>
+                <p className="text-sm font-black text-[#5A4C4C]">
+                  {getLowestPrice(selectedProduct.shops) > 0 ? `¥${getLowestPrice(selectedProduct.shops).toLocaleString()}` : '---'}
+                </p>
+              </div>
+              <div className="bg-[#FFF9E6] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">評価</p>
+                <p className="text-sm font-black text-[#D4AF37]">★ {Number(selectedProduct.rating).toFixed(2)}</p>
+              </div>
+              <div className="bg-[#F0F4EF] rounded-[1.5rem] p-4 text-center">
+                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">取扱店舗</p>
+                <p className="text-sm font-black text-[#7B8E76]">{(selectedProduct.shops || []).length}店</p>
+              </div>
             </div>
 
             <div className="flex gap-3 mb-8 px-1">
@@ -3276,7 +3382,14 @@ JSON形式で5〜8項目返してください（コードブロックなし）:
               </a>
             </div>
 
-            <p className="text-sm text-[#8E8282] leading-relaxed mb-10 px-1 font-medium">{selectedProduct.description}</p>
+            {selectedProduct.description && (
+              <section className="mb-10 bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
+                <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 text-[#7B8E76]" /> 商品について
+                </h3>
+                <p className="text-sm text-[#8E8282] leading-relaxed font-medium">{selectedProduct.description}</p>
+              </section>
+            )}
 
             <section className="mb-10 bg-[#FFF5F5] border border-[#FFEBEB] p-8 rounded-[2.5rem] relative overflow-hidden">
               <div className="flex items-center gap-2 mb-4 relative z-10"><Sparkles className="w-5 h-5 text-[#F2ABAC]" /><h3 className="font-black text-[#5A4C4C] text-lg">AIによる分析</h3></div>
@@ -3317,6 +3430,41 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               </section>
             )}
 
+            {/* Yahoo!ショッピング お得な日 */}
+            {(() => {
+              const hasYahoo =
+                (selectedProduct.shops || []).some(s => (s.name || '').includes('Yahoo')) ||
+                crossPlatformShops.some(s => s.source === 'yahoo');
+              if (!hasYahoo) return null;
+              const events = getYahooSaleEvents(new Date(), 3);
+              if (!events.length) return null;
+              const fmtDate = (d) => {
+                const m = d.getMonth() + 1;
+                const day = d.getDate();
+                const dows = ['日', '月', '火', '水', '木', '金', '土'];
+                return `${m}月${day}日（${dows[d.getDay()]}）`;
+              };
+              return (
+                <section className="mb-8 bg-white border border-[#FFD9B5] rounded-[2rem] p-6 shadow-sm">
+                  <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-4">
+                    <span className="text-base">🛒</span> Yahoo!ショッピングのお得な日
+                  </h3>
+                  <div className="space-y-2">
+                    {events.map((ev, i) => (
+                      <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${ev.isToday ? 'bg-[#FFF3E8] border border-[#FFD9B5]' : 'bg-[#F9F6F3]'}`}>
+                        <div className="flex items-center gap-2">
+                          {ev.isToday && <span className="text-[10px] font-black text-white bg-[#E07A30] px-2 py-0.5 rounded-full">今日</span>}
+                          <span className="text-xs font-bold text-[#5A4C4C]">{fmtDate(ev.dateObj)}</span>
+                          <span className="text-xs font-black text-[#8E8282]">{ev.name}</span>
+                        </div>
+                        <span className="text-xs font-black text-[#E07A30]">{ev.bonus}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
+
             {/* ショップ比較 */}
             <section className="mb-12">
               <div className="flex items-center justify-between mb-6 px-1">
@@ -3335,20 +3483,45 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               <div className="space-y-4">
                 {(() => {
                   const existingShops = selectedProduct.shops || [];
-                  const crossPlatformShops = (selectedProduct.crossPlatformPrices || []).map(p => ({
-                    name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング',
-                    type: 'mall',
-                    lowestPrice: p.price,
-                    url: p.url,
-                    sellers: [{ name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング', price: p.price, url: p.url, shipping: 0, points: 0 }]
-                  }));
-                  
+                  const allCandidates = [...existingShops, ...crossPlatformShops];
+
+                  // 外れ値除去: 中央値の15%未満の価格は別商品の誤マッチとして除外
+                  const nonZero = allCandidates
+                    .map(s => s.lowestPrice || s.price || 0)
+                    .filter(p => p > 0)
+                    .sort((a, b) => a - b);
+                  const median = nonZero.length > 0 ? nonZero[Math.floor(nonZero.length / 2)] : 0;
+                  const isReasonablePrice = (s) => {
+                    const p = s.lowestPrice || s.price || 0;
+                    return !median || p === 0 || p >= median * 0.15;
+                  };
+
                   const shopByKey = new Map();
-                  const shopKey = (s) => (s.name || s.shop_name || '').toLowerCase();
-                  
-                  for (const s of [...existingShops, ...crossPlatformShops]) {
+                  // source を含めることで楽天とYahooの同名ショップが別エントリになる
+                  const shopKey = (s) => {
+                    const name = (s.name || s.shop_name || '').toLowerCase();
+                    const src = s.source || '';
+                    return src ? `${src}:${name}` : name;
+                  };
+
+                  // crossPlatformShops はAPIから取得した正確なURLを持つため優先
+                  const hasCrossRakuten = crossPlatformShops.some(s => s.source === 'rakuten');
+                  const hasCrossYahoo = crossPlatformShops.some(s => s.source === 'yahoo');
+
+                  for (const s of crossPlatformShops.filter(isReasonablePrice)) {
                     const key = shopKey(s);
                     if (!key) continue;
+                    const cur = shopByKey.get(key);
+                    if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
+                      shopByKey.set(key, s);
+                    }
+                  }
+
+                  for (const s of existingShops.filter(isReasonablePrice)) {
+                    const key = shopKey(s);
+                    if (!key) continue;
+                    // 楽天・Yahoo はDBに古いURLが入っているため常にスキップし、APIの新鮮データのみ使う
+                    if (key.includes('楽天') || key.includes('yahoo') || key.includes('ヤフー')) continue;
                     const cur = shopByKey.get(key);
                     if (!cur || (s.lowestPrice || s.price || Infinity) < (cur.lowestPrice || cur.price || Infinity)) {
                       shopByKey.set(key, s);
@@ -3366,11 +3539,19 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     });
                   }
 
-                  return Array.from(shopByKey.values()).sort((a, b) => {
-                    if (a.lowestPrice === 0) return 1;
-                    if (b.lowestPrice === 0) return -1;
-                    return (a.lowestPrice || a.price) - (b.lowestPrice || b.price);
-                  });
+                  const RENTAL_KW = ['レンタル', 'rental', 'レンタ', 'リース'];
+                  const checkRental = (s) => {
+                    const targets = [s.name || '', s.shop_name || '', ...(s.sellers || []).flatMap(sel => [sel.name || '', sel.note || ''])];
+                    return targets.some(t => RENTAL_KW.some(k => t.toLowerCase().includes(k)));
+                  };
+                  return Array.from(shopByKey.values())
+                    .map(s => ({ ...s, _isRental: checkRental(s) }))
+                    .sort((a, b) => {
+                      if (a._isRental !== b._isRental) return a._isRental ? 1 : -1;
+                      if (a.lowestPrice === 0) return 1;
+                      if (b.lowestPrice === 0) return -1;
+                      return (a.lowestPrice || a.price) - (b.lowestPrice || b.price);
+                    });
                 })().map((shop, idx) => (
                   <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
                     <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`} 
@@ -3378,10 +3559,15 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       <div className="flex-1 pr-4">
                         <div className="flex items-center flex-wrap gap-2 mb-1.5">
                           <div className="w-5 h-5 rounded-md flex items-center justify-center overflow-hidden border border-[#F4EFEB] bg-white">
-                            {(shop.name || shop.shop_name).includes('楽天') ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> : 
+                            {(shop.name || shop.shop_name).includes('楽天') ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
                              (shop.name || shop.shop_name).includes('Yahoo') ? <img src="https://shopping.yahoo.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
                              (shop.name || shop.shop_name).toLowerCase().includes('amazon') ? <img src="https://www.amazon.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
-                             <Store className="w-3.5 h-3.5 text-[#A5A19E]" />}
+                             (() => {
+                               const sp = SPECIALTY_SHOPS.find(s => s.source === (shop.source || ''));
+                               return sp
+                                 ? <img src={`https://www.google.com/s2/favicons?domain=${sp.domain}&sz=32`} className="w-3.5 h-3.5" onError={e => { e.target.style.display='none'; }} />
+                                 : <Store className="w-3.5 h-3.5 text-[#A5A19E]" />;
+                             })()}
                           </div>
                           <p className="text-base font-black text-[#5A4C4C]">{shop.name || shop.shop_name}</p>
                           {shop.type === 'official' && (
@@ -3389,9 +3575,14 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                               <ShieldCheck className="w-2.5 h-2.5" /> 公式
                             </span>
                           )}
+                          {shop._isRental && (
+                            <span className="bg-[#7BA7CC] text-white text-[9px] font-black px-2.5 py-1 rounded-md">
+                              レンタル
+                            </span>
+                          )}
                         </div>
                         <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">
-                          {shop.lowestPrice > 0 ? `出品者: ${Math.max(1, (shop.sellers || []).length)}店舗` : "最新の価格・在庫をチェック"}
+                          {shop._isRental ? 'レンタル料金（新品購入ではありません）' : shop.lowestPrice > 0 ? `出品者: ${Math.max(1, (shop.sellers || []).length)}店舗` : "最新の価格・在庫をチェック"}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
@@ -3447,82 +3638,22 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           })}
                       </div>
                     )}
-                    <p className="text-center text-[10px] text-[#D4CDC7] mt-8">Honest Baby v1.2.1</p>
               </div>
                 ))}
               </div>
             </section>
 
-            {/* ＝＝＝＝＝ ベビー専門店でも探す ＝＝＝＝＝ */}
-            <section className="mb-12">
-              <div className="flex items-center gap-2 mb-4 px-1">
-                <Store className="w-5 h-5 text-[#7B8E76]" />
-                <h3 className="font-black text-[#5A4C4C] text-xl">ベビー専門店でも探す</h3>
-              </div>
-              <p className="text-[10px] text-[#A5A19E] font-bold mb-4 px-1">公式オンラインストアで在庫・セール情報を確認できます</p>
-              <div className="grid grid-cols-2 gap-3">
-                {OFFICIAL_RETAILERS.filter(retailer =>
-                  retailer.domain !== 'mikihouse.co.jp' || selectedProduct.category === 'ウェア'
-                ).map(retailer => {
-                  const searchKw = (selectedProduct.name || '').split(/[\s　]+/).slice(0, 3).join(' ');
-                  const url = retailer.searchUrl(searchKw) + retailer.affiliateParam;
-                  return (
-                    <a
-                      key={retailer.domain}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 bg-white border border-[#F4EFEB] rounded-[1.5rem] px-4 py-4 shadow-sm active:scale-95 transition-transform"
-                    >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-[#F4EFEB]">
-                        <img
-                          src={`https://www.google.com/s2/favicons?domain=${retailer.domain}&sz=32`}
-                          className="w-6 h-6"
-                          onError={e => { e.target.style.display = 'none'; }}
-                          alt={retailer.shortName}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-[#5A4C4C] truncate">{retailer.shortName}</p>
-                        <p className="text-[9px] text-[#A5A19E] font-bold">公式オンラインストア</p>
-                      </div>
-                      <ExternalLink className="w-3.5 h-3.5 text-[#A5A19E] ml-auto shrink-0" />
-                    </a>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* ＝＝＝＝＝ 口コミセクション (ネイティブ＆SNS統合) ＝＝＝＝＝ */}
+            {/* ＝＝＝＝＝ 口コミセクション ＝＝＝＝＝ */}
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-6 px-1">
                 <MessageCircle className="w-5 h-5 text-[#F2ABAC]" />
                 <h3 className="font-black text-[#5A4C4C] text-xl">口コミ・レビュー</h3>
               </div>
 
-              {/* タブ切り替え */}
-              <div className="flex p-1 bg-[#F9F6F3] rounded-full mb-6 relative">
-                <button
-                  onClick={() => setReviewTab('honest')}
-                  className={`flex-1 py-3 text-xs font-black rounded-full transition-all z-10 ${reviewTab === 'honest' ? 'text-[#5A4C4C]' : 'text-[#A5A19E]'}`}
-                >
-                  ユーザーの口コミ
-                </button>
-                <button
-                  onClick={() => setReviewTab('sns')}
-                  className={`flex-1 py-3 text-xs font-black rounded-full transition-all z-10 ${reviewTab === 'sns' ? 'text-[#5A4C4C]' : 'text-[#A5A19E]'}`}
-                >
-                  SNSでの評判
-                </button>
-                <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-out pointer-events-none ${reviewTab === 'sns' ? 'translate-x-full' : 'translate-x-0'}`}></div>
-              </div>
-
-              {/* Honest レビュー (ネイティブ) */}
-              {reviewTab === 'honest' && (
-                <div className="animate-in fade-in duration-300">
+              <div>
                   <div className="flex items-center justify-between mb-6 px-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-[#5A4C4C]">{selectedProduct.rating}</span>
+                      <span className="text-3xl font-black text-[#5A4C4C]">{Number(selectedProduct.rating).toFixed(2)}</span>
                       <div className="flex items-center text-[#D4AF37]">
                         {[...Array(5)].map((_, i) => <Star key={i} className={`w-4 h-4 ${i < Math.floor(selectedProduct.rating) ? 'fill-current' : 'text-gray-200'}`} />)}
                       </div>
@@ -3587,52 +3718,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-
-              {/* SNS レビュー */}
-              {reviewTab === 'sns' && (
-                <div className="animate-in fade-in duration-300">
-                  {selectedProduct.snsReviews && selectedProduct.snsReviews.length > 0 ? (
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-6 px-6 pb-4">
-                      {selectedProduct.snsReviews.map(review => (
-                        <div key={review.id} className="min-w-[280px] bg-[#F9F6F3] border border-[#F4EFEB] p-6 rounded-[2rem] shadow-[0_4px_20px_rgb(0,0,0,0.02)]">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#A5A58D] to-[#E2D5C3] shadow-inner" />
-                            <div className="flex-1">
-                              <p className="text-xs font-black text-[#5A4C4C]">@{review.user}</p>
-                              <div className="flex items-center gap-1 text-[9px] text-[#A5A19E] font-bold uppercase tracking-tighter mt-0.5">
-                                {review.platform === 'instagram' ? <Instagram className="w-2.5 h-2.5" /> : <Twitter className="w-2.5 h-2.5" />}
-                                {review.platform}
-                              </div>
-                            </div>
-                          </div>
-                          <p className="text-xs text-[#8E8282] leading-relaxed italic line-clamp-4">"{review.content}"</p>
-                          <div className="mt-4 text-[10px] text-[#A5A19E] flex items-center gap-1 font-bold">
-                            <Heart className="w-3 h-3 fill-current text-rose-300" /> {review.likes} Likes
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="bg-[#FFF5F5] border border-[#FFEBEB] p-6 rounded-[2rem] shadow-sm">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Sparkles className="w-4 h-4 text-[#F2ABAC]" />
-                        <h4 className="text-xs font-black text-[#5A4C4C]">AIによるSNS評判まとめ</h4>
-                      </div>
-                      <p className="text-xs text-[#8E8282] leading-relaxed font-medium">
-                        {selectedProduct.aiAnalysis ? 
-                          `${selectedProduct.name}はSNS上では「${selectedProduct.aiAnalysis.slice(0, 50)}...」といった声が多く、特にデザイン性と実用性のバランスが高く評価されています。` : 
-                          "現在SNSでのリアルな評判を解析中です。一般的には、使い勝手の良さとブランドの信頼性で多くのママ・パパに選ばれているアイテムです。"}
-                      </p>
-                      <div className="mt-4 flex gap-2">
-                        <span className="text-[9px] font-bold bg-white text-[#F2ABAC] px-2 py-1 rounded-md border border-[#F2ABAC]/20">#SNSで話題</span>
-                        <span className="text-[9px] font-bold bg-white text-[#F2ABAC] px-2 py-1 rounded-md border border-[#F2ABAC]/20">#口コミ高評価</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              </div>
             </section>
           </div>
           </div>
@@ -3889,7 +3975,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
         <div className="fixed bottom-[72px] left-0 right-0 z-50 px-4 pointer-events-none">
           <div className="bg-white border border-[#F2ABAC]/40 rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 pointer-events-auto max-w-md mx-auto">
             <div className="w-9 h-9 rounded-xl bg-[#FFF5F5] flex items-center justify-center flex-shrink-0">
-              <img src="/icons/icon-192x192.png" alt="" className="w-6 h-6 rounded-lg" />
+              <img src="/apple-touch-icon.png" alt="" className="w-6 h-6 rounded-lg" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-black text-[#5A4C4C] leading-tight">ホーム画面に追加</p>
@@ -3965,7 +4051,12 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   ))}
                 </div>
               </div>
-              <button onClick={() => { setBabyInfo({ ...babyForm }); setShowBabyModal(false); }}
+              <button onClick={() => {
+                const info = { ...babyForm };
+                setBabyInfo(info);
+                if (user) saveBabyProfileToDB(user.id, info);
+                setShowBabyModal(false);
+              }}
                 className="w-full py-4 bg-[#5A4C4C] text-white rounded-full font-black text-sm active:scale-95 transition-transform mt-2">
                 保存する
               </button>
