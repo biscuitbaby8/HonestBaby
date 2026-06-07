@@ -82,7 +82,22 @@ function notFoundHtml() {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug');
+
   if (!slug) {
+    if (searchParams.get('list') === '1') {
+      const { data, error } = await supabase
+        .from('articles')
+        .select('slug, title, meta_description, created_at')
+        .eq('published', true)
+        .order('created_at', { ascending: false });
+      if (error) {
+        return Response.json({ articles: [] }, { status: 200 });
+      }
+      return Response.json({ articles: data || [] }, {
+        status: 200,
+        headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=3600' },
+      });
+    }
     return new Response(null, { status: 302, headers: { Location: '/' } });
   }
 
