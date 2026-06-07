@@ -50,10 +50,5 @@
       "source": "/article/:slug",
       "destination": "/api/article?slug=:slug"
     }
-  ],
-  "functions": {
-    "api/**/*.js": {
-      "maxDuration": 10
-    }
-  }
+  ]
 }

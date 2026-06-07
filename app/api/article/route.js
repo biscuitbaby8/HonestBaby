@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
+  process.env.SUPABASE_SERVICE_KEY || 'placeholder_key'
+);
 
 function escapeHtml(s) {
   return String(s)
@@ -71,9 +74,22 @@ function inlineFormat(text) {
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" style="color:#FF6B6B;font-weight:700;text-decoration:underline;" target="_blank" rel="noopener">$1</a>');
 }
 
-export default async function handler(req, res) {
-  const { slug } = req.query;
-  if (!slug) return res.redirect('/');
+function notFoundHtml() {
+  return `<!DOCTYPE html><html lang="ja"><head>
+<meta charset="UTF-8"><title>記事が見つかりません | HonestBaby</title>
+<meta http-equiv="refresh" content="3;url=https://honestbaby-care.com/">
+</head><body style="font-family:sans-serif;text-align:center;padding:4rem;background:#FFF5E4;">
+<h2 style="color:#1A1A2E;">記事が見つかりませんでした</h2>
+<p style="color:#888;">3秒後にトップページへ移動します。</p>
+</body></html>`;
+}
+
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const slug = searchParams.get('slug');
+  if (!slug) {
+    return new Response(null, { status: 302, headers: { Location: '/' } });
+  }
 
   const { data: article, error } = await supabase
     .from('articles')
@@ -82,22 +98,17 @@ export default async function handler(req, res) {
     .single();
 
   if (error || !article || !article.published) {
-    return res.status(404).send(`<!DOCTYPE html><html lang="ja"><head>
-<meta charset="UTF-8"><title>記事が見つかりません | HonestBaby</title>
-<meta http-equiv="refresh" content="3;url=https://honestbaby-care.com/">
-</head><body style="font-family:sans-serif;text-align:center;padding:4rem;background:#FFF5E4;">
-<h2 style="color:#1A1A2E;">記事が見つかりませんでした</h2>
-<p style="color:#888;">3秒後にトップページへ移動します。</p>
-</body></html>`);
+    return new Response(notFoundHtml(), {
+      status: 404,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
   }
 
   const title = escapeHtml(article.title);
   const desc = escapeHtml(article.meta_description || article.title);
   const bodyHtml = markdownToHtml(article.content);
 
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
-  res.send(`<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -146,5 +157,13 @@ ${bodyHtml}
 </main>
 <footer>© HonestBaby | <a href="https://honestbaby-care.com/privacy" style="color:#A5A19E">プライバシーポリシー</a></footer>
 </body>
-</html>`);
+</html>`;
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 's-maxage=3600, stale-while-revalidate=86400',
+    },
+  });
 }

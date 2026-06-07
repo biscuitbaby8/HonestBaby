@@ -1,6 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
+  process.env.SUPABASE_SERVICE_KEY || 'placeholder_key'
+);
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
 function auth(password) {
   const expected = process.env.ADMIN_PASSWORD;
@@ -8,17 +17,21 @@ function auth(password) {
   return password === expected;
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+export async function OPTIONS() {
+  return new Response(null, { status: 200, headers: CORS });
+}
 
-  const { action, password, ...params } = req.body || {};
+export async function POST(request) {
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+  const { action, password, ...params } = body || {};
 
   if (!auth(password)) {
-    return res.status(401).json({ error: 'パスワードが正しくありません' });
+    return Response.json({ error: 'パスワードが正しくありません' }, { status: 401, headers: CORS });
   }
 
   try {
@@ -28,13 +41,13 @@ export default async function handler(req, res) {
         .select('id, slug, title, published, created_at')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return res.status(200).json({ articles: data });
+      return Response.json({ articles: data }, { status: 200, headers: CORS });
     }
 
     if (action === 'save') {
       const { slug, title, meta_description, content, published } = params;
       if (!slug || !title || !content) {
-        return res.status(400).json({ error: 'slug・title・contentは必須です' });
+        return Response.json({ error: 'slug・title・contentは必須です' }, { status: 400, headers: CORS });
       }
       const { data, error } = await supabase
         .from('articles')
@@ -42,7 +55,7 @@ export default async function handler(req, res) {
         .select('id, slug, title, published')
         .single();
       if (error) throw error;
-      return res.status(200).json({ article: data });
+      return Response.json({ article: data }, { status: 200, headers: CORS });
     }
 
     if (action === 'toggle') {
@@ -52,7 +65,7 @@ export default async function handler(req, res) {
         .update({ published })
         .eq('id', id);
       if (error) throw error;
-      return res.status(200).json({ ok: true });
+      return Response.json({ ok: true }, { status: 200, headers: CORS });
     }
 
     if (action === 'delete') {
@@ -62,11 +75,11 @@ export default async function handler(req, res) {
         .delete()
         .eq('id', id);
       if (error) throw error;
-      return res.status(200).json({ ok: true });
+      return Response.json({ ok: true }, { status: 200, headers: CORS });
     }
 
-    return res.status(400).json({ error: '不明なaction' });
+    return Response.json({ error: '不明なaction' }, { status: 400, headers: CORS });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return Response.json({ error: e.message }, { status: 500, headers: CORS });
   }
 }
