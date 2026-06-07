@@ -781,6 +781,14 @@ const App = () => {
   const [diagAnswers, setDiagAnswers] = useState({});
   const [diagResult, setDiagResult] = useState(null);
   const [isDiagLoading, setIsDiagLoading] = useState(false);
+  const [savedDiagResult, setSavedDiagResult] = useState(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('honestBabyDiagResult');
+      if (raw) setSavedDiagResult(JSON.parse(raw));
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1994,52 +2002,136 @@ ${userText}
 
   const buildDiagCategories = (answers) => {
     const { timing, siblings, home, budget } = answers;
+    const isPrenatalEarly = timing === '妊娠中（〜3ヶ月）' || timing === '妊娠中（3〜6ヶ月）';
+    const isPrenatalLate = timing === '妊娠中（6ヶ月〜）';
+    const isPrenatal = isPrenatalEarly || isPrenatalLate;
+    const isNewborn = timing === 'すでに生まれた（0〜6ヶ月）';
+    const isOlderBaby = timing === 'すでに生まれた（6ヶ月〜）';
+    const isSecondChild = !!(siblings && siblings.includes('第2子'));
+    const isHouse = !!(home && home.includes('一戸建て'));
+    const isApartmentNoElevator = home === 'マンション・アパート（階段のみ）';
+    const isParentsHome = home === '実家に帰省予定';
+    const tightBudget = budget === '〜10万円（最小限で揃えたい）';
+    const richBudget = budget === '20万円以上（しっかり揃えたい）';
+
     const items = [];
-    const add = (category, priority, reason) => items.push({ category, priority, reason });
+    const add = (category, priority, reason, details, timingLabel) =>
+      items.push({ category, priority, reason, details, timingLabel });
 
-    // 常に必須
-    add('おむつ', '必須', '退院直後から必要。まず1〜2パック購入を');
-    add('ウェア', '必須', '肌着・カバーオールを3〜5枚ずつ準備');
-    add('お風呂用品', '必須', '退院翌日から沐浴が始まる');
-    add('寝具・ベッド', '必須', '安全な睡眠環境は最優先');
-    add('ミルク・授乳', '必須', '授乳方法が決まる前から哺乳瓶を備えて');
+    // --- おむつ ---
+    add('おむつ', '必須',
+      '退院直後から1日10回以上交換することも',
+      tightBudget
+        ? ['新生児用は1パックだけ（すぐサイズアウトするため買いすぎ注意）', 'お尻拭きを2〜3個']
+        : ['新生児用1〜2パック＋Sサイズも少量試す', 'お尻拭き多めにストック', 'おむつ用ゴミ箱もあると匂い対策に◎'],
+      isPrenatal ? '出産前に少量だけ準備' : '今すぐ必要');
 
-    // マタニティ（出産前なら）
-    if (timing && timing.includes('妊娠中')) {
-      add('マタニティ', '必須', '妊娠中の体をサポートするグッズ');
+    // --- ウェア ---
+    add('ウェア', '必須',
+      '汗をかきやすく1日に何度も着替えるため多めに',
+      ['短肌着・コンビ肌着を3〜5枚ずつ', 'season（季節）に合わせたカバーオール', isSecondChild ? '上の子のお下がりが使えるかも確認を' : '退院時用のセレモニードレスも検討'],
+      isPrenatal ? '出産前に準備' : '今すぐ必要');
+
+    // --- お風呂用品 ---
+    add('お風呂用品', '必須',
+      '退院翌日から沐浴がスタート',
+      ['ベビーバス（折りたたみ式が場所を取らずおすすめ）', '沐浴布・ベビー用ソープ・温度計', '保湿剤・綿棒'],
+      '出産前に必ず準備');
+
+    // --- 寝具・ベッド ---
+    add('寝具・ベッド', '必須',
+      '安全な睡眠環境づくりは最優先事項',
+      isHouse || richBudget
+        ? ['ベビーベッド or 添い寝用ベッドガード', '硬め・通気性のよいマットレス', '季節に合わせたスリーパー（掛け布団は窒息リスクで非推奨）']
+        : ['コンパクトな添い寝用ベッドやベッドインベッド', '硬めのマットレス', 'スリーパー（掛け布団は避ける）'],
+      isPrenatal ? '出産前に準備' : '早急に準備');
+
+    // --- ミルク・授乳 ---
+    add('ミルク・授乳', '必須',
+      '母乳のみの予定でも哺乳瓶は備えておくと安心',
+      ['哺乳瓶2〜3本＋洗浄ブラシ', '哺乳瓶の消毒グッズ（電子レンジ式が手軽）', '授乳クッション', isSecondChild ? '上の子の世話と両立しやすい授乳服も便利' : '母乳パッド・搾乳機（必要に応じて）'],
+      isPrenatal ? '出産前に準備' : '今すぐ必要');
+
+    // --- マタニティ（妊娠中のみ） ---
+    if (isPrenatal) {
+      add('マタニティ', '必須',
+        isPrenatalEarly ? '体型の変化に備えて早めにチェックを' : '出産が近づく時期。入院準備も忘れずに',
+        isPrenatalEarly
+          ? ['マタニティウェア・下着', 'つわり対策グッズ', '母子手帳ケース']
+          : ['産褥ショーツ・授乳しやすい服', '入院バッグの中身チェックリスト', '骨盤ベルト'],
+        isPrenatalEarly ? '体調が落ち着いたら' : '臨月までに準備');
     }
 
-    // 抱っこ紐
-    const needsCarrier = !siblings || siblings.includes('第1子') || siblings.includes('第2子');
-    add('抱っこ紐', '必須', '外出・寝かしつけ両方で大活躍');
+    // --- 抱っこ紐 ---
+    add('抱っこ紐', '必須',
+      '新生児期から使える抱っこ紐があると外出も家事もぐっと楽に',
+      isSecondChild
+        ? ['上の子と手を繋ぎながら使える前向き抱っこタイプ', '新生児対応のインサート付きモデル']
+        : ['新生児期から使えるインサート付きモデル', '腰ベルト付きで肩への負担が少ないもの'],
+      isNewborn || isPrenatal ? '出産前後に準備' : '今すぐ必要');
 
-    // ベビーカー（住環境による）
-    if (home && (home.includes('一戸建て') || home.includes('マンション'))) {
-      add('ベビーカー', '必須', '外出時の移動に不可欠');
+    // --- ベビーカー ---
+    if (isParentsHome) {
+      add('ベビーカー', 'あると便利',
+        '実家帰省中はレンタルサービスの利用も賢い選択',
+        ['里帰り中は短期レンタルでコストを抑える', '帰宅後の生活動線に合わせて購入を検討'],
+        '帰宅後に検討でOK');
+    } else if (isApartmentNoElevator) {
+      add('ベビーカー', '必須',
+        '階段の昇り降りが多いため軽量タイプが必須',
+        ['軽量・片手で畳めるB型タイプがおすすめ', '対面式が必要なら新生児期はA型も検討'],
+        isPrenatal ? '出産前に準備' : '外出が増える前に');
     } else {
-      add('ベビーカー', 'あると便利', '実家帰省時は一時レンタルも◎');
+      add('ベビーカー', '必須',
+        '生後1ヶ月健診以降の外出に向けて準備を',
+        isHouse
+          ? ['新生児期から使えるA型（対面式）', '将来的に使うB型（軽量型）も視野に']
+          : ['コンパクトに収納できるB型タイプ', '新生児期はA型 or 抱っこ紐で代用も可'],
+        isPrenatal ? '出産前に準備' : '1ヶ月健診までに');
     }
 
-    // 安全グッズ（第2子以降 or 一戸建て）
-    if ((siblings && siblings.includes('第2子')) || (home && home.includes('一戸建て'))) {
-      add('安全グッズ', '必須', '上の子・階段があるなら早めに準備');
+    // --- 安全グッズ ---
+    if (isSecondChild || isHouse) {
+      add('安全グッズ', '必須',
+        isSecondChild ? '上の子のいたずら・誤飲対策も同時に必要' : '一戸建ては階段・段差の対策が特に重要',
+        ['コンセントカバー・コーナーガード', '階段ゲート・ベビーフェンス', '上の子がいるなら誤飲しやすい小物の管理を見直し'],
+        isOlderBaby ? '今すぐ必要' : '寝返り・ハイハイが始まる前に');
     } else {
-      add('安全グッズ', 'あると便利', '動き始める前に準備しておくと◎');
+      add('安全グッズ', 'あると便利',
+        '動き始める生後5〜6ヶ月頃までに準備しておくと安心',
+        ['コンセントカバー', '家具の角を保護するコーナーガード', 'ベビーモニター（見守りカメラ）'],
+        '生後5ヶ月頃までに');
     }
 
-    // 離乳食（0〜6ヶ月以降 or 余裕のある予算）
-    if ((timing && timing.includes('6ヶ月')) || (budget && !budget.includes('10万円'))) {
-      add('離乳食・食器', 'あると便利', '5〜6ヶ月から離乳食が始まる');
+    // --- 車用品 ---
+    if (isHouse || home === 'マンション・アパート（エレベーターあり）' || isParentsHome) {
+      add('車用品', '必須',
+        'チャイルドシートの装着は法律上の義務（退院時から必要）',
+        ['新生児から使えるチャイルドシート（回転式は乗せ降ろしが楽）', '車用サンシェード', isParentsHome ? '帰省の移動手段が車なら退院前に取り付け確認を' : null].filter(Boolean),
+        '退院前に必ず準備');
     }
 
-    // おもちゃ（予算あり or 第1子）
-    if (budget && (budget.includes('20万円') || budget.includes('10〜20'))) {
-      add('おもちゃ', 'あると便利', '知育・感覚を育てるファーストトイ');
+    // --- 離乳食・食器 ---
+    if (isOlderBaby || richBudget) {
+      add('離乳食・食器', '必須',
+        '生後5〜6ヶ月頃から離乳食デビューの時期',
+        ['ベビーチェア・ハイチェア', '離乳食用の食器・スプーン', 'ブレンダー・調理セット（手作り派の場合）'],
+        '今すぐ準備して問題なし');
+    } else if (isNewborn) {
+      add('離乳食・食器', 'あると便利',
+        'まだ先だが、ベビーチェアは早めに見ておくと選びやすい',
+        ['ベビーチェア（テーブル取り付け式は場所を取らない）', '離乳食用の食器セット'],
+        '生後5ヶ月頃を目安に');
     }
 
-    // 車用品（一戸建て）
-    if (home && home.includes('一戸建て')) {
-      add('車用品', '必須', 'チャイルドシートは法律上義務');
+    // --- おもちゃ ---
+    if (!tightBudget) {
+      add('おもちゃ', 'あると便利',
+        isNewborn || isOlderBaby ? '月齢に合わせて視覚・聴覚を刺激するおもちゃを' : '新生児期はガラガラ・メリーなどシンプルなものから',
+        richBudget
+          ? ['メリー・ジム（プレイマット一体型も人気）', '歯がため・ガラガラ', '月齢に応じた知育玩具を段階的に']
+          : ['ガラガラ・布絵本などシンプルなものから', 'プレイマット'],
+        isOlderBaby ? '今すぐ取り入れてOK' : '生後2〜3ヶ月頃から');
     }
 
     return items;
@@ -2064,6 +2156,11 @@ ${userText}
         })
       );
       setDiagResult(results);
+      try {
+        const saved = { answers, result: results, savedAt: Date.now() };
+        localStorage.setItem('honestBabyDiagResult', JSON.stringify(saved));
+        setSavedDiagResult(saved);
+      } catch { /* localStorage unavailable */ }
     } catch (e) {
       console.error('Diagnosis error:', e);
       setDiagResult([]);
@@ -2390,15 +2487,30 @@ ${userText}
         {/* ─── 出産準備リスト診断バナー ─── */}
         <div
           className="w-full bg-[#EBF0EA] rounded-[2.5rem] p-6 mb-6 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform border border-[#D4DDD2]"
-          onClick={() => { setShowDiagModal(true); setDiagStep(0); setDiagAnswers({}); setDiagResult(null); }}
+          onClick={() => {
+            if (savedDiagResult) {
+              setDiagAnswers(savedDiagResult.answers || {});
+              setDiagResult(savedDiagResult.result || []);
+              setDiagStep(DIAG_QUESTIONS.length);
+            } else {
+              setDiagStep(0);
+              setDiagAnswers({});
+              setDiagResult(null);
+            }
+            setShowDiagModal(true);
+          }}
         >
           <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
             <Baby className="w-7 h-7 text-[#7B8E76]" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[10px] font-black uppercase tracking-widest text-[#7B8E76] mb-0.5">診断機能</div>
-            <div className="text-base font-black text-[#5A4C4C] leading-tight">出産準備リストを自動生成</div>
-            <div className="text-[11px] text-[#8E8282] font-bold mt-0.5">4つの質問に答えるだけ ·  AI が必要なものをリストアップ</div>
+            <div className="text-base font-black text-[#5A4C4C] leading-tight">
+              {savedDiagResult ? 'あなたの出産準備リスト' : '出産準備リストを自動生成'}
+            </div>
+            <div className="text-[11px] text-[#8E8282] font-bold mt-0.5">
+              {savedDiagResult ? '保存済みのリストを見る・編集する →' : '4つの質問に答えるだけ · あなたに合った持ち物リストを作成'}
+            </div>
           </div>
           <ChevronRight className="w-5 h-5 text-[#A5A19E] flex-shrink-0" />
         </div>
@@ -3918,14 +4030,26 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       <div className="flex flex-col gap-4 mb-6">
                       {diagResult.filter(i => i.priority === '必須').map((item) => (
                         <div key={item.category} className="border border-[#F4EFEB] rounded-[1.5rem] overflow-hidden">
-                          <div className="px-4 py-3 flex items-center justify-between" style={{ background: item.priority === '必須' ? '#FFF5F5' : '#EBF0EA' }}>
+                          <div className="px-4 py-3 flex items-center justify-between" style={{ background: '#FFF5F5' }}>
                             <div className="flex items-center gap-2">
                               <CategoryIcon name={item.category} className="w-4 h-4 text-[#5A4C4C]" />
                               <span className="font-black text-[#5A4C4C] text-sm">{item.category}</span>
                             </div>
-                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${item.priority === '必須' ? 'bg-[#F2ABAC] text-white' : 'bg-[#7B8E76] text-white'}`}>{item.priority}</span>
+                            <div className="flex items-center gap-1.5">
+                              {item.timingLabel && <span className="text-[9px] font-bold px-2 py-1 rounded-full bg-white text-[#8E8282] border border-[#F4EFEB]">⏰ {item.timingLabel}</span>}
+                              <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-[#F2ABAC] text-white">{item.priority}</span>
+                            </div>
                           </div>
-                          {item.reason && <p className="px-4 py-2 text-[11px] text-[#8E8282] font-bold border-b border-[#F4EFEB]">{item.reason}</p>}
+                          {item.reason && <p className="px-4 pt-2 text-[11px] text-[#8E8282] font-bold">{item.reason}</p>}
+                          {item.details && item.details.length > 0 && (
+                            <ul className="px-4 pb-3 pt-1 space-y-1 border-b border-[#F4EFEB]">
+                              {item.details.map((d, idx) => (
+                                <li key={idx} className="text-[11px] text-[#5A4C4C] font-medium flex items-start gap-1.5">
+                                  <span className="text-[#F2ABAC] flex-shrink-0">・</span>{d}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                           {item.products && item.products.length > 0 && (
                             <div className="divide-y divide-[#F4EFEB]">
                               {item.products.map(p => (
@@ -3967,9 +4091,21 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                                   <CategoryIcon name={item.category} className="w-4 h-4 text-[#5A4C4C]" />
                                   <span className="font-black text-[#5A4C4C] text-sm">{item.category}</span>
                                 </div>
-                                <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-[#7B8E76] text-white">{item.priority}</span>
+                                <div className="flex items-center gap-1.5">
+                                  {item.timingLabel && <span className="text-[9px] font-bold px-2 py-1 rounded-full bg-white text-[#8E8282] border border-[#F4EFEB]">⏰ {item.timingLabel}</span>}
+                                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-[#7B8E76] text-white">{item.priority}</span>
+                                </div>
                               </div>
-                              {item.reason && <p className="px-4 py-2 text-[11px] text-[#8E8282] font-bold border-b border-[#F4EFEB]">{item.reason}</p>}
+                              {item.reason && <p className="px-4 pt-2 text-[11px] text-[#8E8282] font-bold">{item.reason}</p>}
+                              {item.details && item.details.length > 0 && (
+                                <ul className="px-4 pb-3 pt-1 space-y-1 border-b border-[#F4EFEB]">
+                                  {item.details.map((d, idx) => (
+                                    <li key={idx} className="text-[11px] text-[#5A4C4C] font-medium flex items-start gap-1.5">
+                                      <span className="text-[#7B8E76] flex-shrink-0">・</span>{d}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                               {item.products && item.products.length > 0 && (
                                 <div className="divide-y divide-[#F4EFEB]">
                                   {item.products.map(p => (
