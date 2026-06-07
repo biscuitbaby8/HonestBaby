@@ -790,6 +790,19 @@ const App = () => {
     } catch { /* ignore */ }
   }, []);
 
+  // 公開記事一覧（記事タブ・ホーム導線カード用）
+  const [publishedArticles, setPublishedArticles] = useState([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('articles')
+        .select('slug, title, meta_description, created_at')
+        .eq('published', true)
+        .order('created_at', { ascending: false });
+      if (data) setPublishedArticles(data);
+    })();
+  }, []);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
@@ -935,7 +948,7 @@ const App = () => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
-    const validTabs = ['home', 'search', 'ai', 'gift', 'user'];
+    const validTabs = ['home', 'search', 'ai', 'gift', 'user', 'articles'];
     if (tab && validTabs.includes(tab)) setActiveTab(tab);
   }, []);
 
@@ -2470,67 +2483,73 @@ ${userText}
 
     return (
       <div className="animate-in fade-in duration-500">
-        <div className="w-full bg-[#FFF5F5] rounded-[2.5rem] p-8 mb-8 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#FFEBEB] cursor-pointer" onClick={() => setActiveTab('ai')}>
-          {/* AI Banner Content */}
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="bg-white p-1.5 rounded-full shadow-sm"><Sparkles className="w-4 h-4 text-[#F2ABAC]" /></div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#F2ABAC]">AI Concierge</span>
+        {/* ─── クイックアクセスタイル（AIコンサル / 出産準備診断 / Yahoo!お得情報 / 記事・コラム） ─── */}
+        <div className="grid grid-cols-2 gap-3 mb-6 lg:grid-cols-4">
+          <div
+            className="bg-[#FFF5F5] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#FFEBEB] cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
+            onClick={() => setActiveTab('ai')}
+          >
+            <div className="bg-white p-1.5 rounded-full shadow-sm w-fit"><Sparkles className="w-4 h-4 text-[#F2ABAC]" /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#F2ABAC] mb-1">AI Concierge</p>
+              <p className="text-sm font-black text-[#5A4C4C] leading-tight">AIに相談する</p>
             </div>
-            <h4 className="text-2xl font-black mb-2 text-[#5A4C4C] leading-tight">AIに育児アイテムを<br />相談してみる</h4>
-            <p className="text-[11px] text-[#8E8282] max-w-[200px] font-bold">ぴったりのベビー用品をAIが比較・提案します</p>
+            <Bot className="absolute right-2 bottom-2 w-14 h-14 text-[#F2ABAC] opacity-10 rotate-12" />
           </div>
-          <div className="absolute right-[-10%] bottom-[-20%] w-48 h-48 bg-[#FFE6E6] rounded-full opacity-50 blur-2xl"></div>
-          <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
-        </div>
 
-        {/* ─── 出産準備リスト診断バナー ─── */}
-        <div
-          className="w-full bg-[#EBF0EA] rounded-[2.5rem] p-6 mb-6 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform border border-[#D4DDD2]"
-          onClick={() => {
-            if (savedDiagResult) {
-              setDiagAnswers(savedDiagResult.answers || {});
-              setDiagResult(savedDiagResult.result || []);
-              setDiagStep(DIAG_QUESTIONS.length);
-            } else {
-              setDiagStep(0);
-              setDiagAnswers({});
-              setDiagResult(null);
-            }
-            setShowDiagModal(true);
-          }}
-        >
-          <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
-            <Baby className="w-7 h-7 text-[#7B8E76]" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-widest text-[#7B8E76] mb-0.5">診断機能</div>
-            <div className="text-base font-black text-[#5A4C4C] leading-tight">
-              {savedDiagResult ? 'あなたの出産準備リスト' : '出産準備リストを自動生成'}
+          <div
+            className="bg-[#EBF0EA] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#D4DDD2] cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
+            onClick={() => {
+              if (savedDiagResult) {
+                setDiagAnswers(savedDiagResult.answers || {});
+                setDiagResult(savedDiagResult.result || []);
+                setDiagStep(DIAG_QUESTIONS.length);
+              } else {
+                setDiagStep(0);
+                setDiagAnswers({});
+                setDiagResult(null);
+              }
+              setShowDiagModal(true);
+            }}
+          >
+            <div className="bg-white p-1.5 rounded-full shadow-sm w-fit"><Baby className="w-4 h-4 text-[#7B8E76]" /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#7B8E76] mb-1">診断機能</p>
+              <p className="text-sm font-black text-[#5A4C4C] leading-tight">
+                {savedDiagResult ? 'あなたの準備リスト' : '出産準備リスト診断'}
+              </p>
             </div>
-            <div className="text-[11px] text-[#8E8282] font-bold mt-0.5">
-              {savedDiagResult ? '保存済みのリストを見る・編集する →' : '4つの質問に答えるだけ · あなたに合った持ち物リストを作成'}
-            </div>
+            <Baby className="absolute right-2 bottom-2 w-14 h-14 text-[#7B8E76] opacity-10 rotate-12" />
           </div>
-          <ChevronRight className="w-5 h-5 text-[#A5A19E] flex-shrink-0" />
-        </div>
 
-        {/* ─── Yahoo!ショッピング 今日のお得バナー ─── */}
-        {(() => {
-          const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
-          if (!todayEvents.length) return null;
-          const ev = todayEvents[0];
-          return (
-            <div className="mb-6 bg-[#FFF3E8] border border-[#FFD9B5] rounded-[2rem] p-5 flex items-center justify-between shadow-sm">
-              <div>
-                <p className="text-[10px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!ショッピング 今日のお得</p>
-                <p className="text-base font-black text-[#5A4C4C]">{ev.name}</p>
-                <p className="text-xs text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+          {(() => {
+            const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
+            if (!todayEvents.length) return null;
+            const ev = todayEvents[0];
+            return (
+              <div className="bg-[#FFF3E8] border border-[#FFD9B5] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm flex flex-col justify-between min-h-[8.5rem]">
+                <span className="text-2xl w-fit">🛒</span>
+                <div>
+                  <p className="text-[9px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!お得情報</p>
+                  <p className="text-sm font-black text-[#5A4C4C] leading-tight truncate">{ev.name}</p>
+                  <p className="text-[10px] text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+                </div>
               </div>
-              <span className="text-3xl">🛒</span>
+            );
+          })()}
+
+          <div
+            className="bg-[#F4EFEB] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#E5DFD9] cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
+            onClick={() => setActiveTab('articles')}
+          >
+            <div className="bg-white p-1.5 rounded-full shadow-sm w-fit"><FileText className="w-4 h-4 text-[#7B8E76]" /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#7B8E76] mb-1">Articles</p>
+              <p className="text-sm font-black text-[#5A4C4C] leading-tight">記事・コラムを読む</p>
             </div>
-          );
-        })()}
+            <FileText className="absolute right-2 bottom-2 w-14 h-14 text-[#7B8E76] opacity-10 rotate-12" />
+          </div>
+        </div>
 
         {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
         {babyInfo && babyAgeMonths != null && (() => {
@@ -2763,7 +2782,48 @@ ${userText}
     );
   };
 
+  const renderArticles = () => {
+    return (
+      <div className="animate-in slide-in-from-right duration-300">
+        <div className="bg-[#F4EFEB] -mx-6 px-6 pt-4 pb-10 rounded-b-[3rem] mb-8 relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-40 h-40 bg-[#7B8E76] rounded-full opacity-10 blur-3xl translate-x-1/2 -translate-y-1/2"></div>
+          <div className="flex items-center gap-3 mb-4 relative z-10">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#7B8E76] shadow-sm -rotate-6"><FileText className="w-6 h-6" /></div>
+            <div>
+              <h2 className="text-2xl font-black text-[#5A4C4C]">記事・コラム</h2>
+              <p className="text-[10px] text-[#A5A19E] font-bold mt-1 tracking-widest">CHILDCARE GUIDES &amp; TIPS</p>
+            </div>
+          </div>
+          <p className="text-xs text-[#8E8282] font-bold leading-relaxed relative z-10">育児の悩みに役立つ比較ガイドやチェックリストをお届けします。</p>
+        </div>
 
+        {publishedArticles.length === 0 ? (
+          <div className="py-16 text-center text-[#A5A19E] text-xs font-bold">記事は準備中です。少々お待ちください。</div>
+        ) : (
+          <div className="flex flex-col gap-3 mb-8">
+            {publishedArticles.map(a => (
+              <a
+                key={a.slug}
+                href={`/article/${a.slug}`}
+                className="flex items-center gap-4 bg-white border border-[#F4EFEB] rounded-[1.75rem] p-5 shadow-sm active:scale-[0.98] transition-transform"
+              >
+                <div className="w-12 h-12 bg-[#EBF0EA] rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-6 h-6 text-[#7B8E76]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-black text-[#5A4C4C] leading-snug truncate">{a.title}</h3>
+                  {a.meta_description && (
+                    <p className="text-[11px] text-[#A5A19E] font-bold mt-1 line-clamp-2">{a.meta_description}</p>
+                  )}
+                </div>
+                <ChevronRight className="w-5 h-5 text-[#A5A19E] flex-shrink-0" />
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderGift = () => {
     return (
@@ -3005,22 +3065,6 @@ ${userText}
         {/* 法的リンク */}
         <div className="px-2 border-t border-[#F4EFEB] pt-8">
           <div className="flex flex-col gap-4">
-            <div className="mb-2">
-              <p className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-3">記事・ガイド</p>
-              <div className="flex flex-col gap-2">
-                {[
-                  { slug: 'babycara-hikaku', label: 'ベビーカー選び方・比較ガイド' },
-                  { slug: 'syussan-junbi-list', label: '出産準備リスト（月齢別チェックリスト）' },
-                  { slug: 'omutsu-hikaku', label: 'おむつ比較・おすすめランキング' },
-                ].map(a => (
-                  <div key={a.slug} className="flex items-center gap-2 text-xs font-bold text-[#D4CDC7] cursor-default">
-                    <FileText className="w-4 h-4 flex-shrink-0" />
-                    <span>{a.label}</span>
-                    <span className="text-[9px] font-black bg-[#F4EFEB] text-[#C0B8B2] px-2 py-0.5 rounded-full uppercase tracking-wider">Coming Soon</span>
-                  </div>
-                ))}
-              </div>
-            </div>
             <button onClick={() => { setShowContactModal(true); setContactSent(false); setContactContent(''); setContactCategory('商品について'); }} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Mail className="w-4 h-4 mr-2" /> お問い合わせ</button>
             <button onClick={() => setActiveLegalPage('terms')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><FileText className="w-4 h-4 mr-2" /> 利用規約</button>
             <button onClick={() => setActiveLegalPage('privacy')} className="flex items-center text-xs font-bold text-[#A5A19E] hover:text-[#5A4C4C] transition-colors"><Shield className="w-4 h-4 mr-2" /> プライバシーポリシー</button>
@@ -3051,6 +3095,7 @@ ${userText}
             { id: 'search', label: '検索',     icon: <Search className="w-5 h-5" /> },
             { id: 'ai',     label: 'AIコンサル', icon: <Bot className="w-5 h-5" /> },
             { id: 'gift',   label: 'ギフト',   icon: <Gift className="w-5 h-5" /> },
+            { id: 'articles', label: '記事・コラム', icon: <FileText className="w-5 h-5" /> },
             { id: 'user',   label: 'マイページ', icon: <User className="w-5 h-5" /> },
           ].map(tab => (
             <button
@@ -3117,6 +3162,7 @@ ${userText}
       <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden lg:flex-1 lg:overflow-auto' : 'px-6 pt-4 lg:px-10 lg:pt-8 lg:max-w-7xl lg:mx-auto'} style={activeTab === 'ai' ? { paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)' } : {}}>
         {activeTab === 'home' && renderHome()}
         {activeTab === 'gift' && renderGift()}
+        {activeTab === 'articles' && renderArticles()}
         {activeTab === 'user' && renderUser()}
 
         {activeTab === 'search' && (
