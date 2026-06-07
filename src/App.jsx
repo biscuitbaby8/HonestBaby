@@ -431,6 +431,10 @@ const App = () => {
 
   // Navigation States
   const [activeTab, setActiveTab] = useState('home');
+  // タブ切り替え時に前のタブのスクロール位置が引き継がれて上部が見切れるのを防ぐ
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Category & Filter States
@@ -791,15 +795,15 @@ const App = () => {
   }, []);
 
   // 公開記事一覧（記事タブ・ホーム導線カード用）
+  // articlesテーブルはservice roleのみ読み取り可（RLS）のため、SSR用APIのlistモードを利用
   const [publishedArticles, setPublishedArticles] = useState([]);
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from('articles')
-        .select('slug, title, meta_description, created_at')
-        .eq('published', true)
-        .order('created_at', { ascending: false });
-      if (data) setPublishedArticles(data);
+      try {
+        const res = await fetch('/api/article?list=1');
+        const json = await res.json();
+        if (Array.isArray(json.articles)) setPublishedArticles(json.articles);
+      } catch { /* ignore */ }
     })();
   }, []);
 
@@ -2483,8 +2487,8 @@ ${userText}
 
     return (
       <div className="animate-in fade-in duration-500">
-        {/* ─── クイックアクセスタイル（AIコンサル / 出産準備診断 / Yahoo!お得情報 / 記事・コラム） ─── */}
-        <div className="grid grid-cols-2 gap-3 mb-6 lg:grid-cols-4">
+        {/* ─── クイックアクセスタイル（モバイル専用・AIコンサル / 出産準備診断 / Yahoo!お得情報 / 記事・コラム） ─── */}
+        <div className="grid grid-cols-2 gap-3 mb-6 lg:hidden">
           <div
             className="bg-[#FFF5F5] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#FFEBEB] cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
             onClick={() => setActiveTab('ai')}
@@ -2549,6 +2553,68 @@ ${userText}
             </div>
             <FileText className="absolute right-2 bottom-2 w-14 h-14 text-[#7B8E76] opacity-10 rotate-12" />
           </div>
+        </div>
+
+        {/* ─── PC専用バナー群（元のレイアウトを維持） ─── */}
+        <div className="hidden lg:block">
+          <div className="w-full bg-[#FFF5F5] rounded-[2.5rem] p-8 mb-8 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#FFEBEB] cursor-pointer" onClick={() => setActiveTab('ai')}>
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="bg-white p-1.5 rounded-full shadow-sm"><Sparkles className="w-4 h-4 text-[#F2ABAC]" /></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#F2ABAC]">AI Concierge</span>
+              </div>
+              <h4 className="text-2xl font-black mb-2 text-[#5A4C4C] leading-tight">AIに育児アイテムを<br />相談してみる</h4>
+              <p className="text-[11px] text-[#8E8282] max-w-[200px] font-bold">ぴったりのベビー用品をAIが比較・提案します</p>
+            </div>
+            <div className="absolute right-[-10%] bottom-[-20%] w-48 h-48 bg-[#FFE6E6] rounded-full opacity-50 blur-2xl"></div>
+            <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
+          </div>
+
+          <div
+            className="w-full bg-[#EBF0EA] rounded-[2.5rem] p-6 mb-6 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform border border-[#D4DDD2]"
+            onClick={() => {
+              if (savedDiagResult) {
+                setDiagAnswers(savedDiagResult.answers || {});
+                setDiagResult(savedDiagResult.result || []);
+                setDiagStep(DIAG_QUESTIONS.length);
+              } else {
+                setDiagStep(0);
+                setDiagAnswers({});
+                setDiagResult(null);
+              }
+              setShowDiagModal(true);
+            }}
+          >
+            <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
+              <Baby className="w-7 h-7 text-[#7B8E76]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-widest text-[#7B8E76] mb-0.5">診断機能</div>
+              <div className="text-base font-black text-[#5A4C4C] leading-tight">
+                {savedDiagResult ? 'あなたの出産準備リスト' : '出産準備リストを自動生成'}
+              </div>
+              <div className="text-[11px] text-[#8E8282] font-bold mt-0.5">
+                {savedDiagResult ? '保存済みのリストを見る・編集する →' : '4つの質問に答えるだけ · あなたに合った持ち物リストを作成'}
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[#A5A19E] flex-shrink-0" />
+          </div>
+
+          {(() => {
+            const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
+            if (!todayEvents.length) return null;
+            const ev = todayEvents[0];
+            return (
+              <div className="mb-6 bg-[#FFF3E8] border border-[#FFD9B5] rounded-[2rem] p-5 flex items-center justify-between shadow-sm">
+                <div>
+                  <p className="text-[10px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!ショッピング 今日のお得</p>
+                  <p className="text-base font-black text-[#5A4C4C]">{ev.name}</p>
+                  <p className="text-xs text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+                </div>
+                <span className="text-3xl">🛒</span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
