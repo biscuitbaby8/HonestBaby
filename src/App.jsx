@@ -2543,15 +2543,15 @@ ${userText}
           })()}
 
           <div
-            className="bg-[#F4EFEB] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#E5DFD9] cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
+            className="bg-[#FFF9E6] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#F9DC5C]/40 cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
             onClick={() => setActiveTab('articles')}
           >
-            <div className="bg-white p-1.5 rounded-full shadow-sm w-fit"><FileText className="w-4 h-4 text-[#7B8E76]" /></div>
+            <div className="bg-white p-1.5 rounded-full shadow-sm w-fit"><FileText className="w-4 h-4 text-[#D4AF37]" /></div>
             <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-[#7B8E76] mb-1">Articles</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#B8860B] mb-1">Articles</p>
               <p className="text-sm font-black text-[#5A4C4C] leading-tight">記事・コラムを読む</p>
             </div>
-            <FileText className="absolute right-2 bottom-2 w-14 h-14 text-[#7B8E76] opacity-10 rotate-12" />
+            <FileText className="absolute right-2 bottom-2 w-14 h-14 text-[#D4AF37] opacity-10 rotate-12" />
           </div>
         </div>
 
@@ -2851,13 +2851,13 @@ ${userText}
   const renderArticles = () => {
     return (
       <div className="animate-in slide-in-from-right duration-300">
-        <div className="bg-[#F4EFEB] -mx-6 px-6 pt-4 pb-10 rounded-b-[3rem] mb-8 relative overflow-hidden">
-          <div className="absolute right-0 top-0 w-40 h-40 bg-[#7B8E76] rounded-full opacity-10 blur-3xl translate-x-1/2 -translate-y-1/2"></div>
+        <div className="bg-[#FFF9E6] -mx-6 px-6 pt-4 pb-10 rounded-b-[3rem] mb-8 relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-40 h-40 bg-[#F9DC5C] rounded-full opacity-20 blur-3xl translate-x-1/2 -translate-y-1/2"></div>
           <div className="flex items-center gap-3 mb-4 relative z-10">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#7B8E76] shadow-sm -rotate-6"><FileText className="w-6 h-6" /></div>
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#D4AF37] shadow-sm -rotate-6"><FileText className="w-6 h-6" /></div>
             <div>
               <h2 className="text-2xl font-black text-[#5A4C4C]">記事・コラム</h2>
-              <p className="text-[10px] text-[#A5A19E] font-bold mt-1 tracking-widest">CHILDCARE GUIDES &amp; TIPS</p>
+              <p className="text-[10px] text-[#B8860B] font-bold mt-1 tracking-widest">CHILDCARE GUIDES &amp; TIPS</p>
             </div>
           </div>
           <p className="text-xs text-[#8E8282] font-bold leading-relaxed relative z-10">育児の悩みに役立つ比較ガイドやチェックリストをお届けします。</p>
@@ -2873,8 +2873,8 @@ ${userText}
                 href={`/article/${a.slug}`}
                 className="flex items-center gap-4 bg-white border border-[#F4EFEB] rounded-[1.75rem] p-5 shadow-sm active:scale-[0.98] transition-transform"
               >
-                <div className="w-12 h-12 bg-[#EBF0EA] rounded-2xl flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-6 h-6 text-[#7B8E76]" />
+                <div className="w-12 h-12 bg-[#FFF9E6] rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-6 h-6 text-[#D4AF37]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-black text-[#5A4C4C] leading-snug truncate">{a.title}</h3>
