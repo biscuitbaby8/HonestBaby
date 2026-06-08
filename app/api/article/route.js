@@ -134,21 +134,21 @@ export async function GET(request) {
 <link rel="canonical" href="https://honestbaby-care.com/article/${escapeHtml(slug)}">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#FFF5E4;color:#1A1A2E;font-family:'Noto Sans JP','Hiragino Sans',sans-serif;line-height:1.8;-webkit-font-smoothing:antialiased}
-header{background:#fff;border-bottom:2px solid #FF6B6B;padding:1rem 1.5rem;display:flex;align-items:center;gap:1rem}
-header a{color:#FF6B6B;text-decoration:none;font-weight:900;font-size:1.1rem;letter-spacing:-0.02em}
+body{background:#FFFDFB;color:#5A4C4C;font-family:'Noto Sans JP','Hiragino Sans',sans-serif;line-height:1.8;-webkit-font-smoothing:antialiased}
+header{background:#fff;border-bottom:2px solid #F2ABAC;padding:1rem 1.5rem;display:flex;align-items:center;gap:1rem}
+header a{color:#7B8E76;text-decoration:none;font-weight:900;font-size:1.1rem;letter-spacing:-0.02em}
 .breadcrumb{font-size:0.7rem;color:#A5A19E;margin-top:0.25rem}
 main{max-width:720px;margin:0 auto;padding:2rem 1.5rem 4rem}
-h1{font-size:1.6rem;font-weight:900;color:#1A1A2E;margin:0 0 1rem;line-height:1.3}
-h2{font-size:1.25rem;font-weight:900;color:#1A1A2E;margin:2rem 0 0.75rem;padding-bottom:0.4rem;border-bottom:2px solid #FF6B6B}
-h3{font-size:1rem;font-weight:700;color:#1A1A2E;margin:1.5rem 0 0.5rem}
-p{margin:0.75rem 0;font-size:0.95rem;color:#3A3A3A}
+h1{font-size:1.6rem;font-weight:900;color:#5A4C4C;margin:0 0 1rem;line-height:1.3}
+h2{font-size:1.25rem;font-weight:900;color:#5A4C4C;margin:2rem 0 0.75rem;padding-bottom:0.4rem;border-bottom:2px solid #F2ABAC}
+h3{font-size:1rem;font-weight:700;color:#5A4C4C;margin:1.5rem 0 0.5rem}
+p{margin:0.75rem 0;font-size:0.95rem;color:#5A4C4C}
 ul{margin:0.75rem 0 0.75rem 1.5rem}
-li{margin:0.4rem 0;font-size:0.95rem;color:#3A3A3A}
-strong{font-weight:700;color:#1A1A2E}
+li{margin:0.4rem 0;font-size:0.95rem;color:#5A4C4C}
+strong{font-weight:700;color:#5A4C4C}
 code{background:#F4EFEB;padding:0.1em 0.4em;border-radius:4px;font-size:0.85em;font-family:monospace}
 hr{border:none;border-top:1px solid #F4EFEB;margin:2rem 0}
-.cta{background:#FF6B6B;color:#fff;display:block;text-align:center;padding:1.2rem 2rem;border-radius:2rem;text-decoration:none;font-weight:900;font-size:1rem;margin:3rem 0 1rem;box-shadow:0 4px 12px rgba(255,107,107,0.3);transition:transform 0.15s}
+.cta{background:#F2ABAC;color:#fff;display:block;text-align:center;padding:1.2rem 2rem;border-radius:2rem;text-decoration:none;font-weight:900;font-size:1rem;margin:3rem 0 1rem;box-shadow:0 4px 12px rgba(242,171,172,0.35);transition:transform 0.15s}
 .cta:hover{transform:scale(1.02)}
 footer{text-align:center;padding:2rem;font-size:0.75rem;color:#A5A19E;border-top:1px solid #F4EFEB}
 </style>
