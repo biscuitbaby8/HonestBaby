@@ -12,9 +12,41 @@ function markdownToHtml(md) {
   const lines = md.split('\n');
   const out = [];
   let inList = false;
+  let tableLines = [];
+
+  function flushTable() {
+    if (tableLines.length < 2) {
+      tableLines.forEach(l => out.push(`<p>${inlineFormat(l)}</p>`));
+      tableLines = [];
+      return;
+    }
+    const parseRow = (line) =>
+      line.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+    const headers = parseRow(tableLines[0]);
+    const rows = tableLines.slice(2).map(parseRow);
+    let html = '<table><thead><tr>';
+    headers.forEach(h => { html += `<th>${inlineFormat(h)}</th>`; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(row => {
+      html += '<tr>';
+      row.forEach(cell => { html += `<td>${inlineFormat(cell)}</td>`; });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    out.push(html);
+    tableLines = [];
+  }
 
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
+
+    // table row
+    if (/^\|.+\|$/.test(line.trim())) {
+      if (inList) { out.push('</ul>'); inList = false; }
+      tableLines.push(line.trim());
+      continue;
+    }
+    if (tableLines.length) flushTable();
 
     // headings
     if (/^### /.test(line)) {
@@ -57,6 +89,7 @@ function markdownToHtml(md) {
     out.push(`<p>${inlineFormat(line)}</p>`);
   }
 
+  if (tableLines.length) flushTable();
   if (inList) out.push('</ul>');
   return out.join('\n');
 }
@@ -66,7 +99,7 @@ function inlineFormat(text) {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code>$1</code>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" style="color:#FF6B6B;font-weight:700;text-decoration:underline;" target="_blank" rel="noopener">$1</a>');
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" style="color:#F2ABAC;font-weight:700;text-decoration:underline;" target="_blank" rel="noopener">$1</a>');
 }
 
 function notFoundHtml() {
@@ -148,6 +181,10 @@ li{margin:0.4rem 0;font-size:0.95rem;color:#5A4C4C}
 strong{font-weight:700;color:#5A4C4C}
 code{background:#F4EFEB;padding:0.1em 0.4em;border-radius:4px;font-size:0.85em;font-family:monospace}
 hr{border:none;border-top:1px solid #F4EFEB;margin:2rem 0}
+table{width:100%;border-collapse:collapse;margin:1.25rem 0;font-size:0.9rem}
+th{background:#F4EFEB;color:#5A4C4C;font-weight:900;padding:0.65rem 0.875rem;text-align:left;border-bottom:2px solid #F2ABAC}
+td{padding:0.65rem 0.875rem;border-bottom:1px solid #F4EFEB;color:#5A4C4C;vertical-align:top}
+tr:last-child td{border-bottom:none}
 .cta{background:#F2ABAC;color:#fff;display:block;text-align:center;padding:1.2rem 2rem;border-radius:2rem;text-decoration:none;font-weight:900;font-size:1rem;margin:3rem 0 1rem;box-shadow:0 4px 12px rgba(242,171,172,0.35);transition:transform 0.15s}
 .cta:hover{transform:scale(1.02)}
 footer{text-align:center;padding:2rem;font-size:0.75rem;color:#A5A19E;border-top:1px solid #F4EFEB}
