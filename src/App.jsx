@@ -445,6 +445,8 @@ const App = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [giftBudgetFilter, setGiftBudgetFilter] = useState("すべて");
   const [giftSceneFilter, setGiftSceneFilter] = useState("すべて");
+  const [giftTypeFilter, setGiftTypeFilter] = useState("すべて");
+  const [giftApiCache, setGiftApiCache] = useState({});
 
   // 管理モード: URLに ?admin=1 が付いているか、セッション中に有効化した場合はON
   const isAdminMode = (() => {
@@ -1326,40 +1328,86 @@ const App = () => {
     fetchCross();
   }, [selectedProduct?.id]);
 
-  // ギフトタブ: DBから取得してフィルタ（クロンが毎朝更新）
-  const sceneKeywords = {
-    '出産祝い': ['出産祝い', 'ギフト', 'プレゼント'],
-    'ハーフバースデー': ['ハーフバースデー', '6ヶ月', '半年'],
-    '友人へ': ['おしゃれ', 'かわいい', 'おしゃれ'],
-    '同僚へ': ['実用', 'セット', '消耗品'],
-    '家族・親戚から': ['セット', '豪華', 'まとめ'],
+  // ギフトタブ: カテゴリ×シーン×予算でAPIリアルタイム取得 + DBを合算
+  const GIFT_TYPES = [
+    { label: 'すべて',         query: '出産祝い ギフトセット ベビー' },
+    { label: 'ロンパース・服', query: '出産祝い ロンパース ベビー服 セット' },
+    { label: 'おもちゃ',      query: '出産祝い おもちゃ 知育 ガラガラ ベビー' },
+    { label: 'スキンケア',    query: '出産祝い ベビー スキンケア ケアセット ソープ' },
+    { label: 'タオル・スタイ', query: '出産祝い タオル スタイ ベビー セット' },
+    { label: '食器・哺乳瓶',  query: '出産祝い 食器セット 哺乳瓶 マグ ベビー' },
+    { label: 'ブランドギフト', query: '出産祝い ファミリア ミキハウス ブランド ギフト' },
+  ];
+  const GIFT_SCENE_QUERIES = {
+    '出産祝い':      '出産祝い',
+    'ハーフバースデー': 'ハーフバースデー 6ヶ月',
+    '1歳のお祝い':   '1歳 誕生日 お祝い',
+    '男の子向け':    '男の子 ベビー ギフト',
+    '女の子向け':    '女の子 ベビー ギフト',
+    '双子・ふたご':  '双子 セット ギフト',
   };
+  const GIFT_BUDGETS = [
+    { label: 'すべて',         range: null },
+    { label: '〜3,000円',     range: [0, 2999] },
+    { label: '3,000〜5,000円', range: [3000, 4999] },
+    { label: '5,000〜10,000円', range: [5000, 9999] },
+    { label: '10,000円以上',   range: [10000, Infinity] },
+  ];
 
   useEffect(() => {
     if (activeTab !== 'gift') return;
-    const base = dbProducts.filter(p => p.category === 'ギフトセット');
+    const typeObj = GIFT_TYPES.find(t => t.label === giftTypeFilter) || GIFT_TYPES[0];
+    const sceneQ = GIFT_SCENE_QUERIES[giftSceneFilter] || '';
+    const budgetObj = GIFT_BUDGETS.find(b => b.label === giftBudgetFilter) || GIFT_BUDGETS[0];
+    const cacheKey = `${giftTypeFilter}|${giftSceneFilter}|${giftBudgetFilter}`;
 
-    const priceRanges = {
-      '3000円〜': [3000, 4999],
-      '5000円〜': [5000, 9999],
-      '10000円〜': [10000, Infinity],
+    if (giftApiCache[cacheKey]) {
+      setGiftProducts(giftApiCache[cacheKey]);
+      return;
+    }
+
+    const fetchGifts = async () => {
+      setIsGiftLoading(true);
+      try {
+        const query = [typeObj.query, sceneQ].filter(Boolean).join(' ');
+        const res = await fetch(`/api/rakuten?query=${encodeURIComponent(query)}&noFilter=1`);
+        const data = res.ok ? await res.json() : { products: [] };
+        const apiItems = (data.products || [])
+          .map(item => ({
+            id: `gift-api-${item.id}`,
+            name: cleanName(item.name),
+            price: item.price,
+            image: item.image,
+            category: 'ギフトセット',
+            shops: [{ name: '楽天市場', lowestPrice: item.price, url: item.url, sellers: [{ name: item.brand || '楽天市場', price: item.price, url: item.url, shipping: 0, points: 0 }] }],
+            rating: item.rating || 4.0,
+          }))
+          .filter(validateProduct);
+
+        // DB商品とマージ（同名重複排除）
+        const dbBase = dbProducts.filter(p => p.category === 'ギフトセット');
+        const nameSet = new Set(apiItems.map(p => p.name.slice(0, 15)));
+        const merged = [...apiItems, ...dbBase.filter(p => !nameSet.has(p.name.slice(0, 15)))];
+
+        // 予算フィルタ
+        const filtered = merged.filter(p => {
+          const price = getLowestPrice(p.shops) || p.price || 0;
+          if (!budgetObj.range) return true;
+          return price >= budgetObj.range[0] && price <= budgetObj.range[1];
+        });
+
+        setGiftProducts(filtered);
+        setGiftApiCache(prev => ({ ...prev, [cacheKey]: filtered }));
+      } catch (e) {
+        console.error('Gift fetch failed:', e);
+        const base = dbProducts.filter(p => p.category === 'ギフトセット');
+        setGiftProducts(base);
+      } finally {
+        setIsGiftLoading(false);
+      }
     };
-    const range = priceRanges[giftBudgetFilter];
-    const kws = sceneKeywords[giftSceneFilter];
-
-    const filtered = base.filter(p => {
-      const price = getLowestPrice(p.shops) || p.price || 0;
-      if (range && (price < range[0] || price > range[1])) return false;
-      if (kws && !kws.some(kw => p.name.includes(kw))) return false;
-      return true;
-    });
-
-    setGiftProducts(filtered.length > 0 ? filtered : base.filter(p => {
-      const price = getLowestPrice(p.shops) || p.price || 0;
-      if (range && (price < range[0] || price > range[1])) return false;
-      return true;
-    }));
-  }, [activeTab, giftBudgetFilter, giftSceneFilter, dbProducts]);
+    fetchGifts();
+  }, [activeTab, giftTypeFilter, giftSceneFilter, giftBudgetFilter, dbProducts]);
 
   useEffect(() => {
     if (!window.visualViewport) return;
@@ -2946,8 +2994,12 @@ ${userText}
   };
 
   const renderGift = () => {
+    const giftTypeLabels = GIFT_TYPES.map(t => t.label);
+    const giftSceneLabels = ['すべて', '出産祝い', 'ハーフバースデー', '1歳のお祝い', '男の子向け', '女の子向け', '双子・ふたご'];
+    const giftBudgetLabels = GIFT_BUDGETS.map(b => b.label);
     return (
       <div className="animate-in slide-in-from-right duration-300">
+        {/* ヘッダー */}
         <div className="bg-[#FFF9F0] -mx-6 px-6 pt-4 pb-10 rounded-b-[3rem] mb-8 relative overflow-hidden">
           <div className="absolute right-0 top-0 w-40 h-40 bg-[#F9DC5C] rounded-full opacity-20 blur-3xl translate-x-1/2 -translate-y-1/2"></div>
           <div className="flex items-center gap-3 mb-4 relative z-10">
@@ -2957,27 +3009,52 @@ ${userText}
               <p className="text-[10px] text-[#A5A19E] font-bold mt-1 tracking-widest">FOR SPECIAL SOMEONE</p>
             </div>
           </div>
-          <p className="text-xs text-[#8E8282] font-bold leading-relaxed relative z-10">絶対喜ばれるベビーアイテムを厳選。<br />ギフト対応の公式ショップも比較できます。</p>
+          <p className="text-xs text-[#8E8282] font-bold leading-relaxed relative z-10">絶対喜ばれるベビーアイテムを厳選。<br />ブランド公式ギフトセットも比較できます。</p>
         </div>
 
-        <h3 className="font-black text-[#5A4C4C] mb-4 px-1">予算から探す</h3>
-        <div className="flex flex-wrap gap-2 mb-8">
-          {["すべて", "3000円〜", "5000円〜", "10000円〜"].map(tag => (
-            <button key={tag} onClick={() => setGiftBudgetFilter(tag)} className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all ${giftBudgetFilter === tag ? 'bg-[#F2ABAC] text-white shadow-sm' : 'bg-white border border-[#F4EFEB] text-[#A5A19E]'}`}>{tag}</button>
+        {/* カテゴリで絞り込み */}
+        <h3 className="font-black text-[#5A4C4C] mb-3 px-1 text-sm">カテゴリ</h3>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-6 px-6 pb-1 mb-6">
+          {giftTypeLabels.map(tag => (
+            <button key={tag} onClick={() => { setGiftTypeFilter(tag); setGiftApiCache({}); }}
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${giftTypeFilter === tag ? 'bg-[#F2ABAC] text-white shadow-sm' : 'bg-white border border-[#F4EFEB] text-[#8E8282]'}`}>
+              {tag}
+            </button>
           ))}
         </div>
 
-        <h3 className="font-black text-[#5A4C4C] mb-4 px-1">シーン・贈る相手から探す</h3>
-        <div className="flex flex-wrap gap-2 mb-8">
-          {["すべて", "出産祝い", "ハーフバースデー", "友人へ", "同僚へ", "家族・親戚から"].map(tag => (
-            <button key={tag} onClick={() => setGiftSceneFilter(tag)} className={`px-4 py-2 rounded-xl text-[11px] font-bold transition-all ${giftSceneFilter === tag ? 'bg-[#7B8E76] text-white shadow-sm' : 'bg-[#F9F6F3] text-[#8E8282]'}`}>{tag}</button>
+        {/* シーン・贈る相手 */}
+        <h3 className="font-black text-[#5A4C4C] mb-3 px-1 text-sm">シーン・贈る相手</h3>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-6 px-6 pb-1 mb-6">
+          {giftSceneLabels.map(tag => (
+            <button key={tag} onClick={() => { setGiftSceneFilter(tag); setGiftApiCache({}); }}
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${giftSceneFilter === tag ? 'bg-[#7B8E76] text-white shadow-sm' : 'bg-white border border-[#F4EFEB] text-[#8E8282]'}`}>
+              {tag}
+            </button>
           ))}
         </div>
 
-        <div className="flex items-center justify-between mb-5 px-1"><h3 className="font-black text-[#5A4C4C] text-xl">おすすめのギフト</h3></div>
+        {/* 予算 */}
+        <h3 className="font-black text-[#5A4C4C] mb-3 px-1 text-sm">予算</h3>
+        <div className="flex flex-wrap gap-2 mb-8">
+          {giftBudgetLabels.map(tag => (
+            <button key={tag} onClick={() => setGiftBudgetFilter(tag)}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${giftBudgetFilter === tag ? 'bg-[#5A4C4C] text-white shadow-sm' : 'bg-white border border-[#F4EFEB] text-[#8E8282]'}`}>
+              {tag}
+            </button>
+          ))}
+        </div>
+
+        {/* 商品グリッド */}
+        <div className="flex items-center justify-between mb-4 px-1">
+          <h3 className="font-black text-[#5A4C4C] text-lg">
+            {giftTypeFilter !== 'すべて' ? giftTypeFilter : 'おすすめのギフト'}
+          </h3>
+          {giftProducts.length > 0 && <span className="text-[10px] text-[#A5A19E] font-bold">{giftProducts.length}件</span>}
+        </div>
         <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4 xl:grid-cols-5">
-          {dbLoading
-            ? <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold animate-pulse">ギフト商品を読み込み中...</div>
+          {isGiftLoading
+            ? <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold animate-pulse">ギフト商品を検索中...</div>
             : giftProducts.length > 0
               ? giftProducts.map((p, i) => <ProductCard key={p.id || i} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />)
               : <div className="col-span-2 py-10 text-center text-[#A5A19E] text-xs font-bold">条件に合うギフトが見つかりません</div>}
