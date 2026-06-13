@@ -479,6 +479,8 @@ const App = () => {
   const [productSearchResults, setProductSearchResults] = useState([]);
   const [productSearchLoading, setProductSearchLoading] = useState(false);
   const contentTextareaRef = useRef(null);
+  const productSearchDebounceRef = useRef(null);
+  const productSearchReqRef = useRef(0);
 
   // User Data States
   const [favorites, setFavorites] = useState(() => {
@@ -2192,17 +2194,23 @@ ${userText}
   };
 
   // --- 記事エディタ商品検索 ---
-  const searchProductsForArticle = async (q) => {
-    if (!q.trim()) { setProductSearchResults([]); return; }
+  const searchProductsForArticle = (q) => {
+    setProductSearchQuery(q);
+    clearTimeout(productSearchDebounceRef.current);
+    if (!q.trim()) { setProductSearchResults([]); setProductSearchLoading(false); return; }
     setProductSearchLoading(true);
-    const { data } = await supabase
-      .from('products')
-      .select('id, name, category')
-      .ilike('name', `%${q}%`)
-      .eq('is_blocked', false)
-      .limit(8);
-    setProductSearchResults(data || []);
-    setProductSearchLoading(false);
+    const reqId = ++productSearchReqRef.current;
+    productSearchDebounceRef.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, category')
+        .ilike('name', `%${q}%`)
+        .eq('is_blocked', false)
+        .limit(8);
+      if (reqId !== productSearchReqRef.current) return;
+      setProductSearchResults(data || []);
+      setProductSearchLoading(false);
+    }, 300);
   };
 
   const insertProductLink = (product) => {
@@ -3577,7 +3585,7 @@ ${userText}
                         <Search className="w-3.5 h-3.5 text-[#A5A19E] flex-shrink-0" />
                         <input
                           value={productSearchQuery}
-                          onChange={e => { setProductSearchQuery(e.target.value); searchProductsForArticle(e.target.value); }}
+                          onChange={e => searchProductsForArticle(e.target.value)}
                           placeholder="商品を検索してリンクを挿入..."
                           className="flex-1 bg-transparent text-xs focus:outline-none text-[#5A4C4C] placeholder-[#C0B8B2]"
                         />
