@@ -39,6 +39,17 @@ export async function POST(request) {
       return Response.json({ articles: data }, { status: 200, headers: CORS });
     }
 
+    if (action === 'get') {
+      const { id } = params;
+      const { data, error } = await supabase
+        .from('articles')
+        .select('id, slug, title, meta_description, content, published')
+        .eq('id', id)
+        .single();
+      if (error) throw error;
+      return Response.json({ article: data }, { status: 200, headers: CORS });
+    }
+
     if (action === 'save') {
       const { slug, title, meta_description, content, published } = params;
       if (!slug || !title || !content) {
