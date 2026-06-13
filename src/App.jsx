@@ -2288,6 +2288,23 @@ ${userText}
     }
   };
 
+  const handleArticleEdit = async (a) => {
+    try {
+      const res = await articleAdminCall('get', { id: a.id });
+      const full = res.article;
+      setArticleForm({
+        slug: full.slug || '',
+        title: full.title || '',
+        meta_description: full.meta_description || '',
+        content: full.content || '',
+        published: full.published ?? true,
+      });
+      setArticleAdminView('edit');
+    } catch (e) {
+      alert('記事の読み込みに失敗しました: ' + e.message);
+    }
+  };
+
   // --- 新機能: レビュー投稿ハンドラ ---
   const submitReview = async () => {
     if (!reviewForm.content.trim() || !selectedProduct) return;
@@ -3513,9 +3530,13 @@ ${userText}
                         </div>
                         <div className="flex gap-2">
                           <button
+                            onClick={() => handleArticleEdit(a)}
+                            className="flex-1 py-2 text-[11px] font-black border-2 border-[#7B8E76] rounded-xl text-[#7B8E76] active:scale-95 transition-transform"
+                          >編集</button>
+                          <button
                             onClick={() => handleArticleToggle(a.id, !a.published)}
-                            className="flex-1 py-2 text-[11px] font-black border border-[#F4EFEB] rounded-xl text-[#7B8E76] active:scale-95 transition-transform"
-                          >{a.published ? '非公開にする' : '公開する'}</button>
+                            className="flex-1 py-2 text-[11px] font-black border border-[#F4EFEB] rounded-xl text-[#A5A19E] active:scale-95 transition-transform"
+                          >{a.published ? '非公開' : '公開する'}</button>
                           <button
                             onClick={() => handleArticleDelete(a.id)}
                             className="px-4 py-2 text-[11px] font-black border border-[#FFEBEB] rounded-xl text-[#F2ABAC] active:scale-95 transition-transform"
