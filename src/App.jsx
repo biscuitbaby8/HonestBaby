@@ -64,7 +64,7 @@ const CATEGORY_TREE = [
   { name: "トイレ用品", id: "200819", keyword: "おまる", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
   { name: "車用品", id: "566088", keyword: "チャイルドシート", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ", "周辺グッズ"] },
   { name: "マタニティ", id: "553946", keyword: "マタニティ", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
-  { name: "ギフトセット", id: "205222", keyword: "出産祝い ギフト", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
+  { name: "ギフトセット", id: "205222", keyword: "出産祝い ギフト", subs: ["ロンパース・服", "おもちゃ", "スキンケア", "タオル・スタイ", "食器・哺乳瓶", "ブランドギフト"] }
 ];
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
@@ -2182,7 +2182,10 @@ ${userText}
         if (blocklist.has(code)) return false;
         // ギフトセットはギフトページ専用。「すべて」ホームには表示しない
         if (selectedCategory === "すべて" && p.category === "ギフトセット") return false;
-        const matchCat = selectedCategory === "すべて" || p.category === selectedCategory;
+        // ゴミ箱・袋はDBではカテゴリ"ゴミ箱・袋"で保存されるが、UIではおむつのサブカテゴリとして扱う
+        const matchCat = selectedCategory === "すべて"
+          || p.category === selectedCategory
+          || (selectedCategory === "おむつ" && p.category === "ゴミ箱・袋");
         const matchSub = selectedSubCategory === "すべて" || p.subCategory === selectedSubCategory;
         const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
         return matchCat && matchSub && matchSubSub;
