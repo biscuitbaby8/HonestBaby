@@ -128,7 +128,7 @@ export async function GET(request) {
       }
       return Response.json({ articles: data || [] }, {
         status: 200,
-        headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=3600' },
+        headers: { 'Cache-Control': 'no-store' },
       });
     }
     return new Response(null, { status: 302, headers: { Location: '/' } });

@@ -804,15 +804,14 @@ const App = () => {
   // 公開記事一覧（記事タブ・ホーム導線カード用）
   // articlesテーブルはservice roleのみ読み取り可（RLS）のため、SSR用APIのlistモードを利用
   const [publishedArticles, setPublishedArticles] = useState([]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/article?list=1');
-        const json = await res.json();
-        if (Array.isArray(json.articles)) setPublishedArticles(json.articles);
-      } catch { /* ignore */ }
-    })();
-  }, []);
+  const refreshPublishedArticles = async () => {
+    try {
+      const res = await fetch(`/api/article?list=1&t=${Date.now()}`);
+      const json = await res.json();
+      if (Array.isArray(json.articles)) setPublishedArticles(json.articles);
+    } catch { /* ignore */ }
+  };
+  useEffect(() => { refreshPublishedArticles(); }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -2270,6 +2269,7 @@ ${userText}
       setArticleList(data.articles || []);
       setArticleAdminView('list');
       setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true });
+      if (published) refreshPublishedArticles();
     } catch (e) {
       alert(e.message);
     } finally {
@@ -2281,6 +2281,7 @@ ${userText}
     try {
       await articleAdminCall('toggle', { id, published });
       setArticleList(prev => prev.map(a => a.id === id ? { ...a, published } : a));
+      refreshPublishedArticles();
     } catch (e) {
       alert(e.message);
     }
