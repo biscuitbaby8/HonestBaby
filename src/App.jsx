@@ -474,6 +474,11 @@ const App = () => {
   const [articleAdminView, setArticleAdminView] = useState('list'); // 'list' | 'edit'
   const [articleForm, setArticleForm] = useState({ slug: '', title: '', meta_description: '', content: '', published: true });
   const [articleSaving, setArticleSaving] = useState(false);
+  // 記事エディタ内商品検索
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [productSearchResults, setProductSearchResults] = useState([]);
+  const [productSearchLoading, setProductSearchLoading] = useState(false);
+  const contentTextareaRef = useRef(null);
 
   // User Data States
   const [favorites, setFavorites] = useState(() => {
@@ -2186,6 +2191,38 @@ ${userText}
     }
   };
 
+  // --- 記事エディタ商品検索 ---
+  const searchProductsForArticle = async (q) => {
+    if (!q.trim()) { setProductSearchResults([]); return; }
+    setProductSearchLoading(true);
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, category')
+      .ilike('name', `%${q}%`)
+      .eq('is_blocked', false)
+      .limit(8);
+    setProductSearchResults(data || []);
+    setProductSearchLoading(false);
+  };
+
+  const insertProductLink = (product) => {
+    const link = `[${product.name}](/product/${product.id})`;
+    const el = contentTextareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const current = articleForm.content;
+    const next = current.slice(0, start) + link + current.slice(end);
+    setArticleForm(prev => ({ ...prev, content: next }));
+    setProductSearchQuery('');
+    setProductSearchResults([]);
+    setTimeout(() => {
+      el.focus();
+      const pos = start + link.length;
+      el.setSelectionRange(pos, pos);
+    }, 0);
+  };
+
   // --- 記事管理ハンドラ ---
   const articleAdminCall = async (action, params = {}) => {
     const res = await fetch('/api/admin-article', {
@@ -3513,7 +3550,36 @@ ${userText}
                   ))}
                   <div>
                     <label className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-1 block">本文（Markdown）</label>
+                    {/* 商品リンク挿入 */}
+                    <div className="relative mb-2">
+                      <div className="flex items-center gap-2 bg-[#F9F6F3] border border-[#F4EFEB] rounded-2xl px-3 py-2">
+                        <Search className="w-3.5 h-3.5 text-[#A5A19E] flex-shrink-0" />
+                        <input
+                          value={productSearchQuery}
+                          onChange={e => { setProductSearchQuery(e.target.value); searchProductsForArticle(e.target.value); }}
+                          placeholder="商品を検索してリンクを挿入..."
+                          className="flex-1 bg-transparent text-xs focus:outline-none text-[#5A4C4C] placeholder-[#C0B8B2]"
+                        />
+                        {productSearchLoading && <span className="text-[10px] text-[#A5A19E]">検索中...</span>}
+                      </div>
+                      {productSearchResults.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-10 bg-white border border-[#F4EFEB] rounded-2xl shadow-lg mt-1 overflow-hidden max-h-52 overflow-y-auto">
+                          {productSearchResults.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => insertProductLink(p)}
+                              className="w-full text-left px-4 py-2.5 hover:bg-[#F9F6F3] flex items-center justify-between gap-2 border-b border-[#F4EFEB] last:border-0"
+                            >
+                              <span className="text-xs font-bold text-[#5A4C4C] line-clamp-1">{p.name}</span>
+                              <span className="text-[10px] text-[#A5A19E] flex-shrink-0">{p.category}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <textarea
+                      ref={contentTextareaRef}
                       value={articleForm.content}
                       onChange={e => setArticleForm(prev => ({ ...prev, content: e.target.value }))}
                       placeholder="## 見出し&#10;&#10;本文をMarkdownで入力..."
