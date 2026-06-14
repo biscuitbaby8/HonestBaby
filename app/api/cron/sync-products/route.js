@@ -857,6 +857,40 @@ async function syncGiftSubCategories(log) {
 }
 
 // --- Vercel Cron エンドポイント ---
+async function backfillSubCategories(log) {
+  let offset = 0;
+  const batchSize = 500;
+  let totalUpdated = 0;
+
+  while (true) {
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('id, category, name')
+      .range(offset, offset + batchSize - 1);
+
+    if (error || !products || products.length === 0) break;
+
+    const updates = products.map(p => ({
+      id: p.id,
+      sub_category: extractSubCategory(p.category, p.name),
+    }));
+
+    const { error: upsertError } = await supabase
+      .from('products')
+      .upsert(updates, { onConflict: 'id' });
+
+    if (upsertError) log.push(`⚠️ backfill upsert error at offset ${offset}: ${upsertError.message}`);
+
+    totalUpdated += products.length;
+    log.push(`📝 backfill: ${totalUpdated}件処理済み`);
+    if (products.length < batchSize) break;
+    offset += batchSize;
+  }
+
+  log.push(`✅ backfill完了: 合計${totalUpdated}件`);
+  return totalUpdated;
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
 
@@ -873,6 +907,14 @@ export async function GET(request) {
   }
 
   const log = [];
+
+  // 一括バックフィル（?backfill=1）: 全商品のsub_categoryを再計算・更新
+  if (searchParams.get('backfill') === '1') {
+    log.push(`🔄 sub_category バックフィル開始: ${new Date().toISOString()}`);
+    const count = await backfillSubCategories(log);
+    return Response.json({ ok: true, backfilled: count, log });
+  }
+
   log.push(`🚀 同期開始: ${new Date().toISOString()}`);
 
   let totalSaved = 0;
