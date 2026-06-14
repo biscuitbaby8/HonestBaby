@@ -2212,12 +2212,16 @@ ${userText}
   const searchProductsForArticle = async (q) => {
     if (!q.trim()) { setProductSearchResults([]); return; }
     setProductSearchLoading(true);
-    const { data } = await supabase
+    const keywords = q.trim().split(/\s+/).filter(Boolean);
+    let query = supabase
       .from('products')
       .select('id, name, category')
-      .ilike('name', `%${q}%`)
       .neq('is_blocked', true)
       .limit(8);
+    for (const kw of keywords) {
+      query = query.ilike('name', `%${kw}%`);
+    }
+    const { data } = await query;
     setProductSearchResults(data || []);
     setProductSearchLoading(false);
   };
