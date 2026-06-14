@@ -165,16 +165,34 @@ function parseDiaperCount(name) {
   return m ? parseInt(m[1]) : null;
 }
 
-// サブカテゴリ推定ロジック
+// サブカテゴリ推定ロジック（全カテゴリ対応）
 function extractSubCategory(category, itemName) {
   const rules = {
     "おむつ": [
+      { match: /夜用|よる用|夜間/, sub: "夜用おむつ" },
+      { match: /ゴミ箱|ごみ箱|防臭袋|防臭ポット|おむつポット|サニタリー/, sub: "ゴミ箱・袋" },
+      { match: /おしりふき|おしり拭き/, sub: "おしりふき" },
       { match: /パンツ/, sub: "パンツタイプ" },
       { match: /テープ/, sub: "テープタイプ" },
-      { match: /おしりふき/, sub: "おしりふき" },
+    ],
+    // ゴミ箱・袋はDBではカテゴリ"ゴミ箱・袋"で保存されるため全件にsub付与
+    "ゴミ箱・袋": [
+      { match: /[\s\S]*/, sub: "ゴミ箱・袋" },
+    ],
+    "おもちゃ": [
+      // 月齢表記を優先
+      { match: /0[ヶヵか]月|新生児/, sub: "0ヶ月〜" },
+      { match: /3[ヶヵか]月/, sub: "3ヶ月〜" },
+      { match: /6[ヶヵか]月|ハーフバースデー/, sub: "6ヶ月〜" },
+      { match: /1歳|一歳|12[ヶヵか]月/, sub: "1歳〜" },
+      { match: /2歳|二歳|3歳|三歳|24[ヶヵか]月|36[ヶヵか]月/, sub: "1歳〜" },
+      // 月齢表記なし → 製品タイプで判定
+      { match: /メリー|ベッドメリー|モビール|ガラガラ|にぎにぎ/, sub: "0ヶ月〜" },
+      { match: /歯固め|フィンガーパペット/, sub: "3ヶ月〜" },
+      { match: /プレイマット|引き車|ソフトブロック|積み木|くもん/, sub: "6ヶ月〜" },
+      { match: /乗用|ままごと|パズル|型はめ|ブロックセット|シルバニア|木製玩具/, sub: "1歳〜" },
     ],
     "ベビーカー": [
-      // 周辺グッズを先に判定（本体より優先）
       { match: /レインカバー|雨カバー|防雨カバー/, sub: "周辺グッズ" },
       { match: /ドリンクホルダー|カップホルダー|スマホホルダー|スマートフォンホルダー/, sub: "周辺グッズ" },
       { match: /フットマフ|ハンドルカバー|バンパーバー|サンキャノピー|サンシェード/, sub: "周辺グッズ" },
@@ -186,25 +204,84 @@ function extractSubCategory(category, itemName) {
       { match: /バギー/, sub: "バギー" },
     ],
     "抱っこ紐": [
-      // 周辺グッズを先に判定
       { match: /よだれパッド|ケープ|抱っこ紐カバー|防寒カバー/, sub: "周辺グッズ" },
       { match: /スリング/, sub: "スリング" },
       { match: /ヒップシート/, sub: "ヒップシート" },
+      { match: /横抱き|フロントキャリー/, sub: "横抱き" },
+      { match: /縦抱き/, sub: "縦抱き" },
+    ],
+    "ウェア": [
+      { match: /スタイ|よだれかけ|ビブ/, sub: "スタイ" },
+      { match: /アウター|ジャケット|コート|ベスト|ジャンパー|ブルゾン|ポンチョ/, sub: "アウター" },
+      { match: /カバーオール|プレオール|つなぎ|オールインワン/, sub: "カバーオール" },
+      { match: /肌着|インナー|コンビ肌着|短肌着|ボディスーツ/, sub: "肌着" },
+      { match: /ロンパース/, sub: "ロンパース" },
+    ],
+    "ミルク・授乳": [
+      { match: /母乳パッド|ブレストパッド|乳パッド/, sub: "母乳パッド" },
+      { match: /搾乳器|搾乳機|さく乳/, sub: "搾乳器" },
+      { match: /授乳クッション|抱き枕/, sub: "授乳クッション" },
+      { match: /哺乳瓶|哺乳びん|乳首|ニプル|乳頭/, sub: "哺乳瓶" },
+      { match: /粉ミルク|液体ミルク|フォローアップ|育児用ミルク|調製粉乳/, sub: "ミルク" },
+    ],
+    "離乳食・食器": [
+      { match: /ベビーチェア|ハイチェア|バウンサー|ローチェア|バンボ/, sub: "ベビーチェア" },
+      { match: /スプーン|フォーク|ストローマグ|ストロー|マグカップ|コップ飲み/, sub: "スプーン" },
+      { match: /食器|お椀|ベビー皿|プレート|ランチプレート|お茶碗/, sub: "食器セット" },
+      { match: /ベビーフード|離乳食|レトルト|ベビー食品|おかゆ|フリーズドライ/, sub: "ベビーフード" },
+    ],
+    "寝具・ベッド": [
+      { match: /スリーパー|スリープバッグ|着る布団|寝袋/, sub: "スリーパー" },
+      { match: /まくら|枕|頭の形|頭型/, sub: "まくら" },
+      { match: /布団セット|ふとんセット|掛け布団|敷き布団|羽毛布団|肌布団/, sub: "ベビー布団" },
+      { match: /ベビーベッド|ミニベッド|ハーフベッド|ベビーベット|添い寝/, sub: "ベビーベッド" },
+    ],
+    "安全グッズ": [
+      { match: /ベビーモニター|見守りカメラ|モニタリングカメラ/, sub: "ベビーモニター" },
+      { match: /転倒防止|家具固定|転落防止|耐震|倒れ防止/, sub: "転倒防止" },
+      { match: /扉ロック|ドアロック|引き出しロック|キャビネットロック|チャイルドロック/, sub: "扉ロック" },
+      { match: /コーナーガード|コーナークッション|角クッション|テーブルクッション/, sub: "コーナーガード" },
+      { match: /ベビーゲート|ゲート|柵|フェンス|バリケード/, sub: "ベビーゲート" },
+    ],
+    "お風呂用品": [
+      { match: /保湿|ローション|クリーム|ベビーオイル|セラミド|乳液/, sub: "保湿クリーム" },
+      { match: /ソープ|石けん|シャンプー|ボディウォッシュ|全身洗浄|泡|ボディソープ/, sub: "ベビー用ソープ" },
+      { match: /ベビーバス|沐浴|バスネット|お風呂マット|バスチェア|温度計/, sub: "ベビーバス" },
+    ],
+    "トイレ用品": [
+      { match: /おしりふき|おしり拭き|ウェットティッシュ/, sub: "おしりふき" },
+      { match: /トイトレ|トイレトレーニング/, sub: "トイトレ" },
+      { match: /おまる|ポッティ/, sub: "おまる" },
+      { match: /補助便座|便座シート|トイレシート/, sub: "補助便座" },
     ],
     "車用品": [
-      // 周辺グッズを先に判定（本体より優先）
       { match: /シートプロテクター|座席保護|シート保護|保護シート|保護マット|チェアプロテクター/, sub: "周辺グッズ" },
       { match: /シートカバー|チェアカバー|座席カバー/, sub: "周辺グッズ" },
       { match: /ミラー|カーミラー|後部座席ミラー/, sub: "周辺グッズ" },
       { match: /サンシェード|日よけ|UVカット|車用遮光|車用日除け/, sub: "周辺グッズ" },
       { match: /シートベルトカバー|シートベルトパッド|ベルトパッド/, sub: "周辺グッズ" },
       { match: /ネックピロー|ヘッドサポート|ヘッドレスト/, sub: "周辺グッズ" },
-      { match: /収納|ポーチ|トレイ|バック|オーガナイザー/, sub: "周辺グッズ" },
-      // 本体を判定
+      { match: /収納|ポーチ|トレイ|オーガナイザー/, sub: "周辺グッズ" },
       { match: /ジュニアシート/, sub: "ジュニアシート" },
       { match: /新生児/, sub: "新生児用" },
       { match: /2way|2ウェイ|二way|コンバーチブル/, sub: "2wayタイプ" },
-    ]
+      { match: /1歳以上|1歳から|一歳以上|12[ヶヵか]月以上/, sub: "1歳以上" },
+    ],
+    "マタニティ": [
+      { match: /ノンカフェイン|カフェインゼロ|ハーブティー|麦茶|ルイボス|カモミール/, sub: "ノンカフェイン" },
+      { match: /葉酸|DHA|鉄分|サプリ|マルチビタミン/, sub: "葉酸サプリ" },
+      { match: /授乳ブラ|授乳インナー|マタニティブラ|授乳キャミ/, sub: "授乳ブラ" },
+      { match: /腹帯|マタニティベルト|骨盤ベルト|サポートベルト|腹巻/, sub: "腹帯" },
+      { match: /マタニティウェア|マタニティ服|マタニティパンツ|マタニティワンピース|授乳服|マタニティジーンズ/, sub: "マタニティウェア" },
+    ],
+    "ギフトセット": [
+      { match: /ロンパース|カバーオール|ベビー服|ベビーウェア|肌着|ボディスーツ|コンビ肌着|短肌着/, sub: "ロンパース・服" },
+      { match: /おもちゃ|知育玩具|ガラガラ|メリー|にぎにぎ|フィジェット|積み木|パペット|ぬいぐるみ/, sub: "おもちゃ" },
+      { match: /スキンケア|ローション|クリーム|石けん|ソープ|シャンプー|保湿|ケアセット|ベビーオイル|全身|ボディウォッシュ/, sub: "スキンケア" },
+      { match: /タオル|スタイ|よだれかけ|ガーゼ|ハンカチ|フェイスタオル|バスタオル|おくるみ/, sub: "タオル・スタイ" },
+      { match: /食器|哺乳瓶|マグ|スプーン|フォーク|お食い初め|離乳食セット|ストローカップ|コップ/, sub: "食器・哺乳瓶" },
+      { match: /ミキハウス|ファミリア|ラルフローレン|バーバリー|ブランド|プチバトー|アナスイ|セレモニー/, sub: "ブランドギフト" },
+    ],
   };
 
   const catRules = rules[category];
@@ -213,7 +290,8 @@ function extractSubCategory(category, itemName) {
       if (r.match.test(itemName)) return r.sub;
     }
   }
-  return "本体"; // デフォルト
+  if (category === 'ギフトセット') return 'ギフトセット総合';
+  return '本体';
 }
 
 // --- 楽天API呼び出し（リトライ付き） ---
@@ -677,6 +755,107 @@ async function syncCategory(cat, log, opts = {}) {
   return savedCount;
 }
 
+// --- ギフトサブカテゴリを専用クエリで補完取得 ---
+// 各サブカテゴリ1ページ分（30件）を並列fetch → 合計最大180件の追加ギフト商品
+async function syncGiftSubCategories(log) {
+  if (!RAKUTEN_APP_ID) return;
+  const GIFT_GENRE = '101079';
+  const GIFT_NG = [...NG_KEYWORDS, ...['アルバム', 'フォトアルバム', 'ぬいぐるみ単体', '絵本']];
+
+  const subQueries = [
+    { keyword: '出産祝い ロンパース ベビー服 セット', sub: 'ロンパース・服' },
+    { keyword: '出産祝い 知育玩具 おもちゃ ガラガラ', sub: 'おもちゃ' },
+    { keyword: '出産祝い スキンケア ベビー ケアセット', sub: 'スキンケア' },
+    { keyword: '出産祝い タオル スタイ ガーゼ', sub: 'タオル・スタイ' },
+    { keyword: '出産祝い 食器セット 哺乳瓶 マグ', sub: '食器・哺乳瓶' },
+    { keyword: '出産祝い ミキハウス ファミリア ブランド ギフト', sub: 'ブランドギフト' },
+  ];
+
+  const results = await Promise.allSettled(
+    subQueries.map(async (q) => {
+      const res = await fetchRakutenSearch(q.keyword, GIFT_GENRE, 1);
+      const items = (res.Items || [])
+        .filter(item => !GIFT_NG.some(kw => item.Item.itemName.includes(kw)))
+        .filter(item => REQUIRED_KEYWORDS['ギフトセット'].some(kw => item.Item.itemName.includes(kw)));
+
+      let saved = 0;
+      for (const item of items.slice(0, 20)) {
+        const rawName = item.Item.itemName;
+        const name = cleanName(rawName);
+        const brand = extractBrand(rawName);
+        const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
+        const product = {
+          name,
+          category: 'ギフトセット',
+          sub_category: q.sub,
+          brand,
+          image_url: rawImg.replace(/_ex=\d+x\d+/, '_ex=640x640'),
+          rating: parseFloat(item.Item.reviewAverage) || 0,
+          reviews_count: parseInt(item.Item.reviewCount) || 0,
+          rakuten_item_code: item.Item.itemCode,
+          is_market_wide: true,
+          last_synced_at: new Date().toISOString(),
+        };
+        const shopInfo = {
+          shop_name: item.Item.shopName || '楽天市場',
+          price: item.Item.itemPrice,
+          url: item.Item.affiliateUrl || item.Item.itemUrl,
+          shipping: item.Item.postageFlag === 1 ? 0 : null,
+          points: item.Item.pointRate || 0,
+          rating: parseFloat(item.Item.reviewAverage) || 0,
+          reviews_count: parseInt(item.Item.reviewCount) || 0,
+        };
+
+        try {
+          const { data: existing } = await supabase
+            .from('products')
+            .select('id')
+            .eq('rakuten_item_code', product.rakuten_item_code)
+            .single();
+
+          let productId;
+          if (existing) {
+            productId = existing.id;
+            await supabase.from('products').update({
+              name: product.name,
+              image_url: product.image_url,
+              rating: product.rating,
+              reviews_count: product.reviews_count,
+              sub_category: product.sub_category,
+              brand: product.brand || undefined,
+              last_synced_at: product.last_synced_at,
+            }).eq('id', productId);
+          } else {
+            const { data: inserted, error: ie } = await supabase.from('products').insert([product]).select('id');
+            if (ie) continue;
+            productId = inserted[0].id;
+          }
+
+          await supabase.from('shops_prices').upsert([{
+            product_id: productId,
+            shop_name: '楽天市場',
+            shop_type: 'mall',
+            lowest_price: shopInfo.price,
+            source: 'rakuten',
+            sellers: JSON.stringify([serializeSeller(shopInfo)]),
+          }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+
+          saved++;
+        } catch {
+          // 個別エラーはスキップ
+        }
+      }
+      return { sub: q.sub, saved };
+    })
+  );
+
+  results.forEach(r => {
+    if (r.status === 'fulfilled') {
+      log.push(`  🎁 ギフト補完「${r.value.sub}」: ${r.value.saved}件`);
+    }
+  });
+}
+
 // --- Vercel Cron エンドポイント ---
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -736,6 +915,16 @@ export async function GET(request) {
   });
 
   log.push(`\n🎉 同期完了: 合計 ${totalSaved}件保存`);
+
+  // ギフトサブカテゴリ補完（全バッチ共通で実行。ギフトの各タブに商品を確保する）
+  if (!filterCat) {
+    try {
+      log.push(`\n🎁 ギフトサブカテゴリ補完同期開始...`);
+      await syncGiftSubCategories(log);
+    } catch (e) {
+      log.push(`⚠️ ギフト補完失敗: ${e.message}`);
+    }
+  }
 
   // 価格アラートのトリガー判定 + Push通知送信
   try {

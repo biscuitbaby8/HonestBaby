@@ -58,13 +58,13 @@ const CATEGORY_TREE = [
   { name: "ミルク・授乳", id: "205208", keyword: "ミルク 授乳", subs: ["ミルク", "哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
   { name: "離乳食・食器", id: "213980", keyword: "離乳食", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
   { name: "寝具・ベッド", id: "200822", keyword: "ベビーベッド", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
-  { name: "おもちゃ", id: "201591", keyword: "おもちゃ", subs: ["ガラガラ", "知育玩具", "ぬいぐるみ", "メリー"] },
+  { name: "おもちゃ", id: "201591", keyword: "おもちゃ", subs: ["0ヶ月〜", "3ヶ月〜", "6ヶ月〜", "1歳〜"] },
   { name: "安全グッズ", id: "200841", keyword: "ベビーゲート", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止", "ベビーモニター"] },
   { name: "お風呂用品", id: "200815", keyword: "ベビー お風呂", subs: ["ベビーバス", "ベビー用ソープ", "保湿クリーム"] },
   { name: "トイレ用品", id: "200819", keyword: "おまる", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
   { name: "車用品", id: "566088", keyword: "チャイルドシート", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ", "周辺グッズ"] },
   { name: "マタニティ", id: "553946", keyword: "マタニティ", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
-  { name: "ギフトセット", id: "205222", keyword: "出産祝い ギフト", subs: ["出産祝い", "誕生日ギフト", "名入れギフト"] }
+  { name: "ギフトセット", id: "205222", keyword: "出産祝い ギフト", subs: ["ロンパース・服", "おもちゃ", "スキンケア", "タオル・スタイ", "食器・哺乳瓶", "ブランドギフト"] }
 ];
 
 const CATEGORIES = CATEGORY_TREE.map(c => c.name);
@@ -446,7 +446,6 @@ const App = () => {
   const [giftBudgetFilter, setGiftBudgetFilter] = useState("すべて");
   const [giftSceneFilter, setGiftSceneFilter] = useState("すべて");
   const [giftTypeFilter, setGiftTypeFilter] = useState("すべて");
-  const [giftApiCache, setGiftApiCache] = useState({});
 
   // 管理モード: URLに ?admin=1 が付いているか、セッション中に有効化した場合はON
   const isAdminMode = (() => {
@@ -1328,24 +1327,9 @@ const App = () => {
     fetchCross();
   }, [selectedProduct?.id]);
 
-  // ギフトタブ: カテゴリ×シーン×予算でAPIリアルタイム取得 + DBを合算
   const GIFT_TYPES = [
-    { label: 'すべて',         query: '出産祝い ギフトセット ベビー' },
-    { label: 'ロンパース・服', query: '出産祝い ロンパース ベビー服 セット' },
-    { label: 'おもちゃ',      query: '出産祝い おもちゃ 知育 ガラガラ ベビー' },
-    { label: 'スキンケア',    query: '出産祝い ベビー スキンケア ケアセット ソープ' },
-    { label: 'タオル・スタイ', query: '出産祝い タオル スタイ ベビー セット' },
-    { label: '食器・哺乳瓶',  query: '出産祝い 食器セット 哺乳瓶 マグ ベビー' },
-    { label: 'ブランドギフト', query: '出産祝い ファミリア ミキハウス ブランド ギフト' },
+    'すべて', 'ロンパース・服', 'おもちゃ', 'スキンケア', 'タオル・スタイ', '食器・哺乳瓶', 'ブランドギフト',
   ];
-  const GIFT_SCENE_QUERIES = {
-    '出産祝い':      '出産祝い',
-    'ハーフバースデー': 'ハーフバースデー 6ヶ月',
-    '1歳のお祝い':   '1歳 誕生日 お祝い',
-    '男の子向け':    '男の子 ベビー ギフト',
-    '女の子向け':    '女の子 ベビー ギフト',
-    '双子・ふたご':  '双子 セット ギフト',
-  };
   const GIFT_BUDGETS = [
     { label: 'すべて',         range: null },
     { label: '〜3,000円',     range: [0, 2999] },
@@ -1356,57 +1340,42 @@ const App = () => {
 
   useEffect(() => {
     if (activeTab !== 'gift') return;
-    const typeObj = GIFT_TYPES.find(t => t.label === giftTypeFilter) || GIFT_TYPES[0];
-    const sceneQ = GIFT_SCENE_QUERIES[giftSceneFilter] || '';
     const budgetObj = GIFT_BUDGETS.find(b => b.label === giftBudgetFilter) || GIFT_BUDGETS[0];
-    const cacheKey = `${giftTypeFilter}|${giftSceneFilter}|${giftBudgetFilter}`;
 
-    if (giftApiCache[cacheKey]) {
-      setGiftProducts(giftApiCache[cacheKey]);
-      return;
+    let items = dbProducts.filter(p => p.category === 'ギフトセット');
+
+    // カテゴリタブフィルタ（sub_category で分類済み）
+    if (giftTypeFilter !== 'すべて') {
+      items = items.filter(p => p.subCategory === giftTypeFilter);
     }
 
-    const fetchGifts = async () => {
-      setIsGiftLoading(true);
-      try {
-        const query = [typeObj.query, sceneQ].filter(Boolean).join(' ');
-        const res = await fetch(`/api/rakuten?query=${encodeURIComponent(query)}&noFilter=1`);
-        const data = res.ok ? await res.json() : { products: [] };
-        const apiItems = (data.products || [])
-          .map(item => ({
-            id: `gift-api-${item.id}`,
-            name: cleanName(item.name),
-            price: item.price,
-            image: item.image,
-            category: 'ギフトセット',
-            shops: [{ name: '楽天市場', lowestPrice: item.price, url: item.url, sellers: [{ name: item.brand || '楽天市場', price: item.price, url: item.url, shipping: 0, points: 0 }] }],
-            rating: item.rating || 4.0,
-          }))
-          .filter(validateProduct);
-
-        // DB商品とマージ（同名重複排除）
-        const dbBase = dbProducts.filter(p => p.category === 'ギフトセット');
-        const nameSet = new Set(apiItems.map(p => p.name.slice(0, 15)));
-        const merged = [...apiItems, ...dbBase.filter(p => !nameSet.has(p.name.slice(0, 15)))];
-
-        // 予算フィルタ
-        const filtered = merged.filter(p => {
-          const price = getLowestPrice(p.shops) || p.price || 0;
-          if (!budgetObj.range) return true;
-          return price >= budgetObj.range[0] && price <= budgetObj.range[1];
-        });
-
-        setGiftProducts(filtered);
-        setGiftApiCache(prev => ({ ...prev, [cacheKey]: filtered }));
-      } catch (e) {
-        console.error('Gift fetch failed:', e);
-        const base = dbProducts.filter(p => p.category === 'ギフトセット');
-        setGiftProducts(base);
-      } finally {
-        setIsGiftLoading(false);
+    // シーンフィルタ（商品名キーワードで緩やかに絞り込み）
+    if (giftSceneFilter !== 'すべて') {
+      const SCENE_KW = {
+        '男の子向け':      ['男の子', '男児', 'ボーイ'],
+        '女の子向け':      ['女の子', '女児', 'ガール'],
+        'ハーフバースデー': ['ハーフバースデー', '6ヶ月', '半年'],
+        '1歳のお祝い':    ['1歳', '一歳', '誕生日'],
+        '双子・ふたご':    ['双子', 'ツイン', 'ふたご'],
+        '出産祝い':        ['出産祝い', '出産', '新生児'],
+      };
+      const kws = SCENE_KW[giftSceneFilter] || [];
+      if (kws.length > 0) {
+        const strict = items.filter(p => kws.some(k => p.name.includes(k)));
+        if (strict.length >= 3) items = strict;
       }
-    };
-    fetchGifts();
+    }
+
+    // 予算フィルタ
+    if (budgetObj.range) {
+      items = items.filter(p => {
+        const price = getLowestPrice(p.shops) || p.price || 0;
+        return price >= budgetObj.range[0] && price <= budgetObj.range[1];
+      });
+    }
+
+    setGiftProducts(items);
+    setIsGiftLoading(false);
   }, [activeTab, giftTypeFilter, giftSceneFilter, giftBudgetFilter, dbProducts]);
 
   useEffect(() => {
@@ -2243,12 +2212,16 @@ ${userText}
   const searchProductsForArticle = async (q) => {
     if (!q.trim()) { setProductSearchResults([]); return; }
     setProductSearchLoading(true);
-    const { data } = await supabase
+    const keywords = q.trim().split(/\s+/).filter(Boolean);
+    let query = supabase
       .from('products')
       .select('id, name, category')
-      .ilike('name', `%${q}%`)
-      .eq('is_blocked', false)
+      .neq('is_blocked', true)
       .limit(8);
+    for (const kw of keywords) {
+      query = query.ilike('name', `%${kw}%`);
+    }
+    const { data } = await query;
     setProductSearchResults(data || []);
     setProductSearchLoading(false);
   };
@@ -2259,6 +2232,7 @@ ${userText}
     if (!el) return;
     const start = el.selectionStart;
     const end = el.selectionEnd;
+    const scrollTop = el.scrollTop;
     const current = articleForm.content;
     const next = current.slice(0, start) + link + current.slice(end);
     setArticleForm(prev => ({ ...prev, content: next }));
@@ -2268,6 +2242,7 @@ ${userText}
       el.focus();
       const pos = start + link.length;
       el.setSelectionRange(pos, pos);
+      el.scrollTop = scrollTop;
     }, 0);
   };
 
@@ -2567,7 +2542,10 @@ ${userText}
         if (blocklist.has(code)) return false;
         // ギフトセットはギフトページ専用。「すべて」ホームには表示しない
         if (selectedCategory === "すべて" && p.category === "ギフトセット") return false;
-        const matchCat = selectedCategory === "すべて" || p.category === selectedCategory;
+        // ゴミ箱・袋はDBではカテゴリ"ゴミ箱・袋"で保存されるが、UIではおむつのサブカテゴリとして扱う
+        const matchCat = selectedCategory === "すべて"
+          || p.category === selectedCategory
+          || (selectedCategory === "おむつ" && p.category === "ゴミ箱・袋");
         const matchSub = selectedSubCategory === "すべて" || p.subCategory === selectedSubCategory;
         const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
         return matchCat && matchSub && matchSubSub;
@@ -2994,7 +2972,7 @@ ${userText}
   };
 
   const renderGift = () => {
-    const giftTypeLabels = GIFT_TYPES.map(t => t.label);
+    const giftTypeLabels = GIFT_TYPES;
     const giftSceneLabels = ['すべて', '出産祝い', 'ハーフバースデー', '1歳のお祝い', '男の子向け', '女の子向け', '双子・ふたご'];
     const giftBudgetLabels = GIFT_BUDGETS.map(b => b.label);
     return (
@@ -3016,7 +2994,7 @@ ${userText}
         <h3 className="font-black text-[#5A4C4C] mb-3 px-1 text-sm">カテゴリ</h3>
         <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-6 px-6 pb-1 mb-6">
           {giftTypeLabels.map(tag => (
-            <button key={tag} onClick={() => { setGiftTypeFilter(tag); setGiftApiCache({}); }}
+            <button key={tag} onClick={() => setGiftTypeFilter(tag)}
               className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${giftTypeFilter === tag ? 'bg-[#F2ABAC] text-white shadow-sm' : 'bg-white border border-[#F4EFEB] text-[#8E8282]'}`}>
               {tag}
             </button>
@@ -3027,7 +3005,7 @@ ${userText}
         <h3 className="font-black text-[#5A4C4C] mb-3 px-1 text-sm">シーン・贈る相手</h3>
         <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-6 px-6 pb-1 mb-6">
           {giftSceneLabels.map(tag => (
-            <button key={tag} onClick={() => { setGiftSceneFilter(tag); setGiftApiCache({}); }}
+            <button key={tag} onClick={() => setGiftSceneFilter(tag)}
               className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${giftSceneFilter === tag ? 'bg-[#7B8E76] text-white shadow-sm' : 'bg-white border border-[#F4EFEB] text-[#8E8282]'}`}>
               {tag}
             </button>
