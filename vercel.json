@@ -18,5 +18,37 @@
       "destination": "https://honestbaby-care.com/:path*",
       "permanent": true
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/product/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|TelegramBot|WhatsApp|Line|Discordbot|Google-InspectionTool).*"
+        }
+      ],
+      "destination": "/api/ogp?id=:id"
+    },
+    {
+      "source": "/category/:cat",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|TelegramBot|WhatsApp|Line|Discordbot|Google-InspectionTool).*"
+        }
+      ],
+      "destination": "/api/ogp?cat=:cat"
+    },
+    {
+      "source": "/article/:slug",
+      "destination": "/api/article?slug=:slug"
+    }
   ]
 }

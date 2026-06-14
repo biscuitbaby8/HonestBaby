@@ -431,6 +431,10 @@ const App = () => {
 
   // Navigation States
   const [activeTab, setActiveTab] = useState('home');
+  // タブ切り替え時に前のタブのスクロール位置が引き継がれて上部が見切れるのを防ぐ
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Category & Filter States
@@ -461,6 +465,21 @@ const App = () => {
   const [showBlockedList, setShowBlockedList] = useState(false);
   const [blockedProducts, setBlockedProducts] = useState([]);
   const [isLoadingBlocked, setIsLoadingBlocked] = useState(false);
+
+  // 記事管理モーダル
+  const [showArticleAdmin, setShowArticleAdmin] = useState(false);
+  const [articleAdminPassword, setArticleAdminPassword] = useState('');
+  const [articleAdminAuthed, setArticleAdminAuthed] = useState(false);
+  const [articleAdminError, setArticleAdminError] = useState('');
+  const [articleList, setArticleList] = useState([]);
+  const [articleAdminView, setArticleAdminView] = useState('list'); // 'list' | 'edit'
+  const [articleForm, setArticleForm] = useState({ slug: '', title: '', meta_description: '', content: '', published: true });
+  const [articleSaving, setArticleSaving] = useState(false);
+  // 記事エディタ内商品検索
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [productSearchResults, setProductSearchResults] = useState([]);
+  const [productSearchLoading, setProductSearchLoading] = useState(false);
+  const contentTextareaRef = useRef(null);
 
   // User Data States
   const [favorites, setFavorites] = useState(() => {
@@ -766,6 +785,34 @@ const App = () => {
   const [isAiTyping, setIsAiTyping] = useState(false);
   const chatEndRef = useRef(null);
 
+  // 出産準備診断 States
+  const [showDiagModal, setShowDiagModal] = useState(false);
+  const [diagStep, setDiagStep] = useState(0);
+  const [diagAnswers, setDiagAnswers] = useState({});
+  const [diagResult, setDiagResult] = useState(null);
+  const [isDiagLoading, setIsDiagLoading] = useState(false);
+  const [savedDiagResult, setSavedDiagResult] = useState(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('honestBabyDiagResult');
+      if (raw) setSavedDiagResult(JSON.parse(raw));
+    } catch { /* ignore */ }
+  }, []);
+
+  // 公開記事一覧（記事タブ・ホーム導線カード用）
+  // articlesテーブルはservice roleのみ読み取り可（RLS）のため、SSR用APIのlistモードを利用
+  const [publishedArticles, setPublishedArticles] = useState([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/article?list=1');
+        const json = await res.json();
+        if (Array.isArray(json.articles)) setPublishedArticles(json.articles);
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
@@ -911,7 +958,7 @@ const App = () => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
-    const validTabs = ['home', 'search', 'ai', 'gift', 'user'];
+    const validTabs = ['home', 'search', 'ai', 'gift', 'user', 'articles'];
     if (tab && validTabs.includes(tab)) setActiveTab(tab);
   }, []);
 
@@ -1968,6 +2015,315 @@ ${userText}
     }
   };
 
+  // --- 出産準備診断ハンドラ ---
+  const DIAG_QUESTIONS = [
+    {
+      key: 'timing',
+      question: 'お子さまはいつ頃生まれる予定ですか？',
+      options: ['妊娠中（〜3ヶ月）', '妊娠中（3〜6ヶ月）', '妊娠中（6ヶ月〜）', 'すでに生まれた（0〜6ヶ月）', 'すでに生まれた（6ヶ月〜）']
+    },
+    {
+      key: 'siblings',
+      question: '上のお子さまはいますか？',
+      options: ['いない（第1子）', 'いる（第2子以降）']
+    },
+    {
+      key: 'home',
+      question: 'ご自宅の環境はどちらですか？',
+      options: ['マンション・アパート（エレベーターあり）', 'マンション・アパート（階段のみ）', '一戸建て', '実家に帰省予定']
+    },
+    {
+      key: 'budget',
+      question: 'ベビー用品の総予算感はどのくらいですか？',
+      options: ['〜10万円（最小限で揃えたい）', '10〜20万円（標準的に揃えたい）', '20万円以上（しっかり揃えたい）']
+    }
+  ];
+
+  const buildDiagCategories = (answers) => {
+    const { timing, siblings, home, budget } = answers;
+    const isPrenatalEarly = timing === '妊娠中（〜3ヶ月）' || timing === '妊娠中（3〜6ヶ月）';
+    const isPrenatalLate = timing === '妊娠中（6ヶ月〜）';
+    const isPrenatal = isPrenatalEarly || isPrenatalLate;
+    const isNewborn = timing === 'すでに生まれた（0〜6ヶ月）';
+    const isOlderBaby = timing === 'すでに生まれた（6ヶ月〜）';
+    const isSecondChild = !!(siblings && siblings.includes('第2子'));
+    const isHouse = !!(home && home.includes('一戸建て'));
+    const isApartmentNoElevator = home === 'マンション・アパート（階段のみ）';
+    const isParentsHome = home === '実家に帰省予定';
+    const tightBudget = budget === '〜10万円（最小限で揃えたい）';
+    const richBudget = budget === '20万円以上（しっかり揃えたい）';
+
+    const items = [];
+    const add = (category, priority, reason, details, timingLabel) =>
+      items.push({ category, priority, reason, details, timingLabel });
+
+    // --- おむつ ---
+    add('おむつ', '必須',
+      '退院直後から1日10回以上交換することも',
+      tightBudget
+        ? ['新生児用は1パックだけ（すぐサイズアウトするため買いすぎ注意）', 'お尻拭きを2〜3個']
+        : ['新生児用1〜2パック＋Sサイズも少量試す', 'お尻拭き多めにストック', 'おむつ用ゴミ箱もあると匂い対策に◎'],
+      isPrenatal ? '出産前に少量だけ準備' : '今すぐ必要');
+
+    // --- ウェア ---
+    add('ウェア', '必須',
+      '汗をかきやすく1日に何度も着替えるため多めに',
+      ['短肌着・コンビ肌着を3〜5枚ずつ', 'season（季節）に合わせたカバーオール', isSecondChild ? '上の子のお下がりが使えるかも確認を' : '退院時用のセレモニードレスも検討'],
+      isPrenatal ? '出産前に準備' : '今すぐ必要');
+
+    // --- お風呂用品 ---
+    add('お風呂用品', '必須',
+      '退院翌日から沐浴がスタート',
+      ['ベビーバス（折りたたみ式が場所を取らずおすすめ）', '沐浴布・ベビー用ソープ・温度計', '保湿剤・綿棒'],
+      '出産前に必ず準備');
+
+    // --- 寝具・ベッド ---
+    add('寝具・ベッド', '必須',
+      '安全な睡眠環境づくりは最優先事項',
+      isHouse || richBudget
+        ? ['ベビーベッド or 添い寝用ベッドガード', '硬め・通気性のよいマットレス', '季節に合わせたスリーパー（掛け布団は窒息リスクで非推奨）']
+        : ['コンパクトな添い寝用ベッドやベッドインベッド', '硬めのマットレス', 'スリーパー（掛け布団は避ける）'],
+      isPrenatal ? '出産前に準備' : '早急に準備');
+
+    // --- ミルク・授乳 ---
+    add('ミルク・授乳', '必須',
+      '母乳のみの予定でも哺乳瓶は備えておくと安心',
+      ['哺乳瓶2〜3本＋洗浄ブラシ', '哺乳瓶の消毒グッズ（電子レンジ式が手軽）', '授乳クッション', isSecondChild ? '上の子の世話と両立しやすい授乳服も便利' : '母乳パッド・搾乳機（必要に応じて）'],
+      isPrenatal ? '出産前に準備' : '今すぐ必要');
+
+    // --- マタニティ（妊娠中のみ） ---
+    if (isPrenatal) {
+      add('マタニティ', '必須',
+        isPrenatalEarly ? '体型の変化に備えて早めにチェックを' : '出産が近づく時期。入院準備も忘れずに',
+        isPrenatalEarly
+          ? ['マタニティウェア・下着', 'つわり対策グッズ', '母子手帳ケース']
+          : ['産褥ショーツ・授乳しやすい服', '入院バッグの中身チェックリスト', '骨盤ベルト'],
+        isPrenatalEarly ? '体調が落ち着いたら' : '臨月までに準備');
+    }
+
+    // --- 抱っこ紐 ---
+    add('抱っこ紐', '必須',
+      '新生児期から使える抱っこ紐があると外出も家事もぐっと楽に',
+      isSecondChild
+        ? ['上の子と手を繋ぎながら使える前向き抱っこタイプ', '新生児対応のインサート付きモデル']
+        : ['新生児期から使えるインサート付きモデル', '腰ベルト付きで肩への負担が少ないもの'],
+      isNewborn || isPrenatal ? '出産前後に準備' : '今すぐ必要');
+
+    // --- ベビーカー ---
+    if (isParentsHome) {
+      add('ベビーカー', 'あると便利',
+        '実家帰省中はレンタルサービスの利用も賢い選択',
+        ['里帰り中は短期レンタルでコストを抑える', '帰宅後の生活動線に合わせて購入を検討'],
+        '帰宅後に検討でOK');
+    } else if (isApartmentNoElevator) {
+      add('ベビーカー', '必須',
+        '階段の昇り降りが多いため軽量タイプが必須',
+        ['軽量・片手で畳めるB型タイプがおすすめ', '対面式が必要なら新生児期はA型も検討'],
+        isPrenatal ? '出産前に準備' : '外出が増える前に');
+    } else {
+      add('ベビーカー', '必須',
+        '生後1ヶ月健診以降の外出に向けて準備を',
+        isHouse
+          ? ['新生児期から使えるA型（対面式）', '将来的に使うB型（軽量型）も視野に']
+          : ['コンパクトに収納できるB型タイプ', '新生児期はA型 or 抱っこ紐で代用も可'],
+        isPrenatal ? '出産前に準備' : '1ヶ月健診までに');
+    }
+
+    // --- 安全グッズ ---
+    if (isSecondChild || isHouse) {
+      add('安全グッズ', '必須',
+        isSecondChild ? '上の子のいたずら・誤飲対策も同時に必要' : '一戸建ては階段・段差の対策が特に重要',
+        ['コンセントカバー・コーナーガード', '階段ゲート・ベビーフェンス', '上の子がいるなら誤飲しやすい小物の管理を見直し'],
+        isOlderBaby ? '今すぐ必要' : '寝返り・ハイハイが始まる前に');
+    } else {
+      add('安全グッズ', 'あると便利',
+        '動き始める生後5〜6ヶ月頃までに準備しておくと安心',
+        ['コンセントカバー', '家具の角を保護するコーナーガード', 'ベビーモニター（見守りカメラ）'],
+        '生後5ヶ月頃までに');
+    }
+
+    // --- 車用品 ---
+    if (isHouse || home === 'マンション・アパート（エレベーターあり）' || isParentsHome) {
+      add('車用品', '必須',
+        'チャイルドシートの装着は法律上の義務（退院時から必要）',
+        ['新生児から使えるチャイルドシート（回転式は乗せ降ろしが楽）', '車用サンシェード', isParentsHome ? '帰省の移動手段が車なら退院前に取り付け確認を' : null].filter(Boolean),
+        '退院前に必ず準備');
+    }
+
+    // --- 離乳食・食器 ---
+    if (isOlderBaby || richBudget) {
+      add('離乳食・食器', '必須',
+        '生後5〜6ヶ月頃から離乳食デビューの時期',
+        ['ベビーチェア・ハイチェア', '離乳食用の食器・スプーン', 'ブレンダー・調理セット（手作り派の場合）'],
+        '今すぐ準備して問題なし');
+    } else if (isNewborn) {
+      add('離乳食・食器', 'あると便利',
+        'まだ先だが、ベビーチェアは早めに見ておくと選びやすい',
+        ['ベビーチェア（テーブル取り付け式は場所を取らない）', '離乳食用の食器セット'],
+        '生後5ヶ月頃を目安に');
+    }
+
+    // --- おもちゃ ---
+    if (!tightBudget) {
+      add('おもちゃ', 'あると便利',
+        isNewborn || isOlderBaby ? '月齢に合わせて視覚・聴覚を刺激するおもちゃを' : '新生児期はガラガラ・メリーなどシンプルなものから',
+        richBudget
+          ? ['メリー・ジム（プレイマット一体型も人気）', '歯がため・ガラガラ', '月齢に応じた知育玩具を段階的に']
+          : ['ガラガラ・布絵本などシンプルなものから', 'プレイマット'],
+        isOlderBaby ? '今すぐ取り入れてOK' : '生後2〜3ヶ月頃から');
+    }
+
+    return items;
+  };
+
+  const runDiagnosis = async (answers) => {
+    setIsDiagLoading(true);
+    setDiagResult(null);
+    try {
+      const categories = buildDiagCategories(answers);
+
+      const results = await Promise.all(
+        categories.map(async (item) => {
+          const { data: products } = await supabase
+            .from('products')
+            .select('id, name, image, price, rating, shops')
+            .eq('category', item.category)
+            .or('is_blocked.is.null,is_blocked.eq.false')
+            .order('popularity_rank', { ascending: true })
+            .limit(3);
+          return { ...item, products: products || [] };
+        })
+      );
+      setDiagResult(results);
+      try {
+        const saved = { answers, result: results, savedAt: Date.now() };
+        localStorage.setItem('honestBabyDiagResult', JSON.stringify(saved));
+        setSavedDiagResult(saved);
+      } catch { /* localStorage unavailable */ }
+    } catch (e) {
+      console.error('Diagnosis error:', e);
+      setDiagResult([]);
+    } finally {
+      setIsDiagLoading(false);
+    }
+  };
+
+  // --- 記事エディタ商品検索 ---
+  const searchProductsForArticle = async (q) => {
+    if (!q.trim()) { setProductSearchResults([]); return; }
+    setProductSearchLoading(true);
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, category')
+      .ilike('name', `%${q}%`)
+      .neq('is_blocked', true)
+      .limit(8);
+    setProductSearchResults(data || []);
+    setProductSearchLoading(false);
+  };
+
+  const insertProductLink = (product) => {
+    const link = `[${product.name}](/product/${product.id})`;
+    const el = contentTextareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const scrollTop = el.scrollTop;
+    const current = articleForm.content;
+    const next = current.slice(0, start) + link + current.slice(end);
+    setArticleForm(prev => ({ ...prev, content: next }));
+    setProductSearchQuery('');
+    setProductSearchResults([]);
+    setTimeout(() => {
+      el.focus();
+      const pos = start + link.length;
+      el.setSelectionRange(pos, pos);
+      el.scrollTop = scrollTop;
+    }, 0);
+  };
+
+  // --- 記事管理ハンドラ ---
+  const articleAdminCall = async (action, params = {}) => {
+    const res = await fetch('/api/admin-article', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, password: articleAdminPassword, ...params })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'エラー');
+    return data;
+  };
+
+  const openArticleAdmin = async () => {
+    setShowArticleAdmin(true);
+    setArticleAdminAuthed(false);
+    setArticleAdminPassword('');
+    setArticleAdminError('');
+    setArticleAdminView('list');
+  };
+
+  const handleArticleAuth = async () => {
+    try {
+      const data = await articleAdminCall('list');
+      setArticleList(data.articles || []);
+      setArticleAdminAuthed(true);
+      setArticleAdminError('');
+    } catch (e) {
+      setArticleAdminError(e.message);
+    }
+  };
+
+  const handleArticleSave = async (published) => {
+    setArticleSaving(true);
+    try {
+      await articleAdminCall('save', { ...articleForm, published });
+      const data = await articleAdminCall('list');
+      setArticleList(data.articles || []);
+      setArticleAdminView('list');
+      setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true });
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setArticleSaving(false);
+    }
+  };
+
+  const handleArticleToggle = async (id, published) => {
+    try {
+      await articleAdminCall('toggle', { id, published });
+      setArticleList(prev => prev.map(a => a.id === id ? { ...a, published } : a));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleArticleDelete = async (id) => {
+    if (!window.confirm('この記事を削除しますか？')) return;
+    try {
+      await articleAdminCall('delete', { id });
+      setArticleList(prev => prev.filter(a => a.id !== id));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleArticleEdit = async (a) => {
+    try {
+      const res = await articleAdminCall('get', { id: a.id });
+      const full = res.article;
+      setArticleForm({
+        slug: full.slug || '',
+        title: full.title || '',
+        meta_description: full.meta_description || '',
+        content: full.content || '',
+        published: full.published ?? true,
+      });
+      setArticleAdminView('edit');
+    } catch (e) {
+      alert('記事の読み込みに失敗しました: ' + e.message);
+    }
+  };
+
   // --- 新機能: レビュー投稿ハンドラ ---
   const submitReview = async () => {
     if (!reviewForm.content.trim() || !selectedProduct) return;
@@ -2207,36 +2563,135 @@ ${userText}
 
     return (
       <div className="animate-in fade-in duration-500">
-        <div className="w-full bg-[#FFF5F5] rounded-[2.5rem] p-8 mb-8 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#FFEBEB] cursor-pointer" onClick={() => setActiveTab('ai')}>
-          {/* AI Banner Content */}
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="bg-white p-1.5 rounded-full shadow-sm"><Sparkles className="w-4 h-4 text-[#F2ABAC]" /></div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#F2ABAC]">AI Concierge</span>
+        {/* ─── クイックアクセスタイル（モバイル専用・AIコンサル / 出産準備診断 / Yahoo!お得情報 / 記事・コラム） ─── */}
+        <div className="grid grid-cols-2 gap-3 mb-6 lg:hidden">
+          <div
+            className="bg-[#FFF5F5] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#FFEBEB] cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
+            onClick={() => setActiveTab('ai')}
+          >
+            <div className="bg-white p-1.5 rounded-full shadow-sm w-fit"><Sparkles className="w-4 h-4 text-[#F2ABAC]" /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#F2ABAC] mb-1">AI Concierge</p>
+              <p className="text-sm font-black text-[#5A4C4C] leading-tight">AIに相談する</p>
             </div>
-            <h4 className="text-2xl font-black mb-2 text-[#5A4C4C] leading-tight">AIに育児アイテムを<br />相談してみる</h4>
-            <p className="text-[11px] text-[#8E8282] max-w-[200px] font-bold">ぴったりのベビー用品をAIが比較・提案します</p>
+            <Bot className="absolute right-2 bottom-2 w-14 h-14 text-[#F2ABAC] opacity-10 rotate-12" />
           </div>
-          <div className="absolute right-[-10%] bottom-[-20%] w-48 h-48 bg-[#FFE6E6] rounded-full opacity-50 blur-2xl"></div>
-          <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
+
+          <div
+            className="bg-[#EBF0EA] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#D4DDD2] cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
+            onClick={() => {
+              if (savedDiagResult) {
+                setDiagAnswers(savedDiagResult.answers || {});
+                setDiagResult(savedDiagResult.result || []);
+                setDiagStep(DIAG_QUESTIONS.length);
+              } else {
+                setDiagStep(0);
+                setDiagAnswers({});
+                setDiagResult(null);
+              }
+              setShowDiagModal(true);
+            }}
+          >
+            <div className="bg-white p-1.5 rounded-full shadow-sm w-fit"><Baby className="w-4 h-4 text-[#7B8E76]" /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#7B8E76] mb-1">診断機能</p>
+              <p className="text-sm font-black text-[#5A4C4C] leading-tight">
+                {savedDiagResult ? 'あなたの準備リスト' : '出産準備リスト診断'}
+              </p>
+            </div>
+            <Baby className="absolute right-2 bottom-2 w-14 h-14 text-[#7B8E76] opacity-10 rotate-12" />
+          </div>
+
+          {(() => {
+            const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
+            if (!todayEvents.length) return null;
+            const ev = todayEvents[0];
+            return (
+              <div className="bg-[#FFF3E8] border border-[#FFD9B5] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm flex flex-col justify-between min-h-[8.5rem]">
+                <span className="text-2xl w-fit">🛒</span>
+                <div>
+                  <p className="text-[9px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!お得情報</p>
+                  <p className="text-sm font-black text-[#5A4C4C] leading-tight truncate">{ev.name}</p>
+                  <p className="text-[10px] text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div
+            className="bg-[#FFF9E6] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#F9DC5C]/40 cursor-pointer flex flex-col justify-between min-h-[8.5rem]"
+            onClick={() => setActiveTab('articles')}
+          >
+            <div className="bg-white p-1.5 rounded-full shadow-sm w-fit"><FileText className="w-4 h-4 text-[#D4AF37]" /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#B8860B] mb-1">Articles</p>
+              <p className="text-sm font-black text-[#5A4C4C] leading-tight">記事・コラムを読む</p>
+            </div>
+            <FileText className="absolute right-2 bottom-2 w-14 h-14 text-[#D4AF37] opacity-10 rotate-12" />
+          </div>
         </div>
 
-        {/* ─── Yahoo!ショッピング 今日のお得バナー ─── */}
-        {(() => {
-          const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
-          if (!todayEvents.length) return null;
-          const ev = todayEvents[0];
-          return (
-            <div className="mb-6 bg-[#FFF3E8] border border-[#FFD9B5] rounded-[2rem] p-5 flex items-center justify-between shadow-sm">
-              <div>
-                <p className="text-[10px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!ショッピング 今日のお得</p>
-                <p className="text-base font-black text-[#5A4C4C]">{ev.name}</p>
-                <p className="text-xs text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+        {/* ─── PC専用バナー群（元のレイアウトを維持） ─── */}
+        <div className="hidden lg:block">
+          <div className="w-full bg-[#FFF5F5] rounded-[2.5rem] p-8 mb-8 relative overflow-hidden shadow-sm active:scale-[0.98] transition-transform border border-[#FFEBEB] cursor-pointer" onClick={() => setActiveTab('ai')}>
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="bg-white p-1.5 rounded-full shadow-sm"><Sparkles className="w-4 h-4 text-[#F2ABAC]" /></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#F2ABAC]">AI Concierge</span>
               </div>
-              <span className="text-3xl">🛒</span>
+              <h4 className="text-2xl font-black mb-2 text-[#5A4C4C] leading-tight">AIに育児アイテムを<br />相談してみる</h4>
+              <p className="text-[11px] text-[#8E8282] max-w-[200px] font-bold">ぴったりのベビー用品をAIが比較・提案します</p>
             </div>
-          );
-        })()}
+            <div className="absolute right-[-10%] bottom-[-20%] w-48 h-48 bg-[#FFE6E6] rounded-full opacity-50 blur-2xl"></div>
+            <Bot className="absolute right-4 bottom-2 w-24 h-24 text-[#F2ABAC] opacity-20 rotate-12" />
+          </div>
+
+          <div
+            className="w-full bg-[#EBF0EA] rounded-[2.5rem] p-6 mb-6 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform border border-[#D4DDD2]"
+            onClick={() => {
+              if (savedDiagResult) {
+                setDiagAnswers(savedDiagResult.answers || {});
+                setDiagResult(savedDiagResult.result || []);
+                setDiagStep(DIAG_QUESTIONS.length);
+              } else {
+                setDiagStep(0);
+                setDiagAnswers({});
+                setDiagResult(null);
+              }
+              setShowDiagModal(true);
+            }}
+          >
+            <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
+              <Baby className="w-7 h-7 text-[#7B8E76]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-widest text-[#7B8E76] mb-0.5">診断機能</div>
+              <div className="text-base font-black text-[#5A4C4C] leading-tight">
+                {savedDiagResult ? 'あなたの出産準備リスト' : '出産準備リストを自動生成'}
+              </div>
+              <div className="text-[11px] text-[#8E8282] font-bold mt-0.5">
+                {savedDiagResult ? '保存済みのリストを見る・編集する →' : '4つの質問に答えるだけ · あなたに合った持ち物リストを作成'}
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[#A5A19E] flex-shrink-0" />
+          </div>
+
+          {(() => {
+            const todayEvents = getYahooSaleEvents(new Date(), 3).filter(e => e.isToday);
+            if (!todayEvents.length) return null;
+            const ev = todayEvents[0];
+            return (
+              <div className="mb-6 bg-[#FFF3E8] border border-[#FFD9B5] rounded-[2rem] p-5 flex items-center justify-between shadow-sm">
+                <div>
+                  <p className="text-[10px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!ショッピング 今日のお得</p>
+                  <p className="text-base font-black text-[#5A4C4C]">{ev.name}</p>
+                  <p className="text-xs text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
+                </div>
+                <span className="text-3xl">🛒</span>
+              </div>
+            );
+          })()}
+        </div>
 
         {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
         {babyInfo && babyAgeMonths != null && (() => {
@@ -2431,6 +2886,31 @@ ${userText}
           )}
         </div>
 
+        {/* ─── レンタル・サブスクサービス ─── */}
+        {selectedCategory === 'すべて' && (
+          <div className="mt-10 mb-4">
+            <div className="flex items-center gap-2 mb-4 px-1">
+              <span className="text-[10px] font-black text-[#7B8E76] uppercase tracking-widest">Services</span>
+              <span className="text-xs font-bold text-[#5A4C4C]">レンタル・サブスクで賢く育児</span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-2">
+              {[
+                { name: 'ベビレンタ', desc: 'ベビーカー・チャイルドシートなど', tag: 'レンタル', color: '#FFF5F5', tagColor: '#F2ABAC', url: 'https://babyrenta.com/' },
+                { name: 'Toysub！', desc: 'おもちゃのサブスク 月額3,980円〜', tag: 'サブスク', color: '#EBF0EA', tagColor: '#7B8E76', url: 'https://toysub.net/' },
+                { name: 'ナイスベビー', desc: 'ベビー用品レンタル専門店', tag: 'レンタル', color: '#FFF5F5', tagColor: '#F2ABAC', url: 'https://www.nicebaby.co.jp/' },
+              ].map(s => (
+                <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer nofollow"
+                  className="flex-shrink-0 w-44 rounded-[1.5rem] p-4 border border-[#F4EFEB] shadow-sm active:scale-95 transition-transform"
+                  style={{ background: s.color }}>
+                  <span className="text-[9px] font-black rounded-full px-2 py-0.5" style={{ background: s.tagColor, color: '#fff' }}>{s.tag}</span>
+                  <div className="font-black text-[#5A4C4C] text-sm mt-2 mb-1">{s.name}</div>
+                  <div className="text-[10px] text-[#8E8282] font-bold leading-snug">{s.desc}</div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 自律成長型プラットフォーム・フッター */}
         <div className="text-center py-10 opacity-30">
           <p className="text-[9px] font-black tracking-widest text-[#A5A19E]">HONEST BABY PLATFORM v2.0.0 (AUTONOMOUS)</p>
@@ -2444,7 +2924,48 @@ ${userText}
     );
   };
 
+  const renderArticles = () => {
+    return (
+      <div className="animate-in slide-in-from-right duration-300">
+        <div className="bg-[#FFF9E6] -mx-6 px-6 pt-4 pb-10 rounded-b-[3rem] mb-8 relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-40 h-40 bg-[#F9DC5C] rounded-full opacity-20 blur-3xl translate-x-1/2 -translate-y-1/2"></div>
+          <div className="flex items-center gap-3 mb-4 relative z-10">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#D4AF37] shadow-sm -rotate-6"><FileText className="w-6 h-6" /></div>
+            <div>
+              <h2 className="text-2xl font-black text-[#5A4C4C]">記事・コラム</h2>
+              <p className="text-[10px] text-[#B8860B] font-bold mt-1 tracking-widest">CHILDCARE GUIDES &amp; TIPS</p>
+            </div>
+          </div>
+          <p className="text-xs text-[#8E8282] font-bold leading-relaxed relative z-10">育児の悩みに役立つ比較ガイドやチェックリストをお届けします。</p>
+        </div>
 
+        {publishedArticles.length === 0 ? (
+          <div className="py-16 text-center text-[#A5A19E] text-xs font-bold">記事は準備中です。少々お待ちください。</div>
+        ) : (
+          <div className="flex flex-col gap-3 mb-8">
+            {publishedArticles.map(a => (
+              <a
+                key={a.slug}
+                href={`/article/${a.slug}`}
+                className="flex items-center gap-4 bg-white border border-[#F4EFEB] rounded-[1.75rem] p-5 shadow-sm active:scale-[0.98] transition-transform"
+              >
+                <div className="w-12 h-12 bg-[#FFF9E6] rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-6 h-6 text-[#D4AF37]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-black text-[#5A4C4C] leading-snug truncate">{a.title}</h3>
+                  {a.meta_description && (
+                    <p className="text-[11px] text-[#A5A19E] font-bold mt-1 line-clamp-2">{a.meta_description}</p>
+                  )}
+                </div>
+                <ChevronRight className="w-5 h-5 text-[#A5A19E] flex-shrink-0" />
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderGift = () => {
     const giftTypeLabels = GIFT_TYPES;
@@ -2745,6 +3266,7 @@ ${userText}
             { id: 'search', label: '検索',     icon: <Search className="w-5 h-5" /> },
             { id: 'ai',     label: 'AIコンサル', icon: <Bot className="w-5 h-5" /> },
             { id: 'gift',   label: 'ギフト',   icon: <Gift className="w-5 h-5" /> },
+            { id: 'articles', label: '記事・コラム', icon: <FileText className="w-5 h-5" /> },
             { id: 'user',   label: 'マイページ', icon: <User className="w-5 h-5" /> },
           ].map(tab => (
             <button
@@ -2811,6 +3333,7 @@ ${userText}
       <main className={activeTab === 'ai' ? 'px-6 pt-4 flex flex-col flex-1 min-h-0 overflow-hidden lg:flex-1 lg:overflow-auto' : 'px-6 pt-4 lg:px-10 lg:pt-8 lg:max-w-7xl lg:mx-auto'} style={activeTab === 'ai' ? { paddingBottom: 'max(calc(env(safe-area-inset-bottom) + 4.5rem), 5rem)' } : {}}>
         {activeTab === 'home' && renderHome()}
         {activeTab === 'gift' && renderGift()}
+        {activeTab === 'articles' && renderArticles()}
         {activeTab === 'user' && renderUser()}
 
         {activeTab === 'search' && (
@@ -2990,12 +3513,169 @@ ${userText}
         </div>
       )}
 
-      {/* ＝＝＝＝＝ 管理者: 非表示リスト浮きボタン ＝＝＝＝＝ */}
+      {/* ＝＝＝＝＝ 管理者: 浮きボタン群 ＝＝＝＝＝ */}
       {isAdminMode && !showUndoToast && (
-        <button
-          onClick={() => { setShowBlockedList(true); fetchBlockedProducts(); }}
-          className="fixed bottom-28 right-4 z-[200] bg-red-500 text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
-        >🚫 非表示リスト</button>
+        <div className="fixed bottom-28 right-4 z-[200] flex flex-col gap-2">
+          <button
+            onClick={openArticleAdmin}
+            className="bg-[#7B8E76] text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+          >📝 記事管理</button>
+          <button
+            onClick={() => { setShowBlockedList(true); fetchBlockedProducts(); }}
+            className="bg-red-500 text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+          >🚫 非表示リスト</button>
+        </div>
+      )}
+
+      {/* ＝＝＝＝＝ 管理者: 記事管理モーダル ＝＝＝＝＝ */}
+      {showArticleAdmin && (
+        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end sm:items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) setShowArticleAdmin(false); }}>
+          <div className="bg-[#FFFDFB] w-full max-w-lg rounded-t-[2rem] sm:rounded-[2rem] max-h-[92svh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-[#FFFDFB] px-6 pt-5 pb-4 flex items-center justify-between border-b border-[#F4EFEB]">
+              <span className="font-black text-[#5A4C4C]">📝 記事管理</span>
+              <button onClick={() => setShowArticleAdmin(false)} className="w-8 h-8 bg-[#F9F6F3] rounded-full flex items-center justify-center"><X className="w-4 h-4 text-[#A5A19E]" /></button>
+            </div>
+
+            <div className="px-6 py-6 flex-1">
+              {/* パスワード認証 */}
+              {!articleAdminAuthed && (
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm font-bold text-[#5A4C4C]">管理者パスワードを入力してください</p>
+                  <input
+                    type="password"
+                    value={articleAdminPassword}
+                    onChange={e => setArticleAdminPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleArticleAuth()}
+                    placeholder="パスワード"
+                    className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76]"
+                    autoFocus
+                  />
+                  {articleAdminError && <p className="text-xs text-red-500 font-bold">{articleAdminError}</p>}
+                  <button onClick={handleArticleAuth} className="w-full py-3 bg-[#7B8E76] text-white rounded-2xl font-black text-sm active:scale-95 transition-transform">
+                    ログイン
+                  </button>
+                </div>
+              )}
+
+              {/* 記事一覧 */}
+              {articleAdminAuthed && articleAdminView === 'list' && (
+                <div>
+                  <button
+                    onClick={() => { setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true }); setArticleAdminView('edit'); }}
+                    className="w-full py-3 border-2 border-dashed border-[#D4DDD2] rounded-2xl text-sm font-black text-[#7B8E76] mb-5 active:scale-95 transition-transform"
+                  >＋ 新規記事を追加</button>
+                  {articleList.length === 0 && (
+                    <p className="text-xs text-center text-[#A5A19E] font-bold py-8">記事がまだありません</p>
+                  )}
+                  <div className="flex flex-col gap-3">
+                    {articleList.map(a => (
+                      <div key={a.id} className="border border-[#F4EFEB] rounded-2xl p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black text-[#5A4C4C] text-sm truncate">{a.title}</p>
+                            <p className="text-[10px] text-[#A5A19E] font-bold">/article/{a.slug}</p>
+                          </div>
+                          <span className={`text-[9px] font-black px-2 py-1 rounded-full flex-shrink-0 ${a.published ? 'bg-[#EBF0EA] text-[#7B8E76]' : 'bg-[#F4EFEB] text-[#A5A19E]'}`}>
+                            {a.published ? '公開中' : '下書き'}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleArticleEdit(a)}
+                            className="flex-1 py-2 text-[11px] font-black border-2 border-[#7B8E76] rounded-xl text-[#7B8E76] active:scale-95 transition-transform"
+                          >編集</button>
+                          <button
+                            onClick={() => handleArticleToggle(a.id, !a.published)}
+                            className="flex-1 py-2 text-[11px] font-black border border-[#F4EFEB] rounded-xl text-[#A5A19E] active:scale-95 transition-transform"
+                          >{a.published ? '非公開' : '公開する'}</button>
+                          <button
+                            onClick={() => handleArticleDelete(a.id)}
+                            className="px-4 py-2 text-[11px] font-black border border-[#FFEBEB] rounded-xl text-[#F2ABAC] active:scale-95 transition-transform"
+                          >削除</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 記事編集フォーム */}
+              {articleAdminAuthed && articleAdminView === 'edit' && (
+                <div className="flex flex-col gap-4">
+                  <button onClick={() => setArticleAdminView('list')} className="flex items-center gap-1 text-xs text-[#A5A19E] font-bold mb-1">
+                    <ChevronLeft className="w-4 h-4" /> 一覧に戻る
+                  </button>
+                  {[
+                    { key: 'slug', label: 'スラッグ（URL）', placeholder: 'babycara-hikaku' },
+                    { key: 'title', label: 'タイトル', placeholder: 'ベビーカーの選び方...' },
+                    { key: 'meta_description', label: 'meta description（〜110文字）', placeholder: 'Google検索に表示される説明文' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <label className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-1 block">{f.label}</label>
+                      <input
+                        value={articleForm[f.key]}
+                        onChange={e => setArticleForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76]"
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-1 block">本文（Markdown）</label>
+                    {/* 商品リンク挿入 */}
+                    <div className="relative mb-2">
+                      <div className="flex items-center gap-2 bg-[#F9F6F3] border border-[#F4EFEB] rounded-2xl px-3 py-2">
+                        <Search className="w-3.5 h-3.5 text-[#A5A19E] flex-shrink-0" />
+                        <input
+                          value={productSearchQuery}
+                          onChange={e => { setProductSearchQuery(e.target.value); searchProductsForArticle(e.target.value); }}
+                          placeholder="商品を検索してリンクを挿入..."
+                          className="flex-1 bg-transparent text-xs focus:outline-none text-[#5A4C4C] placeholder-[#C0B8B2]"
+                        />
+                        {productSearchLoading && <span className="text-[10px] text-[#A5A19E]">検索中...</span>}
+                      </div>
+                      {productSearchResults.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-10 bg-white border border-[#F4EFEB] rounded-2xl shadow-lg mt-1 overflow-hidden max-h-52 overflow-y-auto">
+                          {productSearchResults.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => insertProductLink(p)}
+                              className="w-full text-left px-4 py-2.5 hover:bg-[#F9F6F3] flex items-center justify-between gap-2 border-b border-[#F4EFEB] last:border-0"
+                            >
+                              <span className="text-xs font-bold text-[#5A4C4C] line-clamp-1">{p.name}</span>
+                              <span className="text-[10px] text-[#A5A19E] flex-shrink-0">{p.category}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <textarea
+                      ref={contentTextareaRef}
+                      value={articleForm.content}
+                      onChange={e => setArticleForm(prev => ({ ...prev, content: e.target.value }))}
+                      placeholder="## 見出し&#10;&#10;本文をMarkdownで入力..."
+                      rows={12}
+                      className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76] resize-none font-mono"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleArticleSave(false)}
+                      disabled={articleSaving}
+                      className="flex-1 py-3.5 border-2 border-[#D4DDD2] rounded-2xl text-sm font-black text-[#7B8E76] active:scale-95 transition-transform disabled:opacity-50"
+                    >下書き保存</button>
+                    <button
+                      onClick={() => handleArticleSave(true)}
+                      disabled={articleSaving}
+                      className="flex-1 py-3.5 bg-[#7B8E76] text-white rounded-2xl text-sm font-black active:scale-95 transition-transform disabled:opacity-50"
+                    >{articleSaving ? '保存中...' : '公開する'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ＝＝＝＝＝ 管理者: ブロック済み商品モーダル ＝＝＝＝＝ */}
@@ -3504,6 +4184,218 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
             >
               {isSubmittingReview ? "送信中..." : "投稿する"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ＝＝＝＝＝ 出産準備リスト診断モーダル ＝＝＝＝＝ */}
+      {showDiagModal && (
+        <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowDiagModal(false); }}>
+          <div className="bg-[#FFFDFB] w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] max-h-[90svh] overflow-y-auto">
+            <div className="sticky top-0 bg-[#FFFDFB] px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#F4EFEB]">
+              <div className="flex items-center gap-2">
+                <Baby className="w-5 h-5 text-[#7B8E76]" />
+                <span className="font-black text-[#5A4C4C]">出産準備リスト診断</span>
+              </div>
+              <button onClick={() => setShowDiagModal(false)} className="w-8 h-8 bg-[#F9F6F3] rounded-full flex items-center justify-center"><X className="w-4 h-4 text-[#A5A19E]" /></button>
+            </div>
+
+            <div className="px-6 py-6">
+              {/* 質問ステップ */}
+              {diagResult === null && !isDiagLoading && (
+                <div>
+                  <div className="flex gap-1 mb-6">
+                    {DIAG_QUESTIONS.map((_, i) => (
+                      <div key={i} className={`h-1 flex-1 rounded-full ${i <= diagStep ? 'bg-[#7B8E76]' : 'bg-[#F4EFEB]'}`} />
+                    ))}
+                  </div>
+                  <p className="text-xs font-black text-[#7B8E76] uppercase tracking-widest mb-2">質問 {diagStep + 1} / {DIAG_QUESTIONS.length}</p>
+                  <h3 className="text-lg font-black text-[#5A4C4C] mb-6 leading-snug">{DIAG_QUESTIONS[diagStep].question}</h3>
+                  <div className="flex flex-col gap-3">
+                    {DIAG_QUESTIONS[diagStep].options.map(opt => {
+                      const isSelected = diagAnswers[DIAG_QUESTIONS[diagStep].key] === opt;
+                      return (
+                        <button
+                          key={opt}
+                          className={`w-full text-left px-5 py-4 rounded-[1.5rem] text-sm font-bold border-2 transition-all active:scale-95 ${isSelected ? 'border-[#7B8E76] bg-[#EBF0EA] text-[#5A4C4C]' : 'border-[#F4EFEB] bg-white text-[#5A4C4C] hover:border-[#D4DDD2]'}`}
+                          onClick={() => {
+                            const key = DIAG_QUESTIONS[diagStep].key;
+                            const newAnswers = { ...diagAnswers, [key]: opt };
+                            setDiagAnswers(newAnswers);
+                            if (diagStep < DIAG_QUESTIONS.length - 1) {
+                              setDiagStep(diagStep + 1);
+                            } else {
+                              setDiagStep(DIAG_QUESTIONS.length);
+                              runDiagnosis(newAnswers);
+                            }
+                          }}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {diagStep > 0 && (
+                    <button onClick={() => setDiagStep(diagStep - 1)} className="mt-4 text-xs text-[#A5A19E] font-bold flex items-center gap-1">
+                      <ChevronLeft className="w-4 h-4" /> 前の質問に戻る
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* ローディング */}
+              {isDiagLoading && (
+                <div className="flex flex-col items-center py-16 gap-4">
+                  <div className="w-10 h-10 border-4 border-[#7B8E76]/20 border-t-[#7B8E76] rounded-full animate-spin"></div>
+                  <p className="text-sm font-bold text-[#A5A19E]">準備リストを作成中...</p>
+                </div>
+              )}
+
+              {/* 結果 */}
+              {diagResult !== null && !isDiagLoading && (
+                <div>
+                  {diagResult.length === 0 ? (
+                    <p className="text-sm text-[#A5A19E] text-center py-8">リストの生成に失敗しました。もう一度お試しください。</p>
+                  ) : (
+                    <>
+                      {/* パーソナライズ要約 */}
+                      <div className="bg-[#EBF0EA] rounded-[1.5rem] px-5 py-4 mb-5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Sparkles className="w-4 h-4 text-[#7B8E76]" />
+                          <span className="text-xs font-black text-[#7B8E76] uppercase tracking-widest">あなたの診断結果</span>
+                        </div>
+                        <p className="text-sm font-bold text-[#5A4C4C] leading-relaxed">
+                          {diagAnswers.siblings?.includes('第2子') ? '2人目のご準備' : 'はじめての出産準備'}、
+                          {diagAnswers.timing?.includes('妊娠中') ? '妊娠中から' : '今から'}計画的に揃えていきましょう！
+                          <br />
+                          <span className="text-xs text-[#8E8282] font-medium">
+                            {diagResult.filter(i => i.priority === '必須').length}カテゴリが「必須」、{diagResult.filter(i => i.priority === 'あると便利').length}カテゴリが「あると便利」です。
+                          </span>
+                        </p>
+                      </div>
+                      {/* 必須リスト */}
+                      <p className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#F2ABAC] inline-block"></span>必須アイテム
+                      </p>
+                      <div className="flex flex-col gap-4 mb-6">
+                      {diagResult.filter(i => i.priority === '必須').map((item) => (
+                        <div key={item.category} className="border border-[#F4EFEB] rounded-[1.5rem] overflow-hidden">
+                          <div className="px-4 py-3 flex items-center justify-between" style={{ background: '#FFF5F5' }}>
+                            <div className="flex items-center gap-2">
+                              <CategoryIcon name={item.category} className="w-4 h-4 text-[#5A4C4C]" />
+                              <span className="font-black text-[#5A4C4C] text-sm">{item.category}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {item.timingLabel && <span className="text-[9px] font-bold px-2 py-1 rounded-full bg-white text-[#8E8282] border border-[#F4EFEB]">⏰ {item.timingLabel}</span>}
+                              <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-[#F2ABAC] text-white">{item.priority}</span>
+                            </div>
+                          </div>
+                          {item.reason && <p className="px-4 pt-2 text-[11px] text-[#8E8282] font-bold">{item.reason}</p>}
+                          {item.details && item.details.length > 0 && (
+                            <ul className="px-4 pb-3 pt-1 space-y-1 border-b border-[#F4EFEB]">
+                              {item.details.map((d, idx) => (
+                                <li key={idx} className="text-[11px] text-[#5A4C4C] font-medium flex items-start gap-1.5">
+                                  <span className="text-[#F2ABAC] flex-shrink-0">・</span>{d}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {item.products && item.products.length > 0 && (
+                            <div className="divide-y divide-[#F4EFEB]">
+                              {item.products.map(p => (
+                                <button
+                                  key={p.id}
+                                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F9F6F3] active:scale-[0.99] transition-all text-left"
+                                  onClick={() => { setSelectedProduct(p); setShowDiagModal(false); }}
+                                >
+                                  {p.image && <img src={p.image} alt={p.name} className="w-10 h-10 object-contain rounded-xl bg-white flex-shrink-0" />}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-[#5A4C4C] truncate">{cleanName(p.name)}</p>
+                                    {p.price && <p className="text-[11px] text-[#F2ABAC] font-black">¥{p.price.toLocaleString()}</p>}
+                                  </div>
+                                  <ChevronRight className="w-4 h-4 text-[#D4CDC7] flex-shrink-0" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            className="w-full py-3 text-[11px] font-black text-[#7B8E76] border-t border-[#F4EFEB] hover:bg-[#EBF0EA] transition-colors"
+                            onClick={() => { handleCategoryChange(item.category); setShowDiagModal(false); setActiveTab('home'); }}
+                          >
+                            {item.category}をもっと見る →
+                          </button>
+                        </div>
+                      ))}
+                      </div>
+                    {/* あると便利リスト */}
+                    {diagResult.filter(i => i.priority === 'あると便利').length > 0 && (
+                      <>
+                        <p className="text-[10px] font-black text-[#7B8E76] uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[#7B8E76] inline-block"></span>あると便利なアイテム
+                        </p>
+                        <div className="flex flex-col gap-4 mb-6">
+                          {diagResult.filter(i => i.priority === 'あると便利').map((item) => (
+                            <div key={item.category} className="border border-[#F4EFEB] rounded-[1.5rem] overflow-hidden">
+                              <div className="px-4 py-3 flex items-center justify-between bg-[#EBF0EA]">
+                                <div className="flex items-center gap-2">
+                                  <CategoryIcon name={item.category} className="w-4 h-4 text-[#5A4C4C]" />
+                                  <span className="font-black text-[#5A4C4C] text-sm">{item.category}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {item.timingLabel && <span className="text-[9px] font-bold px-2 py-1 rounded-full bg-white text-[#8E8282] border border-[#F4EFEB]">⏰ {item.timingLabel}</span>}
+                                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-[#7B8E76] text-white">{item.priority}</span>
+                                </div>
+                              </div>
+                              {item.reason && <p className="px-4 pt-2 text-[11px] text-[#8E8282] font-bold">{item.reason}</p>}
+                              {item.details && item.details.length > 0 && (
+                                <ul className="px-4 pb-3 pt-1 space-y-1 border-b border-[#F4EFEB]">
+                                  {item.details.map((d, idx) => (
+                                    <li key={idx} className="text-[11px] text-[#5A4C4C] font-medium flex items-start gap-1.5">
+                                      <span className="text-[#7B8E76] flex-shrink-0">・</span>{d}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              {item.products && item.products.length > 0 && (
+                                <div className="divide-y divide-[#F4EFEB]">
+                                  {item.products.map(p => (
+                                    <button
+                                      key={p.id}
+                                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F9F6F3] active:scale-[0.99] transition-all text-left"
+                                      onClick={() => { setSelectedProduct(p); setShowDiagModal(false); }}
+                                    >
+                                      {p.image && <img src={p.image} alt={p.name} className="w-10 h-10 object-contain rounded-xl bg-white flex-shrink-0" />}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-[#5A4C4C] truncate">{cleanName(p.name)}</p>
+                                        {p.price && <p className="text-[11px] text-[#F2ABAC] font-black">¥{p.price.toLocaleString()}</p>}
+                                      </div>
+                                      <ChevronRight className="w-4 h-4 text-[#D4CDC7] flex-shrink-0" />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              <button
+                                className="w-full py-3 text-[11px] font-black text-[#7B8E76] border-t border-[#F4EFEB] hover:bg-[#EBF0EA] transition-colors"
+                                onClick={() => { handleCategoryChange(item.category); setShowDiagModal(false); setActiveTab('home'); }}
+                              >
+                                {item.category}をもっと見る →
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    <button
+                      className="mt-2 w-full py-4 rounded-[1.5rem] text-sm font-black bg-[#7B8E76] text-white active:scale-95 transition-transform"
+                      onClick={() => { setDiagStep(0); setDiagAnswers({}); setDiagResult(null); }}
+                    >
+                      もう一度診断する
+                    </button>
+                  </>
+                )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
