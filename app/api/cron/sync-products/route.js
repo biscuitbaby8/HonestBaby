@@ -859,8 +859,9 @@ async function syncGiftSubCategories(log) {
 // --- Vercel Cron エンドポイント ---
 async function backfillSubCategories(log) {
   let offset = 0;
-  const batchSize = 500;
+  const batchSize = 200;
   let totalUpdated = 0;
+  let totalErrors = 0;
 
   while (true) {
     const { data: products, error } = await supabase
@@ -870,16 +871,21 @@ async function backfillSubCategories(log) {
 
     if (error || !products || products.length === 0) break;
 
-    const updates = products.map(p => ({
-      id: p.id,
-      sub_category: extractSubCategory(p.category, p.name),
-    }));
+    // upsert は NOT NULL 制約に引っかかるため、個別 update を並列実行
+    const results = await Promise.all(
+      products.map(p =>
+        supabase
+          .from('products')
+          .update({ sub_category: extractSubCategory(p.category, p.name) })
+          .eq('id', p.id)
+      )
+    );
 
-    const { error: upsertError } = await supabase
-      .from('products')
-      .upsert(updates, { onConflict: 'id' });
-
-    if (upsertError) log.push(`⚠️ backfill upsert error at offset ${offset}: ${upsertError.message}`);
+    const errors = results.filter(r => r.error);
+    totalErrors += errors.length;
+    if (errors.length > 0) {
+      log.push(`⚠️ offset ${offset}: ${errors.length}件エラー: ${errors[0].error.message}`);
+    }
 
     totalUpdated += products.length;
     log.push(`📝 backfill: ${totalUpdated}件処理済み`);
@@ -887,7 +893,7 @@ async function backfillSubCategories(log) {
     offset += batchSize;
   }
 
-  log.push(`✅ backfill完了: 合計${totalUpdated}件`);
+  log.push(`✅ backfill完了: 合計${totalUpdated}件 (エラー${totalErrors}件)`);
   return totalUpdated;
 }
 
