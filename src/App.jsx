@@ -11,6 +11,8 @@ import {
   FileText, Shield, Info, Edit2, Camera, Mail,
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2
 } from 'lucide-react';
+// カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
+import { CATEGORY_TREE, CATEGORIES } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -41,33 +43,6 @@ import ProductCard from './components/ProductCard';
 
 // 市場網羅のための詳細カテゴリツリー
 // ジャンルID は ranking.rakuten.co.jp/daily/<id>/ の URL から確認した実際のID
-const CATEGORY_TREE = [
-  { name: "すべて", id: "100533", keyword: "", subs: [] },
-  {
-    name: "おむつ", id: "205197", keyword: "おむつ", subs: [
-      { name: "テープタイプ", subsubs: ["新生児", "S", "M", "L", "BIG", "BIGより大きい"] },
-      { name: "パンツタイプ", subsubs: ["S", "M", "L", "BIG", "BIGより大きい"] },
-      { name: "夜用おむつ", subsubs: ["M", "L", "BIG", "BIGより大きい"] },
-      { name: "おしりふき" },
-      { name: "ゴミ箱・袋", subsubs: ["おむつポット", "防臭袋"] },
-    ]
-  },
-  { name: "ベビーカー", id: "200833", keyword: "ベビーカー", subs: ["A型", "B型", "AB型", "バギー", "周辺グッズ"] },
-  { name: "抱っこ紐", id: "412209", keyword: "抱っこ紐", subs: ["縦抱き", "横抱き", "スリング", "ヒップシート", "周辺グッズ"] },
-  { name: "ウェア", id: "111102", keyword: "ベビー服", subs: ["ロンパース", "カバーオール", "肌着", "アウター", "スタイ"] },
-  { name: "ミルク・授乳", id: "205208", keyword: "ミルク 授乳", subs: ["ミルク", "哺乳瓶", "搾乳器", "授乳クッション", "母乳パッド"] },
-  { name: "離乳食・食器", id: "213980", keyword: "離乳食", subs: ["ベビーフード", "食器セット", "ベビーチェア", "スプーン"] },
-  { name: "寝具・ベッド", id: "200822", keyword: "ベビーベッド", subs: ["ベビーベッド", "ベビー布団", "スリーパー", "まくら"] },
-  { name: "おもちゃ", id: "201591", keyword: "おもちゃ", subs: ["0ヶ月〜", "3ヶ月〜", "6ヶ月〜", "1歳〜"] },
-  { name: "安全グッズ", id: "200841", keyword: "ベビーゲート", subs: ["ベビーゲート", "コーナーガード", "扉ロック", "転倒防止", "ベビーモニター"] },
-  { name: "お風呂用品", id: "200815", keyword: "ベビー お風呂", subs: ["ベビーバス", "ベビー用ソープ", "保湿クリーム"] },
-  { name: "トイレ用品", id: "200819", keyword: "おまる", subs: ["補助便座", "おまる", "トイトレ", "おしりふき"] },
-  { name: "車用品", id: "566088", keyword: "チャイルドシート", subs: ["新生児用", "1歳以上", "ジュニアシート", "2wayタイプ", "周辺グッズ"] },
-  { name: "マタニティ", id: "553946", keyword: "マタニティ", subs: ["マタニティウェア", "腹帯", "葉酸サプリ", "授乳ブラ", "ノンカフェイン"] },
-  { name: "ギフトセット", id: "205222", keyword: "出産祝い ギフト", subs: ["ロンパース・服", "おもちゃ", "スキンケア", "タオル・スタイ", "食器・哺乳瓶", "ブランドギフト"] }
-];
-
-const CATEGORIES = CATEGORY_TREE.map(c => c.name);
 
 // 月齢→おすすめカテゴリのマッピング
 const AGE_CATEGORY_MAP = [
