@@ -43,6 +43,7 @@ import ProductCard from './components/ProductCard';
 
 // 市場網羅のための詳細カテゴリツリー
 // ジャンルID は ranking.rakuten.co.jp/daily/<id>/ の URL から確認した実際のID
+
 // 月齢→おすすめカテゴリのマッピング
 const AGE_CATEGORY_MAP = [
   { minM: 0,   maxM: 2,   label: '新生児期',       cats: ['おむつ', 'ミルク・授乳', '寝具・ベッド', '抱っこ紐'] },

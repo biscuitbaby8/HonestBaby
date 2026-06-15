@@ -551,7 +551,7 @@ function productNameKey(name) {
 }
 
 // --- メイン同期処理 ---
-async function syncCategory(cat, log, opts = {}) {
+async function syncCategory(cat, log, opts = {}, startDelay = 0) {
   const {
     limitCount = 30,
     includeYahooSupplement = true,
@@ -563,6 +563,9 @@ async function syncCategory(cat, log, opts = {}) {
   if (!RAKUTEN_APP_ID) {
     log.push(`  ⚠️ RAKUTEN_APP_IDが設定されていません`);
   }
+
+  // 楽天レート制限回避: カテゴリごとに開始をずらす
+  if (startDelay > 0) await new Promise(r => setTimeout(r, startDelay));
 
   let rakutenItems = [];
   let rakutenFailed = false;
@@ -803,14 +806,16 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
   const required = REQUIRED_KEYWORDS[category] || [];
 
   const results = await Promise.allSettled(
-    subQueries.map(async (q) => {
+    subQueries.map(async (q, qIdx) => {
+      // 楽天レート制限回避: サブクエリごとに開始をずらす
+      if (qIdx > 0) await new Promise(r => setTimeout(r, qIdx * 1500));
+
       // 1) 楽天を試す
       let rakutenItems = [];
       try {
         const res = await fetchRakutenSearch(q.keyword, genreId, 1);
         rakutenItems = (res.Items || [])
-          .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)))
-          .filter(item => required.some(kw => item.Item.itemName.includes(kw)));
+          .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)));
       } catch {
         rakutenItems = [];
       }
@@ -846,11 +851,11 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
           if (await saveSubCatProduct(product, seller, 'rakuten', '楽天市場')) saved++;
         }
       } else {
-        // 2) 楽天が全滅/空 → Yahooフォールバック（normalizeYahooItem 済みオブジェクト）
+        // 2) 楽天が全滅/空 → Yahooフォールバック（300件取得で必要数を確保）
         source = 'Yahoo';
-        const yahooItems = (await fetchYahooSupplement(q.keyword, category))
-          .filter(it => !ngKeywords.some(kw => it.name.includes(kw)))
-          .filter(it => required.some(kw => it.name.includes(kw)));
+        const yahooKeyword = q.yahooKeyword || q.keyword;
+        const yahooItems = (await fetchYahooSearchFallback(yahooKeyword, category))
+          .filter(it => !ngKeywords.some(kw => it.name.includes(kw)));
         for (const it of yahooItems.slice(0, 20)) {
           const product = {
             name: it.name,
@@ -886,10 +891,10 @@ async function syncToyAgeSubCategories(log) {
     ngKeywords: NG_KEYWORDS,
     emoji: '🧸',
     subQueries: [
-      { keyword: 'ベビー おもちゃ ガラガラ モービル にぎにぎ 新生児', sub: '0ヶ月〜' },
-      { keyword: 'ベビー おもちゃ 歯固め ラトル にぎにぎ 3ヶ月', sub: '3ヶ月〜' },
-      { keyword: 'ベビー おもちゃ プレイマット 積み木 ソフトブロック 6ヶ月', sub: '6ヶ月〜' },
-      { keyword: '知育玩具 おもちゃ パズル ブロック ぬいぐるみ 1歳', sub: '1歳〜' },
+      { keyword: 'ベビー おもちゃ ガラガラ モービル にぎにぎ 新生児', yahooKeyword: 'ベビー おもちゃ 新生児', sub: '0ヶ月〜' },
+      { keyword: 'ベビー おもちゃ 歯固め ラトル にぎにぎ 3ヶ月', yahooKeyword: 'ベビー おもちゃ 3ヶ月', sub: '3ヶ月〜' },
+      { keyword: 'ベビー おもちゃ プレイマット 積み木 ソフトブロック 6ヶ月', yahooKeyword: 'ベビー おもちゃ 6ヶ月 プレイマット', sub: '6ヶ月〜' },
+      { keyword: '知育玩具 おもちゃ パズル ブロック ぬいぐるみ 1歳', yahooKeyword: '知育玩具 おもちゃ 1歳', sub: '1歳〜' },
     ],
   });
 }
@@ -992,12 +997,21 @@ export async function GET(request) {
     }
     log.push(`🎯 フィルタ適用: カテゴリ「${filterCat}」のみ同期します`);
   } else if (batch === '1') {
-    // 前半7カテゴリ（60秒制限内に確実に収めるため2分割）
-    targetCategories = CATEGORIES.slice(0, 7);
+    // おむつ, ゴミ箱・袋, ベビーカー, 抱っこ紐
+    targetCategories = CATEGORIES.slice(0, 4);
     log.push(`📦 バッチ1: ${targetCategories.map(c => c.name).join('、')}`);
   } else if (batch === '2') {
-    targetCategories = CATEGORIES.slice(7);
+    // ウェア, ミルク・授乳, 離乳食・食器, 寝具・ベッド
+    targetCategories = CATEGORIES.slice(4, 8);
     log.push(`📦 バッチ2: ${targetCategories.map(c => c.name).join('、')}`);
+  } else if (batch === '3') {
+    // おもちゃ, 安全グッズ, お風呂用品, トイレ用品
+    targetCategories = CATEGORIES.slice(8, 12);
+    log.push(`📦 バッチ3: ${targetCategories.map(c => c.name).join('、')}`);
+  } else if (batch === '4') {
+    // 車用品, マタニティ, ギフトセット
+    targetCategories = CATEGORIES.slice(12);
+    log.push(`📦 バッチ4: ${targetCategories.map(c => c.name).join('、')}`);
   }
 
   // カテゴリ指定あり = 単発テスト用（軽量処理）、それ以外 = 通常同期（フル処理）
@@ -1006,9 +1020,9 @@ export async function GET(request) {
     ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false }
     : { limitCount: 25, includeYahooSupplement: true, includeYahooPrice: false };
 
-  // カテゴリを並列処理（合計時間を大幅短縮）
+  // カテゴリを並列処理（楽天レート制限回避のため1.5秒ずつずらして開始）
   const results = await Promise.allSettled(
-    targetCategories.map(cat => syncCategory(cat, log, opts))
+    targetCategories.map((cat, idx) => syncCategory(cat, log, opts, idx * 1500))
   );
   results.forEach((r, idx) => {
     if (r.status === 'fulfilled') {
@@ -1020,19 +1034,23 @@ export async function GET(request) {
 
   log.push(`\n🎉 同期完了: 合計 ${totalSaved}件保存`);
 
-  // サブカテゴリ補完（全バッチ共通で実行）
+  // サブカテゴリ補完（バッチ別: おもちゃはbatch=3、ギフトはbatch=4）
   if (!filterCat) {
-    try {
-      log.push(`\n🎁 ギフトサブカテゴリ補完同期開始...`);
-      await syncGiftSubCategories(log);
-    } catch (e) {
-      log.push(`⚠️ ギフト補完失敗: ${e.message}`);
+    if (batch === '3' || !batch) {
+      try {
+        log.push(`\n🧸 おもちゃ月齢別補完同期開始...`);
+        await syncToyAgeSubCategories(log);
+      } catch (e) {
+        log.push(`⚠️ おもちゃ補完失敗: ${e.message}`);
+      }
     }
-    try {
-      log.push(`\n🧸 おもちゃ月齢別補完同期開始...`);
-      await syncToyAgeSubCategories(log);
-    } catch (e) {
-      log.push(`⚠️ おもちゃ補完失敗: ${e.message}`);
+    if (batch === '4' || !batch) {
+      try {
+        log.push(`\n🎁 ギフトサブカテゴリ補完同期開始...`);
+        await syncGiftSubCategories(log);
+      } catch (e) {
+        log.push(`⚠️ ギフト補完失敗: ${e.message}`);
+      }
     }
   }
 
