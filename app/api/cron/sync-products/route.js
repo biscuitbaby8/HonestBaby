@@ -297,14 +297,22 @@ function extractSubCategory(category, itemName) {
 // --- 楽天API呼び出し（リトライ付き） ---
 async function fetchWithRetry(url, maxRetries = 1) {
   for (let i = 0; i <= maxRetries; i++) {
-    const res = await fetch(url, {
-      headers: { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' }
-    });
+    const headers = { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' };
+    if (RAKUTEN_ACCESS_KEY) headers['Authorization'] = `Bearer ${RAKUTEN_ACCESS_KEY}`;
+    const res = await fetch(url, { headers });
     if (res.ok) return res.json();
-    
-    // 403 (Invalid Key) の場合は即座にエラーにしてリトライしない（Vercelの60秒タイムアウト防止）
+
     if (res.status === 403) {
-      throw new Error(`API Error 403: Forbidden or Invalid Key`);
+      // レスポンスボディを記録して原因を把握
+      let body = '';
+      try { body = await res.text(); } catch {}
+      throw new Error(`API Error 403: ${body.slice(0, 100)}`);
+    }
+
+    if (res.status === 400) {
+      let body = '';
+      try { body = await res.text(); } catch {}
+      throw new Error(`API Error 400: ${body.slice(0, 100)}`);
     }
 
     if (res.status === 429 && i < maxRetries) {
@@ -316,12 +324,12 @@ async function fetchWithRetry(url, maxRetries = 1) {
 }
 
 async function fetchRakutenSearch(keyword, genreId, page = 1) {
-  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706?applicationId=${RAKUTEN_APP_ID}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${RAKUTEN_APP_ID}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
   return fetchWithRetry(url);
 }
 
 async function fetchRakutenRanking(genreId) {
-  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20120927?format=json&applicationId=${RAKUTEN_APP_ID}&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+  const url = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${RAKUTEN_APP_ID}&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
   return fetchWithRetry(url);
 }
 
