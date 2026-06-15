@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
-import { request as undiciRequest } from 'undici';
+import { request as httpsRequest } from 'node:https';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -295,13 +295,31 @@ function extractSubCategory(category, itemName) {
   return '本体';
 }
 
+// node:https でHTTPリクエスト（Referer等の禁止ヘッダーも送れる）
+function nodeHttpsGet(url, headers) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const req = httpsRequest({
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method: 'GET',
+      headers,
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => resolve({ statusCode: res.statusCode, text: data }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 // --- 楽天API呼び出し（リトライ付き） ---
 async function fetchWithRetry(url, maxRetries = 1) {
   for (let i = 0; i <= maxRetries; i++) {
     const headers = { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' };
     if (RAKUTEN_ACCESS_KEY) headers['Authorization'] = `Bearer ${RAKUTEN_ACCESS_KEY}`;
-    const { statusCode, body: resBody } = await undiciRequest(url, { method: 'GET', headers });
-    const text = await resBody.text();
+    const { statusCode, text } = await nodeHttpsGet(url, headers);
 
     if (statusCode === 200) return JSON.parse(text);
     if (statusCode === 403) throw new Error(`API Error 403: ${text.slice(0, 100)}`);
