@@ -32,7 +32,8 @@ export async function generateMetadata({ params }) {
     title: meta.title,
     description: meta.desc,
     alternates: { canonical: url },
-    openGraph: { title: meta.title, description: meta.desc, url, type: 'website', images: [`${SITE_URL}/logo.png`] },
+    // images未指定 → app/opengraph-image.jsx（1200×630）が自動適用される
+    openGraph: { title: meta.title, description: meta.desc, url, type: 'website' },
     twitter: { card: 'summary_large_image', title: meta.title, description: meta.desc },
   };
 }
