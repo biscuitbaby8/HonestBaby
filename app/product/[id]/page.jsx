@@ -72,7 +72,11 @@ export default async function ProductPage({ params }) {
     .sort((a, b) => Number(a.lowestPrice) - Number(b.lowestPrice));
   const reviews = (product.honestReviews || []).slice(0, 5);
 
-  const jsonLd = {
+  // レビュー件数は実数のみ採用（捏造を避ける）。評価と件数の両方がある時だけ aggregateRating を出す。
+  const reviewCount = Number(product.reviewsCount) || reviews.length || 0;
+  const hasRating = product.rating > 0 && reviewCount > 0;
+
+  const productLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
@@ -87,16 +91,41 @@ export default async function ProductPage({ params }) {
         availability: 'https://schema.org/InStock',
       },
     }),
-    ...(product.rating && {
+    ...(hasRating && {
       aggregateRating: {
         '@type': 'AggregateRating',
         ratingValue: product.rating,
-        reviewCount: product.reviewsCount || reviews.length || 1,
+        reviewCount,
         bestRating: 5,
         worstRating: 1,
       },
     }),
   };
+
+  // パンくず構造化データ（ホーム > カテゴリ > 商品）
+  const breadcrumbItems = [{ name: 'ホーム', url: `${SITE_URL}/` }];
+  if (product.category && CAT_META[product.category]) {
+    breadcrumbItems.push({
+      name: product.category,
+      url: `${SITE_URL}/category/${encodeURIComponent(product.category)}`,
+    });
+  }
+  breadcrumbItems.push({
+    name: product.name,
+    url: `${SITE_URL}/product/${encodeURIComponent(product.id)}`,
+  });
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: breadcrumbItems.map((it, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: it.name,
+      item: it.url,
+    })),
+  };
+
+  const jsonLd = [productLd, breadcrumbLd];
 
   return (
     <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">

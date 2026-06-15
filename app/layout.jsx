@@ -23,14 +23,13 @@ export const metadata = {
     title: TITLE,
     description:
       'パパ・ママのリアルな口コミと価格比較で、本当に良いベビー用品が見つかるAIコンサルタントアプリ。',
-    images: ['/favicon.png'],
+    // og:image は app/opengraph-image.jsx（1200×630）が自動適用される
   },
   twitter: {
     card: 'summary_large_image',
     title: TITLE,
     description:
       'パパ・ママのリアルな口コミと価格比較で、本当に良いベビー用品が見つかるAIコンサルタントアプリ。',
-    images: ['/favicon.png'],
   },
   verification: {
     google: 'bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI',
@@ -41,15 +40,43 @@ export const viewport = {
   themeColor: '#FF6B6B',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
 };
+
+// サイト全体の構造化データ（WebSite + Organization）。
+// ブランド検索・サイトリンク検索ボックス対応。
+const siteJsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'HonestBaby',
+    url: SITE_URL,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${SITE_URL}/?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'HonestBaby',
+    url: SITE_URL,
+    logo: `${SITE_URL}/favicon.png`,
+  },
+];
 
 export default function RootLayout({ children }) {
   return (
     <html lang="ja">
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
+        />
         {children}
 
         {/* Google Analytics (GA4) */}

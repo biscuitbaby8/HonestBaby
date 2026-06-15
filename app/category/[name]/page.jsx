@@ -58,13 +58,27 @@ export default async function CategoryPage({ params }) {
   }
 
   const meta = CAT_META[cat];
-  const jsonLd = {
+  const collectionLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     name: meta?.title || `${cat}のベビー用品 | HonestBaby`,
     description: meta?.desc || `${cat}のベビー用品を価格比較。`,
     url: `${SITE_URL}/category/${encodeURIComponent(cat)}`,
   };
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'ホーム', item: `${SITE_URL}/` },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: cat,
+        item: `${SITE_URL}/category/${encodeURIComponent(cat)}`,
+      },
+    ],
+  };
+  const jsonLd = [collectionLd, breadcrumbLd];
 
   return (
     <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
