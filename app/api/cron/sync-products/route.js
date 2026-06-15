@@ -19,6 +19,10 @@ const supabase = createClient(
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || process.env.VITE_RAKUTEN_APP_ID;
 const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || process.env.VITE_RAKUTEN_ACCESS_KEY || '';
 const RAKUTEN_AFFILIATE_ID = process.env.RAKUTEN_AFFILIATE_ID || process.env.VITE_RAKUTEN_AFFILIATE_ID || '';
+// 新・楽天API(openapi.rakuten.co.jp)は Referer/Origin が
+// アプリ登録時の「許可するWebサイト」と一致しないと403になる。
+// 既定はサイト本番ドメイン。登録URLが異なる場合は RAKUTEN_REFERER で上書き可。
+const RAKUTEN_REFERER = process.env.RAKUTEN_REFERER || 'https://honestbaby-care.com';
 const YAHOO_CLIENT_ID = process.env.YAHOO_CLIENT_ID || process.env.VITE_YAHOO_CLIENT_ID;
 const VC_SID = process.env.VITE_VC_SID || '3768537';
 
@@ -315,11 +319,19 @@ function nodeHttpsGet(url, headers) {
 }
 
 // --- 楽天API呼び出し（リトライ付き） ---
+// 新・楽天APIに渡す共通ヘッダー。Referer と Origin の両方を送らないと
+// REQUEST_CONTEXT_BODY_HTTP_REFERRER_MISSING (403) になる。
+function rakutenHeaders() {
+  return {
+    'User-Agent': 'Mozilla/5.0',
+    'Referer': RAKUTEN_REFERER,
+    'Origin': RAKUTEN_REFERER,
+  };
+}
+
 async function fetchWithRetry(url, maxRetries = 1) {
   for (let i = 0; i <= maxRetries; i++) {
-    const headers = { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' };
-    if (RAKUTEN_ACCESS_KEY) headers['Authorization'] = `Bearer ${RAKUTEN_ACCESS_KEY}`;
-    const { statusCode, text } = await nodeHttpsGet(url, headers);
+    const { statusCode, text } = await nodeHttpsGet(url, rakutenHeaders());
 
     if (statusCode === 200) return JSON.parse(text);
     if (statusCode === 403) throw new Error(`API Error 403: ${text.slice(0, 100)}`);
@@ -333,7 +345,7 @@ async function fetchWithRetry(url, maxRetries = 1) {
 }
 
 async function fetchRakutenSearch(keyword, genreId, page = 1) {
-  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
   return fetchWithRetry(url);
 }
 
@@ -988,6 +1000,24 @@ export async function GET(request) {
 
   if (!isManual && !isCronAuth) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // 楽天API疎通テスト（?debug=rakuten）: Supabase書き込みなしで
+  // 検索APIを1回だけ叩き、生のステータス＋レスポンスを返す（高速・原因切り分け用）
+  if (searchParams.get('debug') === 'rakuten') {
+    const dbgUrl = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent('紙おむつ')}&hits=3&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+    try {
+      const { statusCode, text } = await nodeHttpsGet(dbgUrl, rakutenHeaders());
+      return Response.json({
+        statusCode,
+        referer: RAKUTEN_REFERER,
+        appIdSet: !!RAKUTEN_APP_ID,
+        accessKeySet: !!RAKUTEN_ACCESS_KEY,
+        body: text.slice(0, 500),
+      });
+    } catch (e) {
+      return Response.json({ error: e.message, referer: RAKUTEN_REFERER });
+    }
   }
 
   const log = [];
