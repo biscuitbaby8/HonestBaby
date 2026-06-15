@@ -937,6 +937,19 @@ const App = () => {
     if (tab && validTabs.includes(tab)) setActiveTab(tab);
   }, []);
 
+  // サイトリンク検索ボックス（schema.org SearchAction）等からの ?q= で
+  // 検索タブを開き、キーワード検索を実行する。
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const term = (params.get('q') || '').trim();
+    if (!term) return;
+    window.history.replaceState({}, '', '/');
+    setActiveTab('search');
+    setSearchTerm(term);
+    fetchRemoteProductsWithAI(term);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // SSR商品ページ（/product/[id]）からのリダイレクト: ?product= で商品モーダルを開く
   useEffect(() => {
     if (typeof window === 'undefined') return;

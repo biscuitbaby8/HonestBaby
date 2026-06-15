@@ -4,6 +4,7 @@ import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META } from '@/src/lib/products';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
+import ProductCardLink from '@/src/components/ProductCardLink';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,6 +28,24 @@ async function fetchProduct(rawId) {
     return data ? formatDbProduct(data) : null;
   } catch {
     return null;
+  }
+}
+
+// 同カテゴリの人気商品を関連商品として取得（内部リンク強化・回遊性向上）
+async function fetchRelated(category, excludeId) {
+  if (!category) return [];
+  try {
+    const { data } = await supabaseServer
+      .from('products')
+      .select('*, shops:shops_prices(*)')
+      .eq('category', category)
+      .neq('id', excludeId)
+      .or('is_blocked.is.null,is_blocked.eq.false')
+      .order('popularity_rank', { ascending: true })
+      .limit(6);
+    return (data || []).map(formatDbProduct);
+  } catch {
+    return [];
   }
 }
 
@@ -58,6 +77,7 @@ export default async function ProductPage({ params }) {
   const product = await fetchProduct(id);
   if (!product) notFound();
 
+  const related = await fetchRelated(product.category, product.id);
   const price = getLowestPrice(product.shops);
   const shops = (product.shops || [])
     .filter((s) => {
@@ -202,6 +222,19 @@ export default async function ProductPage({ params }) {
                   </div>
                   <p className="text-xs text-[#8E8282] leading-relaxed">{r.content}</p>
                 </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {related.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-lg font-black mb-4">
+              {product.category ? `${product.category}の関連商品` : '関連商品'}
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {related.map((p) => (
+                <ProductCardLink key={p.id} product={p} />
               ))}
             </div>
           </section>
