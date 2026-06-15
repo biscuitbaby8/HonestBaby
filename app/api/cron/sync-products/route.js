@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
+import { request as undiciRequest } from 'undici';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -297,29 +298,19 @@ function extractSubCategory(category, itemName) {
 // --- 楽天API呼び出し（リトライ付き） ---
 async function fetchWithRetry(url, maxRetries = 1) {
   for (let i = 0; i <= maxRetries; i++) {
-    const headers = { 'User-Agent': 'Mozilla/5.0' };
+    const headers = { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' };
     if (RAKUTEN_ACCESS_KEY) headers['Authorization'] = `Bearer ${RAKUTEN_ACCESS_KEY}`;
-    const res = await fetch(url, { headers, referrer: 'https://honestbaby-care.com', referrerPolicy: 'unsafe-url' });
-    if (res.ok) return res.json();
+    const { statusCode, body: resBody } = await undiciRequest(url, { method: 'GET', headers });
+    const text = await resBody.text();
 
-    if (res.status === 403) {
-      // レスポンスボディを記録して原因を把握
-      let body = '';
-      try { body = await res.text(); } catch {}
-      throw new Error(`API Error 403: ${body.slice(0, 100)}`);
-    }
-
-    if (res.status === 400) {
-      let body = '';
-      try { body = await res.text(); } catch {}
-      throw new Error(`API Error 400: ${body.slice(0, 100)}`);
-    }
-
-    if (res.status === 429 && i < maxRetries) {
+    if (statusCode === 200) return JSON.parse(text);
+    if (statusCode === 403) throw new Error(`API Error 403: ${text.slice(0, 100)}`);
+    if (statusCode === 400) throw new Error(`API Error 400: ${text.slice(0, 100)}`);
+    if (statusCode === 429 && i < maxRetries) {
       await new Promise(r => setTimeout(r, 1000));
       continue;
     }
-    throw new Error(`API Error ${res.status}`);
+    throw new Error(`API Error ${statusCode}`);
   }
 }
 
