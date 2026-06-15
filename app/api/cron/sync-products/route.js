@@ -316,12 +316,12 @@ async function fetchWithRetry(url, maxRetries = 1) {
 }
 
 async function fetchRakutenSearch(keyword, genreId, page = 1) {
-  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601?applicationId=${RAKUTEN_APP_ID}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706?applicationId=${RAKUTEN_APP_ID}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
   return fetchWithRetry(url);
 }
 
 async function fetchRakutenRanking(genreId) {
-  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20220601?format=json&applicationId=${RAKUTEN_APP_ID}&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+  const url = `https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20120927?format=json&applicationId=${RAKUTEN_APP_ID}&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
   return fetchWithRetry(url);
 }
 
