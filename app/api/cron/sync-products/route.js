@@ -297,9 +297,9 @@ function extractSubCategory(category, itemName) {
 // --- 楽天API呼び出し（リトライ付き） ---
 async function fetchWithRetry(url, maxRetries = 1) {
   for (let i = 0; i <= maxRetries; i++) {
-    const headers = { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' };
+    const headers = { 'User-Agent': 'Mozilla/5.0' };
     if (RAKUTEN_ACCESS_KEY) headers['Authorization'] = `Bearer ${RAKUTEN_ACCESS_KEY}`;
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers, referrer: 'https://honestbaby-care.com', referrerPolicy: 'unsafe-url' });
     if (res.ok) return res.json();
 
     if (res.status === 403) {
