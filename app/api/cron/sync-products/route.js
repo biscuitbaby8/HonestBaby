@@ -757,6 +757,102 @@ async function syncCategory(cat, log, opts = {}) {
 
 // --- ギフトサブカテゴリを専用クエリで補完取得 ---
 // 各サブカテゴリ1ページ分（30件）を並列fetch → 合計最大180件の追加ギフト商品
+async function syncToyAgeSubCategories(log) {
+  if (!RAKUTEN_APP_ID) return;
+  const TOY_GENRE = '101074';
+
+  const subQueries = [
+    { keyword: 'ベビー おもちゃ ガラガラ モービル にぎにぎ 新生児', sub: '0ヶ月〜' },
+    { keyword: 'ベビー おもちゃ 歯固め ラトル にぎにぎ 3ヶ月', sub: '3ヶ月〜' },
+    { keyword: 'ベビー おもちゃ プレイマット 積み木 ソフトブロック 6ヶ月', sub: '6ヶ月〜' },
+    { keyword: '知育玩具 おもちゃ パズル ブロック ぬいぐるみ 1歳', sub: '1歳〜' },
+  ];
+
+  const results = await Promise.allSettled(
+    subQueries.map(async (q) => {
+      const res = await fetchRakutenSearch(q.keyword, TOY_GENRE, 1);
+      const items = (res.Items || [])
+        .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
+        .filter(item => REQUIRED_KEYWORDS['おもちゃ'].some(kw => item.Item.itemName.includes(kw)));
+
+      let saved = 0;
+      for (const item of items.slice(0, 20)) {
+        const rawName = item.Item.itemName;
+        const name = cleanName(rawName);
+        const brand = extractBrand(rawName);
+        const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
+        const product = {
+          name,
+          category: 'おもちゃ',
+          sub_category: q.sub,
+          brand,
+          image_url: rawImg.replace(/_ex=\d+x\d+/, '_ex=640x640'),
+          rating: parseFloat(item.Item.reviewAverage) || 0,
+          reviews_count: parseInt(item.Item.reviewCount) || 0,
+          rakuten_item_code: item.Item.itemCode,
+          is_market_wide: true,
+          last_synced_at: new Date().toISOString(),
+        };
+        const shopInfo = {
+          shop_name: item.Item.shopName || '楽天市場',
+          price: item.Item.itemPrice,
+          url: item.Item.affiliateUrl || item.Item.itemUrl,
+          shipping: item.Item.postageFlag === 1 ? 0 : null,
+          points: item.Item.pointRate || 0,
+          rating: parseFloat(item.Item.reviewAverage) || 0,
+          reviews_count: parseInt(item.Item.reviewCount) || 0,
+        };
+
+        try {
+          const { data: existing } = await supabase
+            .from('products')
+            .select('id')
+            .eq('rakuten_item_code', product.rakuten_item_code)
+            .single();
+
+          let productId;
+          if (existing) {
+            productId = existing.id;
+            await supabase.from('products').update({
+              name: product.name,
+              image_url: product.image_url,
+              rating: product.rating,
+              reviews_count: product.reviews_count,
+              sub_category: product.sub_category,
+              brand: product.brand || undefined,
+              last_synced_at: product.last_synced_at,
+            }).eq('id', productId);
+          } else {
+            const { data: inserted, error: ie } = await supabase.from('products').insert([product]).select('id');
+            if (ie) continue;
+            productId = inserted[0].id;
+          }
+
+          await supabase.from('shops_prices').upsert([{
+            product_id: productId,
+            shop_name: '楽天市場',
+            shop_type: 'mall',
+            lowest_price: shopInfo.price,
+            source: 'rakuten',
+            sellers: JSON.stringify([serializeSeller(shopInfo)]),
+          }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+
+          saved++;
+        } catch {
+          // 個別エラーはスキップ
+        }
+      }
+      return { sub: q.sub, saved };
+    })
+  );
+
+  results.forEach(r => {
+    if (r.status === 'fulfilled') {
+      log.push(`  🧸 おもちゃ補完「${r.value.sub}」: ${r.value.saved}件`);
+    }
+  });
+}
+
 async function syncGiftSubCategories(log) {
   if (!RAKUTEN_APP_ID) return;
   const GIFT_GENRE = '101079';
@@ -964,13 +1060,19 @@ export async function GET(request) {
 
   log.push(`\n🎉 同期完了: 合計 ${totalSaved}件保存`);
 
-  // ギフトサブカテゴリ補完（全バッチ共通で実行。ギフトの各タブに商品を確保する）
+  // サブカテゴリ補完（全バッチ共通で実行）
   if (!filterCat) {
     try {
       log.push(`\n🎁 ギフトサブカテゴリ補完同期開始...`);
       await syncGiftSubCategories(log);
     } catch (e) {
       log.push(`⚠️ ギフト補完失敗: ${e.message}`);
+    }
+    try {
+      log.push(`\n🧸 おもちゃ月齢別補完同期開始...`);
+      await syncToyAgeSubCategories(log);
+    } catch (e) {
+      log.push(`⚠️ おもちゃ補完失敗: ${e.message}`);
     }
   }
 
