@@ -4,7 +4,6 @@ import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META } from '@/src/lib/products';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
-import SpaRedirect from './SpaRedirect';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -129,7 +128,6 @@ export default async function ProductPage({ params }) {
 
   return (
     <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
-      <SpaRedirect productId={product.id} />
       <SiteHeader />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <nav className="text-[11px] text-[#A5A19E] font-bold mb-4">
