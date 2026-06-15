@@ -757,198 +757,158 @@ async function syncCategory(cat, log, opts = {}) {
 
 // --- ギフトサブカテゴリを専用クエリで補完取得 ---
 // 各サブカテゴリ1ページ分（30件）を並列fetch → 合計最大180件の追加ギフト商品
-async function syncToyAgeSubCategories(log) {
-  if (!RAKUTEN_APP_ID) return;
-  const TOY_GENRE = '101074';
+// --- サブカテゴリ補完: 1商品をproducts/shops_pricesに保存（sub_categoryは呼び出し側で確定済み） ---
+async function saveSubCatProduct(product, seller, source, shopName) {
+  try {
+    const { data: existing } = await supabase
+      .from('products').select('id')
+      .eq('rakuten_item_code', product.rakuten_item_code).single();
 
-  const subQueries = [
-    { keyword: 'ベビー おもちゃ ガラガラ モービル にぎにぎ 新生児', sub: '0ヶ月〜' },
-    { keyword: 'ベビー おもちゃ 歯固め ラトル にぎにぎ 3ヶ月', sub: '3ヶ月〜' },
-    { keyword: 'ベビー おもちゃ プレイマット 積み木 ソフトブロック 6ヶ月', sub: '6ヶ月〜' },
-    { keyword: '知育玩具 おもちゃ パズル ブロック ぬいぐるみ 1歳', sub: '1歳〜' },
-  ];
+    let productId;
+    if (existing) {
+      productId = existing.id;
+      await supabase.from('products').update({
+        name: product.name,
+        image_url: product.image_url,
+        rating: product.rating,
+        reviews_count: product.reviews_count,
+        sub_category: product.sub_category,
+        brand: product.brand || undefined,
+        last_synced_at: product.last_synced_at,
+      }).eq('id', productId);
+    } else {
+      const { data: inserted, error: ie } = await supabase.from('products').insert([product]).select('id');
+      if (ie) return false;
+      productId = inserted[0].id;
+    }
+
+    await supabase.from('shops_prices').upsert([{
+      product_id: productId,
+      shop_name: shopName,
+      shop_type: 'mall',
+      lowest_price: seller.price,
+      source,
+      sellers: JSON.stringify([serializeSeller(seller)]),
+    }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// --- サブカテゴリ補完の共通処理: 楽天検索を優先し、失敗/空ならYahoo検索にフォールバック ---
+// sub_category は subQueries の sub を強制設定するため、カテゴリのサブタブに確実に商品が並ぶ。
+async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQueries, emoji }) {
+  const required = REQUIRED_KEYWORDS[category] || [];
 
   const results = await Promise.allSettled(
     subQueries.map(async (q) => {
-      const res = await fetchRakutenSearch(q.keyword, TOY_GENRE, 1);
-      const items = (res.Items || [])
-        .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
-        .filter(item => REQUIRED_KEYWORDS['おもちゃ'].some(kw => item.Item.itemName.includes(kw)));
+      // 1) 楽天を試す
+      let rakutenItems = [];
+      try {
+        const res = await fetchRakutenSearch(q.keyword, genreId, 1);
+        rakutenItems = (res.Items || [])
+          .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)))
+          .filter(item => required.some(kw => item.Item.itemName.includes(kw)));
+      } catch {
+        rakutenItems = [];
+      }
 
       let saved = 0;
-      for (const item of items.slice(0, 20)) {
-        const rawName = item.Item.itemName;
-        const name = cleanName(rawName);
-        const brand = extractBrand(rawName);
-        const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
-        const product = {
-          name,
-          category: 'おもちゃ',
-          sub_category: q.sub,
-          brand,
-          image_url: rawImg.replace(/_ex=\d+x\d+/, '_ex=640x640'),
-          rating: parseFloat(item.Item.reviewAverage) || 0,
-          reviews_count: parseInt(item.Item.reviewCount) || 0,
-          rakuten_item_code: item.Item.itemCode,
-          is_market_wide: true,
-          last_synced_at: new Date().toISOString(),
-        };
-        const shopInfo = {
-          shop_name: item.Item.shopName || '楽天市場',
-          price: item.Item.itemPrice,
-          url: item.Item.affiliateUrl || item.Item.itemUrl,
-          shipping: item.Item.postageFlag === 1 ? 0 : null,
-          points: item.Item.pointRate || 0,
-          rating: parseFloat(item.Item.reviewAverage) || 0,
-          reviews_count: parseInt(item.Item.reviewCount) || 0,
-        };
+      let source = '楽天';
 
-        try {
-          const { data: existing } = await supabase
-            .from('products')
-            .select('id')
-            .eq('rakuten_item_code', product.rakuten_item_code)
-            .single();
-
-          let productId;
-          if (existing) {
-            productId = existing.id;
-            await supabase.from('products').update({
-              name: product.name,
-              image_url: product.image_url,
-              rating: product.rating,
-              reviews_count: product.reviews_count,
-              sub_category: product.sub_category,
-              brand: product.brand || undefined,
-              last_synced_at: product.last_synced_at,
-            }).eq('id', productId);
-          } else {
-            const { data: inserted, error: ie } = await supabase.from('products').insert([product]).select('id');
-            if (ie) continue;
-            productId = inserted[0].id;
-          }
-
-          await supabase.from('shops_prices').upsert([{
-            product_id: productId,
-            shop_name: '楽天市場',
-            shop_type: 'mall',
-            lowest_price: shopInfo.price,
-            source: 'rakuten',
-            sellers: JSON.stringify([serializeSeller(shopInfo)]),
-          }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
-
-          saved++;
-        } catch {
-          // 個別エラーはスキップ
+      if (rakutenItems.length > 0) {
+        for (const item of rakutenItems.slice(0, 20)) {
+          const rawName = item.Item.itemName;
+          const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
+          const product = {
+            name: cleanName(rawName),
+            category,
+            sub_category: q.sub,
+            brand: extractBrand(rawName),
+            image_url: rawImg.replace(/_ex=\d+x\d+/, '_ex=640x640'),
+            rating: parseFloat(item.Item.reviewAverage) || 0,
+            reviews_count: parseInt(item.Item.reviewCount) || 0,
+            rakuten_item_code: item.Item.itemCode,
+            is_market_wide: true,
+            last_synced_at: new Date().toISOString(),
+          };
+          const seller = {
+            shop_name: item.Item.shopName || '楽天市場',
+            price: item.Item.itemPrice,
+            url: item.Item.affiliateUrl || item.Item.itemUrl,
+            shipping: item.Item.postageFlag === 1 ? 0 : null,
+            points: item.Item.pointRate || 0,
+            rating: parseFloat(item.Item.reviewAverage) || 0,
+            reviews_count: parseInt(item.Item.reviewCount) || 0,
+          };
+          if (await saveSubCatProduct(product, seller, 'rakuten', '楽天市場')) saved++;
+        }
+      } else {
+        // 2) 楽天が全滅/空 → Yahooフォールバック（normalizeYahooItem 済みオブジェクト）
+        source = 'Yahoo';
+        const yahooItems = (await fetchYahooSupplement(q.keyword, category))
+          .filter(it => !ngKeywords.some(kw => it.name.includes(kw)))
+          .filter(it => required.some(kw => it.name.includes(kw)));
+        for (const it of yahooItems.slice(0, 20)) {
+          const product = {
+            name: it.name,
+            category,
+            sub_category: q.sub,
+            brand: it.brand,
+            image_url: it.image_url,
+            rating: it.rating,
+            reviews_count: it.reviews_count,
+            rakuten_item_code: it.rakuten_item_code,
+            is_market_wide: true,
+            last_synced_at: it.last_synced_at,
+          };
+          if (await saveSubCatProduct(product, it._rakuten_shop, 'yahoo', 'Yahoo!ショッピング')) saved++;
         }
       }
-      return { sub: q.sub, saved };
+
+      return { sub: q.sub, saved, source };
     })
   );
 
   results.forEach(r => {
     if (r.status === 'fulfilled') {
-      log.push(`  🧸 おもちゃ補完「${r.value.sub}」: ${r.value.saved}件`);
+      log.push(`  ${emoji} ${category}補完「${r.value.sub}」: ${r.value.saved}件 (${r.value.source})`);
     }
   });
 }
 
+async function syncToyAgeSubCategories(log) {
+  await syncSubCategoryQueries(log, {
+    category: 'おもちゃ',
+    genreId: '101074',
+    ngKeywords: NG_KEYWORDS,
+    emoji: '🧸',
+    subQueries: [
+      { keyword: 'ベビー おもちゃ ガラガラ モービル にぎにぎ 新生児', sub: '0ヶ月〜' },
+      { keyword: 'ベビー おもちゃ 歯固め ラトル にぎにぎ 3ヶ月', sub: '3ヶ月〜' },
+      { keyword: 'ベビー おもちゃ プレイマット 積み木 ソフトブロック 6ヶ月', sub: '6ヶ月〜' },
+      { keyword: '知育玩具 おもちゃ パズル ブロック ぬいぐるみ 1歳', sub: '1歳〜' },
+    ],
+  });
+}
+
 async function syncGiftSubCategories(log) {
-  if (!RAKUTEN_APP_ID) return;
-  const GIFT_GENRE = '101079';
-  const GIFT_NG = [...NG_KEYWORDS, ...['アルバム', 'フォトアルバム', 'ぬいぐるみ単体', '絵本']];
-
-  const subQueries = [
-    { keyword: '出産祝い ロンパース ベビー服 セット', sub: 'ロンパース・服' },
-    { keyword: '出産祝い 知育玩具 おもちゃ ガラガラ', sub: 'おもちゃ' },
-    { keyword: '出産祝い スキンケア ベビー ケアセット', sub: 'スキンケア' },
-    { keyword: '出産祝い タオル スタイ ガーゼ', sub: 'タオル・スタイ' },
-    { keyword: '出産祝い 食器セット 哺乳瓶 マグ', sub: '食器・哺乳瓶' },
-    { keyword: '出産祝い ミキハウス ファミリア ブランド ギフト', sub: 'ブランドギフト' },
-  ];
-
-  const results = await Promise.allSettled(
-    subQueries.map(async (q) => {
-      const res = await fetchRakutenSearch(q.keyword, GIFT_GENRE, 1);
-      const items = (res.Items || [])
-        .filter(item => !GIFT_NG.some(kw => item.Item.itemName.includes(kw)))
-        .filter(item => REQUIRED_KEYWORDS['ギフトセット'].some(kw => item.Item.itemName.includes(kw)));
-
-      let saved = 0;
-      for (const item of items.slice(0, 20)) {
-        const rawName = item.Item.itemName;
-        const name = cleanName(rawName);
-        const brand = extractBrand(rawName);
-        const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
-        const product = {
-          name,
-          category: 'ギフトセット',
-          sub_category: q.sub,
-          brand,
-          image_url: rawImg.replace(/_ex=\d+x\d+/, '_ex=640x640'),
-          rating: parseFloat(item.Item.reviewAverage) || 0,
-          reviews_count: parseInt(item.Item.reviewCount) || 0,
-          rakuten_item_code: item.Item.itemCode,
-          is_market_wide: true,
-          last_synced_at: new Date().toISOString(),
-        };
-        const shopInfo = {
-          shop_name: item.Item.shopName || '楽天市場',
-          price: item.Item.itemPrice,
-          url: item.Item.affiliateUrl || item.Item.itemUrl,
-          shipping: item.Item.postageFlag === 1 ? 0 : null,
-          points: item.Item.pointRate || 0,
-          rating: parseFloat(item.Item.reviewAverage) || 0,
-          reviews_count: parseInt(item.Item.reviewCount) || 0,
-        };
-
-        try {
-          const { data: existing } = await supabase
-            .from('products')
-            .select('id')
-            .eq('rakuten_item_code', product.rakuten_item_code)
-            .single();
-
-          let productId;
-          if (existing) {
-            productId = existing.id;
-            await supabase.from('products').update({
-              name: product.name,
-              image_url: product.image_url,
-              rating: product.rating,
-              reviews_count: product.reviews_count,
-              sub_category: product.sub_category,
-              brand: product.brand || undefined,
-              last_synced_at: product.last_synced_at,
-            }).eq('id', productId);
-          } else {
-            const { data: inserted, error: ie } = await supabase.from('products').insert([product]).select('id');
-            if (ie) continue;
-            productId = inserted[0].id;
-          }
-
-          await supabase.from('shops_prices').upsert([{
-            product_id: productId,
-            shop_name: '楽天市場',
-            shop_type: 'mall',
-            lowest_price: shopInfo.price,
-            source: 'rakuten',
-            sellers: JSON.stringify([serializeSeller(shopInfo)]),
-          }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
-
-          saved++;
-        } catch {
-          // 個別エラーはスキップ
-        }
-      }
-      return { sub: q.sub, saved };
-    })
-  );
-
-  results.forEach(r => {
-    if (r.status === 'fulfilled') {
-      log.push(`  🎁 ギフト補完「${r.value.sub}」: ${r.value.saved}件`);
-    }
+  const GIFT_NG = [...NG_KEYWORDS, 'アルバム', 'フォトアルバム', 'ぬいぐるみ単体', '絵本'];
+  await syncSubCategoryQueries(log, {
+    category: 'ギフトセット',
+    genreId: '101079',
+    ngKeywords: GIFT_NG,
+    emoji: '🎁',
+    subQueries: [
+      { keyword: '出産祝い ロンパース ベビー服 セット', sub: 'ロンパース・服' },
+      { keyword: '出産祝い 知育玩具 おもちゃ ガラガラ', sub: 'おもちゃ' },
+      { keyword: '出産祝い スキンケア ベビー ケアセット', sub: 'スキンケア' },
+      { keyword: '出産祝い タオル スタイ ガーゼ', sub: 'タオル・スタイ' },
+      { keyword: '出産祝い 食器セット 哺乳瓶 マグ', sub: '食器・哺乳瓶' },
+      { keyword: '出産祝い ミキハウス ファミリア ブランド ギフト', sub: 'ブランドギフト' },
+    ],
   });
 }
 
