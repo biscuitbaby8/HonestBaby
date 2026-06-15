@@ -294,45 +294,22 @@ function extractSubCategory(category, itemName) {
   return '本体';
 }
 
-// --- 楽天APIのグローバル流量制御 ---
-// 楽天は1アプリ約1リクエスト/秒の制限。カテゴリを並列同期すると一斉にリクエストが飛び
-// 429/403（レート制限）で全滅する。全楽天呼び出しを直列化し最低間隔を空けて回避する。
-let _rakutenChain = Promise.resolve();
-let _lastRakutenAt = 0;
-let _cronStartMs = 0;
-const RAKUTEN_MIN_INTERVAL = 1000; // ms（約1req/秒に整流）
-const RAKUTEN_DEADLINE_MS = 48000; // この時間を過ぎたら楽天をスキップしYahooに委譲（タイムアウト防止）
-
-function rakutenThrottle(fn) {
-  const result = _rakutenChain.then(async () => {
-    if (_cronStartMs && Date.now() - _cronStartMs > RAKUTEN_DEADLINE_MS) {
-      throw new Error('Rakuten skipped (time budget)');
-    }
-    const wait = _lastRakutenAt + RAKUTEN_MIN_INTERVAL - Date.now();
-    if (wait > 0) await new Promise(r => setTimeout(r, wait));
-    _lastRakutenAt = Date.now();
-    return fn();
-  });
-  // 成否に関わらずチェーンを前進させる（この呼び出しの結果は result で個別に返す）
-  _rakutenChain = result.then(() => {}, () => {});
-  return result;
-}
-
-// --- 楽天API呼び出し（リトライ付き・429/403はバックオフ再試行） ---
-async function fetchWithRetry(url, maxRetries = 2) {
+// --- 楽天API呼び出し（リトライ付き） ---
+async function fetchWithRetry(url, maxRetries = 1) {
   for (let i = 0; i <= maxRetries; i++) {
     const res = await fetch(url, {
       headers: { 'Referer': 'https://honestbaby-care.com', 'User-Agent': 'Mozilla/5.0' }
     });
     if (res.ok) return res.json();
-
-    // 429（レート制限）/ 403（過負荷時にも返る）はバックオフして再試行
-    if ((res.status === 429 || res.status === 403) && i < maxRetries) {
-      await new Promise(r => setTimeout(r, 800 * (i + 1)));
-      continue;
-    }
+    
+    // 403 (Invalid Key) の場合は即座にエラーにしてリトライしない（Vercelの60秒タイムアウト防止）
     if (res.status === 403) {
       throw new Error(`API Error 403: Forbidden or Invalid Key`);
+    }
+
+    if (res.status === 429 && i < maxRetries) {
+      await new Promise(r => setTimeout(r, 1000));
+      continue;
     }
     throw new Error(`API Error ${res.status}`);
   }
@@ -340,12 +317,12 @@ async function fetchWithRetry(url, maxRetries = 2) {
 
 async function fetchRakutenSearch(keyword, genreId, page = 1) {
   const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
-  return rakutenThrottle(() => fetchWithRetry(url));
+  return fetchWithRetry(url);
 }
 
 async function fetchRakutenRanking(genreId) {
   const url = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
-  return rakutenThrottle(() => fetchWithRetry(url));
+  return fetchWithRetry(url);
 }
 
 // --- Yahoo商品データを正規化（共通化） ---
@@ -1001,7 +978,6 @@ export async function GET(request) {
   }
 
   log.push(`🚀 同期開始: ${new Date().toISOString()}`);
-  _cronStartMs = Date.now(); // 楽天流量制御の時間予算の起点
 
   let totalSaved = 0;
 
@@ -1044,8 +1020,8 @@ export async function GET(request) {
 
   log.push(`\n🎉 同期完了: 合計 ${totalSaved}件保存`);
 
-  // サブカテゴリ補完（バッチ1では実行しない。バッチ2または全件手動実行時のみ。重複実行と楽天負荷を回避）
-  if (!filterCat && batch !== '1') {
+  // サブカテゴリ補完（全バッチ共通で実行）
+  if (!filterCat) {
     try {
       log.push(`\n🎁 ギフトサブカテゴリ補完同期開始...`);
       await syncGiftSubCategories(log);
