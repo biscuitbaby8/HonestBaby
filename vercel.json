@@ -1,21 +1,13 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/sync-products?manual=1&batch=1",
-      "schedule": "0 17 * * *"
-    },
-    {
-      "path": "/api/cron/sync-products?manual=1&batch=2",
-      "schedule": "30 17 * * *"
-    },
-    {
-      "path": "/api/cron/sync-products?manual=1&batch=3",
-      "schedule": "0 18 * * *"
-    },
-    {
-      "path": "/api/cron/sync-products?manual=1&batch=4",
-      "schedule": "30 18 * * *"
-    }
+    { "path": "/api/cron/sync-products?manual=1&batch=1", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/sync-products?manual=1&batch=2", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/sync-products?manual=1&batch=3", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/sync-products?manual=1&batch=4", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/sync-products?manual=1&batch=5", "schedule": "0 12 * * *" },
+    { "path": "/api/cron/sync-products?manual=1&batch=6", "schedule": "0 15 * * *" },
+    { "path": "/api/cron/sync-products?manual=1&batch=7", "schedule": "0 18 * * *" },
+    { "path": "/api/cron/sync-products?manual=1&batch=8", "schedule": "0 21 * * *" }
   ],
   "redirects": [
     {

@@ -26,23 +26,108 @@ const RAKUTEN_REFERER = process.env.RAKUTEN_REFERER || 'https://honestbaby-care.
 const YAHOO_CLIENT_ID = process.env.YAHOO_CLIENT_ID || process.env.VITE_YAHOO_CLIENT_ID;
 const VC_SID = process.env.VITE_VC_SID || '3768537';
 
-// カテゴリ定義（App.jsx の CATEGORY_TREE と同期）
+// カテゴリ定義（src/lib/products.js の CATEGORY_TREE と同期）
+// keyword     … カテゴリ全体の広い検索（path1 / syncCategory が使用）
+// subs[].sub  … CATEGORY_TREE の sub 文字列と「完全一致」させること（1文字違うと空タブになる）
+// subs[].keywords … サブカテゴリ専用の検索（path2 / syncCategorySubQueries が使用。見つけた枠に
+//                   sub_category を直接確定するので、各サブタブに確実に商品が並ぶ）
+// subs[].yahooKeyword … 楽天が空のときのYahooフォールバック用の広めキーワード（任意）
 const CATEGORIES = [
-  { name: "おむつ",       genreId: "101070", keyword: "紙おむつ 赤ちゃん" },
-  { name: "ゴミ箱・袋",  genreId: "101070", keyword: "おむつ ゴミ箱 防臭" },
-  { name: "ベビーカー",   genreId: "501062", keyword: "ベビーカー" },
-  { name: "抱っこ紐",     genreId: "209214", keyword: "抱っこ紐 新生児" },
-  { name: "ウェア",       genreId: "110464", keyword: "ベビー服 赤ちゃん" },
-  { name: "ミルク・授乳", genreId: "101077", keyword: "ベビー 哺乳瓶" },
-  { name: "離乳食・食器", genreId: "101078", keyword: "離乳食 ベビーフード" },
-  { name: "寝具・ベッド", genreId: "101071", keyword: "ベビーベッド 赤ちゃん布団" },
-  { name: "おもちゃ",     genreId: "101074", keyword: "赤ちゃん おもちゃ 知育" },
-  { name: "安全グッズ",   genreId: "101076", keyword: "ベビー 安全グッズ ゲート" },
-  { name: "お風呂用品",   genreId: "101075", keyword: "ベビー お風呂 沐浴" },
-  { name: "トイレ用品",   genreId: "101072", keyword: "ベビー おしりふき 赤ちゃん" },
-  { name: "車用品",       genreId: "501063", keyword: "チャイルドシート 新生児" },
-  { name: "マタニティ",   genreId: "101080", keyword: "マタニティ 妊娠" },
-  { name: "ギフトセット", genreId: "101079", keyword: "出産祝い ギフトセット 赤ちゃん" },
+  { name: "おむつ", genreId: "101070", keyword: "紙おむつ 赤ちゃん", subs: [
+    { sub: "テープタイプ", keywords: ["おむつ テープ"], yahooKeyword: "おむつ テープ 赤ちゃん" },
+    { sub: "パンツタイプ", keywords: ["おむつ パンツ"], yahooKeyword: "おむつ パンツ 赤ちゃん" },
+    { sub: "夜用おむつ",   keywords: ["おむつ 夜用"], yahooKeyword: "夜用 おむつ" },
+    { sub: "おしりふき",   keywords: ["おしりふき 赤ちゃん"], yahooKeyword: "おしりふき" },
+  ]},
+  { name: "ゴミ箱・袋", genreId: "101070", keyword: "おむつ ゴミ箱 防臭", subs: [
+    { sub: "ゴミ箱・袋", keywords: ["おむつ ゴミ箱 防臭", "おむつ 防臭袋"], yahooKeyword: "おむつ ゴミ箱 防臭" },
+  ]},
+  { name: "ベビーカー", genreId: "501062", keyword: "ベビーカー", subs: [
+    { sub: "A型",       keywords: ["ベビーカー A型"], yahooKeyword: "ベビーカー A型" },
+    { sub: "B型",       keywords: ["ベビーカー B型 軽量"], yahooKeyword: "ベビーカー B型" },
+    { sub: "AB型",      keywords: ["ベビーカー AB型"], yahooKeyword: "ベビーカー AB型" },
+    { sub: "バギー",    keywords: ["ベビーカー バギー 軽量"], yahooKeyword: "ベビーカー バギー" },
+    { sub: "周辺グッズ", keywords: ["ベビーカー レインカバー", "ベビーカー フック"], yahooKeyword: "ベビーカー アクセサリー" },
+  ]},
+  { name: "抱っこ紐", genreId: "209214", keyword: "抱っこ紐 新生児", subs: [
+    { sub: "縦抱き",     keywords: ["抱っこ紐 縦抱き"], yahooKeyword: "抱っこ紐 縦抱き" },
+    { sub: "横抱き",     keywords: ["抱っこ紐 横抱き 新生児"], yahooKeyword: "抱っこ紐 横抱き" },
+    { sub: "スリング",   keywords: ["ベビースリング 抱っこ"], yahooKeyword: "ベビースリング" },
+    { sub: "ヒップシート", keywords: ["ヒップシート 抱っこ紐"], yahooKeyword: "ヒップシート" },
+    { sub: "周辺グッズ", keywords: ["抱っこ紐 よだれカバー", "抱っこ紐 ケープ"], yahooKeyword: "抱っこ紐 カバー" },
+  ]},
+  { name: "ウェア", genreId: "110464", keyword: "ベビー服 赤ちゃん", subs: [
+    { sub: "ロンパース",   keywords: ["ベビー ロンパース"], yahooKeyword: "ベビー ロンパース" },
+    { sub: "カバーオール", keywords: ["ベビー カバーオール"], yahooKeyword: "ベビー カバーオール" },
+    { sub: "肌着",         keywords: ["ベビー 肌着 コンビ肌着"], yahooKeyword: "ベビー 肌着" },
+    { sub: "アウター",     keywords: ["ベビー アウター ジャンパー"], yahooKeyword: "ベビー アウター" },
+    { sub: "スタイ",       keywords: ["ベビー スタイ よだれかけ"], yahooKeyword: "ベビー スタイ" },
+  ]},
+  { name: "ミルク・授乳", genreId: "101077", keyword: "ベビー 哺乳瓶", subs: [
+    { sub: "ミルク",       keywords: ["粉ミルク 育児用ミルク"], yahooKeyword: "粉ミルク 赤ちゃん" },
+    { sub: "哺乳瓶",       keywords: ["哺乳瓶 ベビー"], yahooKeyword: "哺乳瓶" },
+    { sub: "搾乳器",       keywords: ["搾乳器"], yahooKeyword: "搾乳器" },
+    { sub: "授乳クッション", keywords: ["授乳クッション"], yahooKeyword: "授乳クッション" },
+    { sub: "母乳パッド",   keywords: ["母乳パッド"], yahooKeyword: "母乳パッド" },
+  ]},
+  { name: "離乳食・食器", genreId: "101078", keyword: "離乳食 ベビーフード", subs: [
+    { sub: "ベビーフード", keywords: ["ベビーフード 離乳食"], yahooKeyword: "ベビーフード" },
+    { sub: "食器セット",   keywords: ["ベビー食器 セット"], yahooKeyword: "ベビー食器 セット" },
+    { sub: "ベビーチェア", keywords: ["ベビーチェア ハイチェア"], yahooKeyword: "ベビーチェア" },
+    { sub: "スプーン",     keywords: ["離乳食 スプーン ストローマグ"], yahooKeyword: "離乳食 スプーン" },
+  ]},
+  { name: "寝具・ベッド", genreId: "101071", keyword: "ベビーベッド 赤ちゃん布団", subs: [
+    { sub: "ベビーベッド", keywords: ["ベビーベッド"], yahooKeyword: "ベビーベッド" },
+    { sub: "ベビー布団",   keywords: ["ベビー布団 セット"], yahooKeyword: "ベビー布団 セット" },
+    { sub: "スリーパー",   keywords: ["スリーパー ベビー"], yahooKeyword: "スリーパー ベビー" },
+    { sub: "まくら",       keywords: ["ベビー枕 ドーナツ枕"], yahooKeyword: "ベビー枕" },
+  ]},
+  { name: "おもちゃ", genreId: "101074", keyword: "赤ちゃん おもちゃ 知育", subs: [
+    { sub: "0ヶ月〜", keywords: ["ベビー おもちゃ ガラガラ モービル にぎにぎ 新生児"], yahooKeyword: "ベビー おもちゃ 新生児" },
+    { sub: "3ヶ月〜", keywords: ["ベビー おもちゃ 歯固め ラトル にぎにぎ 3ヶ月"], yahooKeyword: "ベビー おもちゃ 3ヶ月" },
+    { sub: "6ヶ月〜", keywords: ["ベビー おもちゃ プレイマット 積み木 ソフトブロック 6ヶ月"], yahooKeyword: "ベビー おもちゃ 6ヶ月 プレイマット" },
+    { sub: "1歳〜",   keywords: ["知育玩具 おもちゃ パズル ブロック ぬいぐるみ 1歳"], yahooKeyword: "知育玩具 おもちゃ 1歳" },
+  ]},
+  { name: "安全グッズ", genreId: "101076", keyword: "ベビー 安全グッズ ゲート", subs: [
+    { sub: "ベビーゲート",   keywords: ["ベビーゲート"], yahooKeyword: "ベビーゲート" },
+    { sub: "コーナーガード", keywords: ["コーナーガード ベビー"], yahooKeyword: "コーナーガード ベビー" },
+    { sub: "扉ロック",       keywords: ["ベビー ドアロック いたずら防止"], yahooKeyword: "ベビー ドアロック" },
+    { sub: "転倒防止",       keywords: ["家具 転倒防止 ベビー"], yahooKeyword: "家具 転倒防止" },
+    { sub: "ベビーモニター", keywords: ["ベビーモニター 見守りカメラ"], yahooKeyword: "ベビーモニター" },
+  ]},
+  { name: "お風呂用品", genreId: "101075", keyword: "ベビー お風呂 沐浴", subs: [
+    { sub: "ベビーバス",   keywords: ["ベビーバス 沐浴"], yahooKeyword: "ベビーバス" },
+    { sub: "ベビー用ソープ", keywords: ["ベビーソープ 全身シャンプー"], yahooKeyword: "ベビーソープ" },
+    { sub: "保湿クリーム", keywords: ["ベビー 保湿 ローション クリーム"], yahooKeyword: "ベビー 保湿クリーム" },
+  ]},
+  { name: "トイレ用品", genreId: "101072", keyword: "ベビー おしりふき 赤ちゃん", subs: [
+    { sub: "補助便座", keywords: ["補助便座"], yahooKeyword: "補助便座" },
+    { sub: "おまる",   keywords: ["おまる"], yahooKeyword: "おまる" },
+    { sub: "トイトレ", keywords: ["トイレトレーニング パンツ"], yahooKeyword: "トイレトレーニング" },
+    { sub: "おしりふき", keywords: ["おしりふき 赤ちゃん"], yahooKeyword: "おしりふき" },
+  ]},
+  { name: "車用品", genreId: "501063", keyword: "チャイルドシート 新生児", subs: [
+    { sub: "新生児用",     keywords: ["チャイルドシート 新生児"], yahooKeyword: "チャイルドシート 新生児" },
+    { sub: "1歳以上",      keywords: ["チャイルドシート 1歳"], yahooKeyword: "チャイルドシート 1歳" },
+    { sub: "ジュニアシート", keywords: ["ジュニアシート"], yahooKeyword: "ジュニアシート" },
+    { sub: "2wayタイプ",   keywords: ["チャイルドシート 回転式"], yahooKeyword: "チャイルドシート 回転式" },
+    { sub: "周辺グッズ",   keywords: ["チャイルドシート 保護マット", "チャイルドシート ミラー"], yahooKeyword: "チャイルドシート アクセサリー" },
+  ]},
+  { name: "マタニティ", genreId: "101080", keyword: "マタニティ 妊娠", subs: [
+    { sub: "マタニティウェア", keywords: ["マタニティ ウェア パジャマ"], yahooKeyword: "マタニティ ウェア" },
+    { sub: "腹帯",         keywords: ["腹帯 マタニティ"], yahooKeyword: "腹帯 マタニティ" },
+    { sub: "葉酸サプリ",   keywords: ["葉酸 サプリ 妊娠"], yahooKeyword: "葉酸 サプリ" },
+    { sub: "授乳ブラ",     keywords: ["授乳ブラ マタニティブラ"], yahooKeyword: "授乳ブラ" },
+    { sub: "ノンカフェイン", keywords: ["ノンカフェイン 妊婦 ハーブティー"], yahooKeyword: "ノンカフェイン 妊婦" },
+  ]},
+  { name: "ギフトセット", genreId: "101079", keyword: "出産祝い ギフトセット 赤ちゃん", subs: [
+    { sub: "ロンパース・服",   keywords: ["出産祝い ロンパース ベビー服 セット"], yahooKeyword: "出産祝い ベビー服 セット" },
+    { sub: "おもちゃ",         keywords: ["出産祝い 知育玩具 おもちゃ ガラガラ"], yahooKeyword: "出産祝い おもちゃ" },
+    { sub: "スキンケア",       keywords: ["出産祝い スキンケア ベビー ケアセット"], yahooKeyword: "出産祝い スキンケア セット" },
+    { sub: "タオル・スタイ",   keywords: ["出産祝い タオル スタイ ガーゼ"], yahooKeyword: "出産祝い タオル スタイ" },
+    { sub: "食器・哺乳瓶",     keywords: ["出産祝い 食器セット 哺乳瓶 マグ"], yahooKeyword: "出産祝い 食器セット" },
+    { sub: "ブランドギフト",   keywords: ["出産祝い ミキハウス ファミリア ブランド ギフト"], yahooKeyword: "出産祝い ブランド ギフト" },
+  ]},
 ];
 
 // カテゴリ別のキーワードフィルタ（本体のみ残す）
@@ -51,15 +136,15 @@ const REQUIRED_KEYWORDS = {
   "ゴミ箱・袋":   ["ゴミ箱", "ごみ箱", "防臭袋", "防臭ポット", "おむつポット", "おむつゴミ箱", "サニタリー"],
   "ベビーカー":   ["ベビーカー", "バギー", "ストローラー"],
   "抱っこ紐":     ["抱っこ紐", "だっこひも", "スリング", "ヒップシート", "キャリア"],
-  "ウェア":       ["ロンパース", "カバーオール", "肌着"],
-  "ミルク・授乳": ["哺乳瓶", "搾乳", "授乳クッション", "母乳", "哺乳"],
-  "離乳食・食器": ["離乳食", "ベビーフード", "ベビーチェア", "ベビー食器"],
-  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー", "ベビー布団"],
-  "おもちゃ":     ["おもちゃ", "知育", "ガラガラ", "メリー", "プレイマット"],
-  "安全グッズ":   ["ゲート", "コーナーガード", "ドアロック", "転倒防止", "ベビーガード"],
-  "お風呂用品":   ["沐浴", "ベビーバス", "体温計", "保湿", "ベビーソープ"],
-  "トイレ用品":   ["おまる", "補助便座", "トイトレ", "おしりふき"],
-  "車用品":       ["チャイルドシート", "ジュニアシート"],
+  "ウェア":       ["ロンパース", "カバーオール", "肌着", "ベビー服", "ボディスーツ", "ツーウェイオール", "プレオール", "つなぎ", "スタイ", "アウター", "おくるみ"],
+  "ミルク・授乳": ["哺乳瓶", "搾乳", "授乳クッション", "母乳", "哺乳", "粉ミルク", "液体ミルク", "ミルク", "乳首"],
+  "離乳食・食器": ["離乳食", "ベビーフード", "ベビーチェア", "ベビー食器", "食器", "スプーン", "マグ", "おやつ"],
+  "寝具・ベッド": ["ベビーベッド", "布団", "スリーパー", "ベビー布団", "まくら", "枕", "マットレス"],
+  "おもちゃ":     ["おもちゃ", "知育", "ガラガラ", "メリー", "プレイマット", "ぬいぐるみ", "積み木", "歯固め", "玩具"],
+  "安全グッズ":   ["ゲート", "コーナーガード", "ドアロック", "転倒防止", "ベビーガード", "ベビーモニター", "見守りカメラ", "ロック", "安全"],
+  "お風呂用品":   ["沐浴", "ベビーバス", "体温計", "保湿", "ベビーソープ", "お風呂", "バスチェア", "湯温計", "ローション"],
+  "トイレ用品":   ["おまる", "補助便座", "トイトレ", "おしりふき", "トイレトレーニング"],
+  "車用品":       ["チャイルドシート", "ジュニアシート", "ベビーシート", "回転式", "シートベルト"],
   "マタニティ":   ["マタニティ", "妊娠", "授乳ブラ", "葉酸", "産前"],
   "ギフトセット": ["ギフト", "出産祝い", "プレゼント"],
 };
@@ -83,6 +168,8 @@ const CATEGORY_NG_KEYWORDS = {
     "犬猫", "わんにゃん", "ペットシーツ", "トイレシート", "ワンちゃん", "ネコちゃん",
     "動物", "アニマル", "ペット対応",
   ],
+  // ギフトは写真集・アルバム等の物販でないものを除外
+  "ギフトセット": ["アルバム", "フォトアルバム", "絵本", "色紙", "メッセージカード単品"],
 };
 
 // Yahoo画像URLを標準サイズに正規化（/i/g/はショップ依存で低画質の場合あり）
@@ -692,13 +779,18 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
       let productId;
       const { data: existing } = await supabase
         .from('products')
-        .select('id')
+        .select('id, sub_category')
         .eq('rakuten_item_code', product.rakuten_item_code)
         .single();
 
       if (existing) {
         // 更新
         productId = existing.id;
+        // 格下げ防止: 既に具体的なサブカテゴリが付いている商品を「本体」で上書きしない
+        // （path2のサブクエリで確定済みのタブ振り分けを、広い検索の再分類で空に戻さない）
+        const keepSub = (existing.sub_category && existing.sub_category !== '本体')
+          ? existing.sub_category
+          : product.sub_category;
         await supabase
           .from('products')
           .update({
@@ -707,7 +799,7 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
             rating: product.rating,
             reviews_count: product.reviews_count,
             popularity_rank: product.popularity_rank,
-            sub_category: product.sub_category,
+            sub_category: keepSub,
             brand: product.brand || undefined,
             last_synced_at: product.last_synced_at,
           })
@@ -829,120 +921,138 @@ async function saveSubCatProduct(product, seller, source, shopName) {
   }
 }
 
+// --- 同時実行プール: items を最大 concurrency 並列で処理。
+// 各起動の前に gapMs だけ待ってAPIレート制限を緩和し、deadline を過ぎたら新規投入を止める。 ---
+async function runWithConcurrency(items, worker, { concurrency = 2, gapMs = 0, deadline } = {}) {
+  const results = new Array(items.length);
+  let idx = 0;
+  async function lane() {
+    while (true) {
+      const myIdx = idx++;
+      if (myIdx >= items.length) break;
+      if (deadline && Date.now() > deadline) {
+        results[myIdx] = { skipped: true, item: items[myIdx] };
+        continue;
+      }
+      if (gapMs) await new Promise(r => setTimeout(r, gapMs));
+      try {
+        results[myIdx] = await worker(items[myIdx], myIdx);
+      } catch (e) {
+        results[myIdx] = { error: e, item: items[myIdx] };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, lane));
+  return results;
+}
+
 // --- サブカテゴリ補完の共通処理: 楽天検索を優先し、失敗/空ならYahoo検索にフォールバック ---
 // sub_category は subQueries の sub を強制設定するため、カテゴリのサブタブに確実に商品が並ぶ。
-async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQueries, emoji }) {
-  const required = REQUIRED_KEYWORDS[category] || [];
+// 同時実行2・固定間隔・ソフト締切で60秒制限内に収める。新規商品には 1000番台の
+// popularity_rank を付与（広い検索の人気商品=1〜を上位に保ちつつ、サブ専用品も順序付きで表示）。
+async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQueries, emoji, deadline }) {
+  const worker = async (q, qIdx) => {
+    // 1) 楽天を試す
+    let rakutenItems = [];
+    try {
+      const res = await fetchRakutenSearch(q.keyword, genreId, 1);
+      rakutenItems = (res.Items || [])
+        .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)));
+    } catch {
+      rakutenItems = [];
+    }
 
-  const results = await Promise.allSettled(
-    subQueries.map(async (q, qIdx) => {
-      // 楽天レート制限回避: サブクエリごとに開始をずらす
-      if (qIdx > 0) await new Promise(r => setTimeout(r, qIdx * 1500));
+    let saved = 0;
+    let source = '楽天';
+    const rankBase = 1000 + qIdx * 50; // サブクエリ毎に別バンド（順序の重複を避ける）
 
-      // 1) 楽天を試す
-      let rakutenItems = [];
-      try {
-        const res = await fetchRakutenSearch(q.keyword, genreId, 1);
-        rakutenItems = (res.Items || [])
-          .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)));
-      } catch {
-        rakutenItems = [];
+    if (rakutenItems.length > 0) {
+      let j = 0;
+      for (const item of rakutenItems.slice(0, 30)) {
+        const rawName = item.Item.itemName;
+        const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
+        const product = {
+          name: cleanName(rawName),
+          category,
+          sub_category: q.sub,
+          brand: extractBrand(rawName),
+          image_url: rawImg.replace(/_ex=\d+x\d+/, '_ex=640x640'),
+          rating: parseFloat(item.Item.reviewAverage) || 0,
+          reviews_count: parseInt(item.Item.reviewCount) || 0,
+          rakuten_item_code: item.Item.itemCode,
+          is_market_wide: true,
+          popularity_rank: rankBase + j,
+          last_synced_at: new Date().toISOString(),
+        };
+        const seller = {
+          shop_name: item.Item.shopName || '楽天市場',
+          price: item.Item.itemPrice,
+          url: item.Item.affiliateUrl || item.Item.itemUrl,
+          shipping: item.Item.postageFlag === 1 ? 0 : null,
+          points: item.Item.pointRate || 0,
+          rating: parseFloat(item.Item.reviewAverage) || 0,
+          reviews_count: parseInt(item.Item.reviewCount) || 0,
+        };
+        if (await saveSubCatProduct(product, seller, 'rakuten', '楽天市場')) saved++;
+        j++;
       }
-
-      let saved = 0;
-      let source = '楽天';
-
-      if (rakutenItems.length > 0) {
-        for (const item of rakutenItems.slice(0, 20)) {
-          const rawName = item.Item.itemName;
-          const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
-          const product = {
-            name: cleanName(rawName),
-            category,
-            sub_category: q.sub,
-            brand: extractBrand(rawName),
-            image_url: rawImg.replace(/_ex=\d+x\d+/, '_ex=640x640'),
-            rating: parseFloat(item.Item.reviewAverage) || 0,
-            reviews_count: parseInt(item.Item.reviewCount) || 0,
-            rakuten_item_code: item.Item.itemCode,
-            is_market_wide: true,
-            last_synced_at: new Date().toISOString(),
-          };
-          const seller = {
-            shop_name: item.Item.shopName || '楽天市場',
-            price: item.Item.itemPrice,
-            url: item.Item.affiliateUrl || item.Item.itemUrl,
-            shipping: item.Item.postageFlag === 1 ? 0 : null,
-            points: item.Item.pointRate || 0,
-            rating: parseFloat(item.Item.reviewAverage) || 0,
-            reviews_count: parseInt(item.Item.reviewCount) || 0,
-          };
-          if (await saveSubCatProduct(product, seller, 'rakuten', '楽天市場')) saved++;
-        }
-      } else {
-        // 2) 楽天が全滅/空 → Yahooフォールバック（300件取得で必要数を確保）
-        source = 'Yahoo';
-        const yahooKeyword = q.yahooKeyword || q.keyword;
-        const yahooItems = (await fetchYahooSearchFallback(yahooKeyword, category))
-          .filter(it => !ngKeywords.some(kw => it.name.includes(kw)));
-        for (const it of yahooItems.slice(0, 20)) {
-          const product = {
-            name: it.name,
-            category,
-            sub_category: q.sub,
-            brand: it.brand,
-            image_url: it.image_url,
-            rating: it.rating,
-            reviews_count: it.reviews_count,
-            rakuten_item_code: it.rakuten_item_code,
-            is_market_wide: true,
-            last_synced_at: it.last_synced_at,
-          };
-          if (await saveSubCatProduct(product, it._rakuten_shop, 'yahoo', 'Yahoo!ショッピング')) saved++;
-        }
+    } else {
+      // 2) 楽天が全滅/空 → Yahooフォールバック（広めキーワードで必要数を確保）
+      source = 'Yahoo';
+      const yahooKeyword = q.yahooKeyword || q.keyword;
+      const yahooItems = (await fetchYahooSearchFallback(yahooKeyword, category))
+        .filter(it => !ngKeywords.some(kw => it.name.includes(kw)));
+      let j = 0;
+      for (const it of yahooItems.slice(0, 30)) {
+        const product = {
+          name: it.name,
+          category,
+          sub_category: q.sub,
+          brand: it.brand,
+          image_url: it.image_url,
+          rating: it.rating,
+          reviews_count: it.reviews_count,
+          rakuten_item_code: it.rakuten_item_code,
+          is_market_wide: true,
+          popularity_rank: rankBase + j,
+          last_synced_at: it.last_synced_at,
+        };
+        if (await saveSubCatProduct(product, it._rakuten_shop, 'yahoo', 'Yahoo!ショッピング')) saved++;
+        j++;
       }
+    }
 
-      return { sub: q.sub, saved, source };
-    })
-  );
+    return { sub: q.sub, saved, source };
+  };
 
+  const results = await runWithConcurrency(subQueries, worker, { concurrency: 2, gapMs: 700, deadline });
   results.forEach(r => {
-    if (r.status === 'fulfilled') {
-      log.push(`  ${emoji} ${category}補完「${r.value.sub}」: ${r.value.saved}件 (${r.value.source})`);
+    if (!r) return;
+    if (r.skipped) {
+      log.push(`  ⏭ ${category}補完「${r.item?.sub || ''}」: 時間切れスキップ`);
+    } else if (r.error) {
+      log.push(`  ⚠️ ${category}補完「${r.item?.sub || ''}」: ${r.error.message}`);
+    } else {
+      log.push(`  ${emoji} ${category}補完「${r.sub}」: ${r.saved}件 (${r.source})`);
     }
   });
 }
 
-async function syncToyAgeSubCategories(log) {
+// --- カテゴリの subs（CATEGORY定義）からサブクエリを組み立てて補完取得（全カテゴリ共通） ---
+async function syncCategorySubQueries(cat, log, deadline) {
+  if (!cat.subs || cat.subs.length === 0) return;
+  const subQueries = cat.subs.flatMap(s =>
+    (s.keywords || []).map(k => ({ keyword: k, yahooKeyword: s.yahooKeyword || k, sub: s.sub }))
+  );
+  if (subQueries.length === 0) return;
+  const ngKeywords = [...NG_KEYWORDS, ...(CATEGORY_NG_KEYWORDS[cat.name] || [])];
   await syncSubCategoryQueries(log, {
-    category: 'おもちゃ',
-    genreId: '101074',
-    ngKeywords: NG_KEYWORDS,
-    emoji: '🧸',
-    subQueries: [
-      { keyword: 'ベビー おもちゃ ガラガラ モービル にぎにぎ 新生児', yahooKeyword: 'ベビー おもちゃ 新生児', sub: '0ヶ月〜' },
-      { keyword: 'ベビー おもちゃ 歯固め ラトル にぎにぎ 3ヶ月', yahooKeyword: 'ベビー おもちゃ 3ヶ月', sub: '3ヶ月〜' },
-      { keyword: 'ベビー おもちゃ プレイマット 積み木 ソフトブロック 6ヶ月', yahooKeyword: 'ベビー おもちゃ 6ヶ月 プレイマット', sub: '6ヶ月〜' },
-      { keyword: '知育玩具 おもちゃ パズル ブロック ぬいぐるみ 1歳', yahooKeyword: '知育玩具 おもちゃ 1歳', sub: '1歳〜' },
-    ],
-  });
-}
-
-async function syncGiftSubCategories(log) {
-  const GIFT_NG = [...NG_KEYWORDS, 'アルバム', 'フォトアルバム', 'ぬいぐるみ単体', '絵本'];
-  await syncSubCategoryQueries(log, {
-    category: 'ギフトセット',
-    genreId: '101079',
-    ngKeywords: GIFT_NG,
-    emoji: '🎁',
-    subQueries: [
-      { keyword: '出産祝い ロンパース ベビー服 セット', sub: 'ロンパース・服' },
-      { keyword: '出産祝い 知育玩具 おもちゃ ガラガラ', sub: 'おもちゃ' },
-      { keyword: '出産祝い スキンケア ベビー ケアセット', sub: 'スキンケア' },
-      { keyword: '出産祝い タオル スタイ ガーゼ', sub: 'タオル・スタイ' },
-      { keyword: '出産祝い 食器セット 哺乳瓶 マグ', sub: '食器・哺乳瓶' },
-      { keyword: '出産祝い ミキハウス ファミリア ブランド ギフト', sub: 'ブランドギフト' },
-    ],
+    category: cat.name,
+    genreId: cat.genreId,
+    ngKeywords,
+    subQueries,
+    emoji: '🗂',
+    deadline,
   });
 }
 
@@ -1020,7 +1130,45 @@ export async function GET(request) {
     }
   }
 
+  // カテゴリ×サブカテゴリの件数監査（?audit=1）: 読み取り専用。
+  // CATEGORIES の宣言サブと突合し、0件のサブカテゴリ(emptySubs)を返す（施策前後の通信簿）。
+  if (searchParams.get('audit') === '1') {
+    const byCategory = {};
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from('products')
+        .select('category, sub_category')
+        .or('is_blocked.is.null,is_blocked.eq.false')
+        .range(from, from + pageSize - 1);
+      if (error || !data || data.length === 0) break;
+      for (const r of data) {
+        const c = r.category || '(none)';
+        const s = r.sub_category || '(none)';
+        byCategory[c] = byCategory[c] || { total: 0, subs: {} };
+        byCategory[c].total++;
+        byCategory[c].subs[s] = (byCategory[c].subs[s] || 0) + 1;
+      }
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+    const emptySubs = [];
+    const thinSubs = []; // 30件未満（目標未達）
+    for (const cat of CATEGORIES) {
+      const got = byCategory[cat.name]?.subs || {};
+      for (const s of (cat.subs || [])) {
+        const n = got[s.sub] || 0;
+        if (n === 0) emptySubs.push(`${cat.name}>${s.sub}`);
+        else if (n < 30) thinSubs.push(`${cat.name}>${s.sub} (${n})`);
+      }
+    }
+    return Response.json({ ok: true, byCategory, emptySubs, thinSubs });
+  }
+
   const log = [];
+  // ソフト締切（リクエスト開始から50秒）。サブカテゴリ補完はこれを過ぎたら新規投入を止める。
+  const deadline = Date.now() + 50000;
 
   // 一括バックフィル（?backfill=1）: 全商品のsub_categoryを再計算・更新
   if (searchParams.get('backfill') === '1') {
@@ -1043,29 +1191,23 @@ export async function GET(request) {
       return Response.json({ error: `Category "${filterCat}" not found` }, { status: 400 });
     }
     log.push(`🎯 フィルタ適用: カテゴリ「${filterCat}」のみ同期します`);
-  } else if (batch === '1') {
-    // おむつ, ゴミ箱・袋, ベビーカー, 抱っこ紐
-    targetCategories = CATEGORIES.slice(0, 4);
-    log.push(`📦 バッチ1: ${targetCategories.map(c => c.name).join('、')}`);
-  } else if (batch === '2') {
-    // ウェア, ミルク・授乳, 離乳食・食器, 寝具・ベッド
-    targetCategories = CATEGORIES.slice(4, 8);
-    log.push(`📦 バッチ2: ${targetCategories.map(c => c.name).join('、')}`);
-  } else if (batch === '3') {
-    // おもちゃ, 安全グッズ, お風呂用品, トイレ用品
-    targetCategories = CATEGORIES.slice(8, 12);
-    log.push(`📦 バッチ3: ${targetCategories.map(c => c.name).join('、')}`);
-  } else if (batch === '4') {
-    // 車用品, マタニティ, ギフトセット
-    targetCategories = CATEGORIES.slice(12);
-    log.push(`📦 バッチ4: ${targetCategories.map(c => c.name).join('、')}`);
+  } else if (batch) {
+    // 1バッチ=2カテゴリ（広い検索＋サブクエリで取得量が増えたため、60秒制限に収まるよう細分化）。
+    // 全15カテゴリ → batch 1〜8（最後の8はギフトセット1件）。vercel.json で時間帯を分散。
+    const BATCH_SIZE = 2;
+    const batchNum = parseInt(batch, 10);
+    if (!Number.isInteger(batchNum) || batchNum < 1) {
+      return Response.json({ error: `Invalid batch "${batch}"` }, { status: 400 });
+    }
+    targetCategories = CATEGORIES.slice((batchNum - 1) * BATCH_SIZE, batchNum * BATCH_SIZE);
+    log.push(`📦 バッチ${batchNum}: ${targetCategories.map(c => c.name).join('、') || '(対象なし)'}`);
   }
 
   // カテゴリ指定あり = 単発テスト用（軽量処理）、それ以外 = 通常同期（フル処理）
   const isSingleCategory = !!filterCat;
   const opts = isSingleCategory
     ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false }
-    : { limitCount: 25, includeYahooSupplement: true, includeYahooPrice: false };
+    : { limitCount: 50, includeYahooSupplement: true, includeYahooPrice: false };
 
   // カテゴリを並列処理（楽天レート制限回避のため1.5秒ずつずらして開始）
   const results = await Promise.allSettled(
@@ -1081,22 +1223,19 @@ export async function GET(request) {
 
   log.push(`\n🎉 同期完了: 合計 ${totalSaved}件保存`);
 
-  // サブカテゴリ補完（バッチ別: おもちゃはbatch=3、ギフトはbatch=4）
+  // サブカテゴリ補完: バッチ内の各カテゴリの subs を専用キーワードで取得し、
+  // 各サブタブに確実に商品を並べる（全カテゴリ共通）。ソフト締切超過分は次回に回す。
   if (!filterCat) {
-    if (batch === '3' || !batch) {
-      try {
-        log.push(`\n🧸 おもちゃ月齢別補完同期開始...`);
-        await syncToyAgeSubCategories(log);
-      } catch (e) {
-        log.push(`⚠️ おもちゃ補完失敗: ${e.message}`);
+    for (const cat of targetCategories) {
+      if (Date.now() > deadline) {
+        log.push(`⏭ 時間切れ: 「${cat.name}」以降のサブカテゴリ補完を次回に回します`);
+        break;
       }
-    }
-    if (batch === '4' || !batch) {
       try {
-        log.push(`\n🎁 ギフトサブカテゴリ補完同期開始...`);
-        await syncGiftSubCategories(log);
+        log.push(`\n🗂 「${cat.name}」サブカテゴリ補完同期開始...`);
+        await syncCategorySubQueries(cat, log, deadline);
       } catch (e) {
-        log.push(`⚠️ ギフト補完失敗: ${e.message}`);
+        log.push(`⚠️ 「${cat.name}」サブ補完失敗: ${e.message}`);
       }
     }
   }
