@@ -701,9 +701,10 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
   let rakutenFailed = false;
 
   try {
-    // 検索API（レビュー数順、2ページ分）
-    const res1 = await fetchRakutenSearch(cat.keyword, cat.genreId, 1);
-    const res2 = await fetchRakutenSearch(cat.keyword, cat.genreId, 2);
+    // 検索API（レビュー数順、2ページ分）。ジャンルIDが無効なカテゴリがあるため genreId は付けず、
+    // normalizeRakutenItems の REQUIRED_KEYWORDS で関連性を担保する（無効ジャンルでの0件・Yahoo頼みを回避）。
+    const res1 = await fetchRakutenSearch(cat.keyword, null, 1);
+    const res2 = await fetchRakutenSearch(cat.keyword, null, 2);
     rakutenItems = [
       ...normalizeRakutenItems(res1.Items || [], cat.name),
       ...normalizeRakutenItems(res2.Items || [], cat.name),
@@ -713,14 +714,14 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
     rakutenFailed = true;
   }
 
-  // ランキングAPIも追加取得
+  // ランキングAPIも追加取得（ジャンルID依存。失敗しても検索で賄えるため致命視しない）
   try {
     const rankingData = await fetchRakutenRanking(cat.genreId);
     const rankingItems = normalizeRakutenItems(rankingData.Items || [], cat.name);
     rakutenItems = [...rakutenItems, ...rankingItems];
   } catch (e) {
-    log.push(`  ⚠️ 楽天ランキングAPI失敗: ${e.message}`);
-    rakutenFailed = true;
+    log.push(`  ⚠️ 楽天ランキングAPI失敗（検索で代替）: ${e.message}`);
+    // 検索が成功していれば致命的ではないので rakutenFailed は立てない（Yahoo補完は維持）
   }
 
   let allItems = [...rakutenItems];
@@ -1191,7 +1192,7 @@ export async function GET(request) {
 
   const log = [];
   // ソフト締切（リクエスト開始から50秒）。サブカテゴリ補完はこれを過ぎたら新規投入を止める。
-  const deadline = Date.now() + 45000;
+  const deadline = Date.now() + 52000;
 
   // 一括バックフィル（?backfill=1）: 全商品のsub_categoryを再計算・更新
   if (searchParams.get('backfill') === '1') {
