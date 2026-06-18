@@ -685,6 +685,7 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
     limitCount = 30,
     includeYahooSupplement = true,
     includeYahooPrice = true,
+    deadline = 0,
   } = opts;
 
   log.push(`📦 カテゴリ「${cat.name}」の同期開始...`);
@@ -773,6 +774,7 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
   log.push(`  ⏱ 上位 ${productsToProcess.length}件を保存します`);
 
   for (let i = 0; i < productsToProcess.length; i++) {
+    if (deadline && Date.now() > deadline) { log.push(`  ⏱ 時間切れ: ${savedCount}件で打ち切り`); break; }
     const product = productsToProcess[i];
     product.popularity_rank = i + 1;
 
@@ -986,7 +988,8 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
 
     if (rakutenItems.length > 0) {
       let j = 0;
-      for (const item of rakutenItems.slice(0, 30)) {
+      for (const item of rakutenItems.slice(0, 20)) {
+        if (deadline && Date.now() > deadline) break; // 時間切れは打ち切り（504回避）
         const rawName = item.Item.itemName;
         const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
         const product = {
@@ -1022,7 +1025,8 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
         .filter(it => !ngKeywords.some(kw => it.name.includes(kw)))
         .filter(it => isRelevant(it.name));
       let j = 0;
-      for (const it of yahooItems.slice(0, 30)) {
+      for (const it of yahooItems.slice(0, 20)) {
+        if (deadline && Date.now() > deadline) break; // 時間切れは打ち切り（504回避）
         const product = {
           name: it.name,
           category,
@@ -1187,7 +1191,7 @@ export async function GET(request) {
 
   const log = [];
   // ソフト締切（リクエスト開始から50秒）。サブカテゴリ補完はこれを過ぎたら新規投入を止める。
-  const deadline = Date.now() + 50000;
+  const deadline = Date.now() + 45000;
 
   // 一括バックフィル（?backfill=1）: 全商品のsub_categoryを再計算・更新
   if (searchParams.get('backfill') === '1') {
@@ -1211,9 +1215,9 @@ export async function GET(request) {
     }
     log.push(`🎯 フィルタ適用: カテゴリ「${filterCat}」のみ同期します`);
   } else if (batch) {
-    // 1バッチ=2カテゴリ（広い検索＋サブクエリで取得量が増えたため、60秒制限に収まるよう細分化）。
-    // 全15カテゴリ → batch 1〜8（最後の8はギフトセット1件）。vercel.json で時間帯を分散。
-    const BATCH_SIZE = 2;
+    // 1バッチ=1カテゴリ（ジャンル非制約で取得量が増え、2カテゴリだと60秒制限を超えたため）。
+    // 全15カテゴリ → batch 1〜15。vercel.json で時間帯を分散。
+    const BATCH_SIZE = 1;
     const batchNum = parseInt(batch, 10);
     if (!Number.isInteger(batchNum) || batchNum < 1) {
       return Response.json({ error: `Invalid batch "${batch}"` }, { status: 400 });
@@ -1225,8 +1229,8 @@ export async function GET(request) {
   // カテゴリ指定あり = 単発テスト用（軽量処理）、それ以外 = 通常同期（フル処理）
   const isSingleCategory = !!filterCat;
   const opts = isSingleCategory
-    ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false }
-    : { limitCount: 50, includeYahooSupplement: true, includeYahooPrice: false };
+    ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false, deadline }
+    : { limitCount: 30, includeYahooSupplement: true, includeYahooPrice: false, deadline };
 
   // カテゴリを並列処理（楽天レート制限回避のため1.5秒ずつずらして開始）
   const results = await Promise.allSettled(
