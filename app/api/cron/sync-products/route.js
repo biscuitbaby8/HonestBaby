@@ -1049,7 +1049,7 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
     return { sub: q.sub, saved, source };
   };
 
-  const results = await runWithConcurrency(subQueries, worker, { concurrency: 2, gapMs: 700, deadline });
+  const results = await runWithConcurrency(subQueries, worker, { concurrency: 3, gapMs: 500, deadline });
   results.forEach(r => {
     if (!r) return;
     if (r.skipped) {
@@ -1065,7 +1065,21 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
 // --- カテゴリの subs（CATEGORY定義）からサブクエリを組み立てて補完取得（全カテゴリ共通） ---
 async function syncCategorySubQueries(cat, log, deadline) {
   if (!cat.subs || cat.subs.length === 0) return;
-  const subQueries = cat.subs.flatMap(s =>
+
+  // 現在のサブ別件数を取得し、少ない順（空を優先）に並べ替える。
+  // 時間切れで打ち切られても、まだ空のサブが先に埋まるようにする。
+  const counts = {};
+  try {
+    const { data } = await supabase
+      .from('products')
+      .select('sub_category')
+      .eq('category', cat.name)
+      .or('is_blocked.is.null,is_blocked.eq.false');
+    for (const r of (data || [])) counts[r.sub_category] = (counts[r.sub_category] || 0) + 1;
+  } catch { /* 取得失敗時は宣言順のまま */ }
+  const sortedSubs = [...cat.subs].sort((a, b) => (counts[a.sub] || 0) - (counts[b.sub] || 0));
+
+  const subQueries = sortedSubs.flatMap(s =>
     (s.keywords || []).map(k => ({ keyword: k, yahooKeyword: s.yahooKeyword || k, sub: s.sub }))
   );
   if (subQueries.length === 0) return;
