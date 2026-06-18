@@ -991,16 +991,28 @@ const App = () => {
       setDbLoading(true);
       setDbError(null);
       try {
-        const { data, error } = await supabase
-          .from('products')
-          .select(`
-            *,
-            shops:shops_prices(*),
-            honestReviews:reviews(*)
-          `)
-          .or('is_blocked.is.null,is_blocked.eq.false');
+        // Supabaseは1リクエスト最大1000件（既定 Max Rows）。商品が1000件を超えると
+        // 一部しか読めずホームのサブカテゴリが空に見えるため、range でページング取得して全件読む。
+        // popularity_rank 昇順で取得し、定番（rank=1〜）を先頭に揃える。
+        const PAGE_SIZE = 1000;
+        let data = [];
+        for (let from = 0; ; from += PAGE_SIZE) {
+          const { data: page, error } = await supabase
+            .from('products')
+            .select(`
+              *,
+              shops:shops_prices(*),
+              honestReviews:reviews(*)
+            `)
+            .or('is_blocked.is.null,is_blocked.eq.false')
+            .order('popularity_rank', { ascending: true, nullsFirst: false })
+            .range(from, from + PAGE_SIZE - 1);
 
-        if (error) throw error;
+          if (error) throw error;
+          if (!page || page.length === 0) break;
+          data = data.concat(page);
+          if (page.length < PAGE_SIZE) break;
+        }
 
         if (data) {
           const formatted = data.map(p => ({
@@ -2534,8 +2546,13 @@ ${userText}
         const matchCat = selectedCategory === "すべて"
           || p.category === selectedCategory
           || (selectedCategory === "おむつ" && p.category === "ゴミ箱・袋");
-        const matchSub = selectedSubCategory === "すべて" || p.subCategory === selectedSubCategory;
-        const matchSubSub = selectedSubSubCategory === "すべて" || p.subSubCategory === selectedSubSubCategory;
+        const matchSub = selectedSubCategory === "すべて"
+          || (p.subCategory || '').trim() === selectedSubCategory.trim();
+        // sub_sub_category（サイズ/月齢）は未保存の商品が多い。未保存なら除外せず通す
+        // （サイズタブが常に空になるのを防ぐ）。
+        const matchSubSub = selectedSubSubCategory === "すべて"
+          || !p.subSubCategory
+          || p.subSubCategory === selectedSubSubCategory;
         return matchCat && matchSub && matchSubSub;
       })
       .sort((a, b) => (b.rating || 0) - (a.rating || 0));

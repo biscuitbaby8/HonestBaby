@@ -52,7 +52,7 @@ export default async function CategoryPage({ params }) {
       .eq('category', cat)
       .or('is_blocked.is.null,is_blocked.eq.false')
       .order('popularity_rank', { ascending: true })
-      .limit(200);
+      .limit(300);
     if (!error && data) products = data.map(formatDbProduct);
   } catch {
     // Supabase接続失敗時は空リストで表示
