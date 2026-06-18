@@ -213,7 +213,22 @@ const CATEGORY_NG_KEYWORDS = {
   "抱っこ紐": [
     "おむつが臭わない袋", "防臭袋", "臭わない袋",
   ],
+  // ウェア（服）: 服そのものではない別カテゴリ商品・生地素材・大人向け商品を除外
+  // （「生地」はスタイ等の説明文にも使われるため、具体的な手芸/業務素材語のみで判定）
+  "ウェア": [
+    "抱っこ紐", "抱っこひも",
+    "おもちゃ", "知育玩具", "ラトル", "布絵本",
+    "ベビーハンガー", "子供用ハンガー", "折りたたみ10連ハンガー",
+    "ダブルガーゼ 生地", "ニット生地", "手芸", "工業用", "業務用", "コールゴム",
+    "寝相アート", "ニューボーンフォト", "マンスリーカード", "月齢カード",
+    "オキシクリーン", "洗たく用洗剤", "酸素系漂白剤",
+    "セクシーランジェリー",
+  ],
 };
+
+// 完全一致した場合のみ除外する「商品名ではない」配送方法プレースホルダー
+// （「メール便可」等の機能説明としての言及は許容するため、名前全体が一致した場合のみ無効化）
+const JUNK_EXACT_NAMES = new Set(["ネコポス", "ネコポス発送", "メール便", "宅配便"]);
 
 // Yahoo画像URLを標準サイズに正規化（/i/g/はショップ依存で低画質の場合あり）
 function upgradeYahooImage(url) {
@@ -598,6 +613,7 @@ function normalizeRakutenItems(items, category) {
 
   return items
     .filter(item => (item.Item.itemName || '').trim().length > 0)
+    .filter(item => !JUNK_EXACT_NAMES.has((item.Item.itemName || '').trim()))
     .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
     .filter(item => extraNG.length === 0 || !extraNG.some(kw => item.Item.itemName.includes(kw)))
     .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.Item.itemName.includes(kw)))
