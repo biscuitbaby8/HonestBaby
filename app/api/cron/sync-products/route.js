@@ -209,6 +209,10 @@ const CATEGORY_NG_KEYWORDS = {
     "スマートフォン iPhone",
     "シートバックポケット", "カーポケット",
   ],
+  // 抱っこ紐: おむつ消臭袋(BOS)はおむつ/ゴミ箱・袋カテゴリの正規品なのでここでは除外
+  "抱っこ紐": [
+    "おむつが臭わない袋", "防臭袋", "臭わない袋",
+  ],
 };
 
 // Yahoo画像URLを標準サイズに正規化（/i/g/はショップ依存で低画質の場合あり）
@@ -593,6 +597,7 @@ function normalizeRakutenItems(items, category) {
   const extraNG = CATEGORY_NG_KEYWORDS[category] || [];
 
   return items
+    .filter(item => (item.Item.itemName || '').trim().length > 0)
     .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
     .filter(item => extraNG.length === 0 || !extraNG.some(kw => item.Item.itemName.includes(kw)))
     .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.Item.itemName.includes(kw)))
