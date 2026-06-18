@@ -155,6 +155,16 @@ const NG_KEYWORDS = [
   '訳あり', 'アウトレット', '中古', 'リユース', 'メール便のみ',
   // ギフト専用商品（ホームのランキングには不要）
   'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
+  // ペット用品（全カテゴリ共通で除外。「ペットボトル」を誤爆しないよう具体語のみ）
+  'ペットゲート', 'ペットカート', 'ペットシーツ', 'ペットシート', 'ペット用', 'ペット対応',
+  '犬用', '猫用', '子猫', '犬ドライ', 'ドッグフード', 'ドッグミルク', 'ロイヤルカナン',
+  '愛犬', '愛猫', 'わんちゃん', 'ねこちゃん',
+  // 大人・介護用品（赤ちゃん用サイトには不要。多用途の「介護 子ども」等は誤爆しないよう具体語のみ）
+  '大人用', '介護用', '介護パンツ', '大人おむつ', '成人用', 'シニア用', '高齢者', '要介護', '失禁', '尿漏れ',
+  // 蚊帳テント・その他明らかに無関係（「蚊帳付きプレイヤード」は誤爆しないよう蚊帳単体は除外せず）
+  'ムカデ', 'モスキートネット',
+  // 名前がレビュー誘導・抱き合わせ等のノイズ商品
+  'レビューを書いて', 'あわせ買い',
 ];
 
 // カテゴリ別追加除外キーワード
@@ -956,11 +966,16 @@ async function runWithConcurrency(items, worker, { concurrency = 2, gapMs = 0, d
 async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQueries, emoji, deadline }) {
   const worker = async (q, qIdx) => {
     // 1) 楽天を試す（サブ補完はジャンル非constraintで広く探す。q.genreId 指定時のみ絞る）
+    //    ジャンル非制約で広く探す代わりに、カテゴリの必須キーワード(REQUIRED)で関連性を担保し
+    //    無関係商品（ペット・大人用・他カテゴリ品）の混入を防ぐ。
+    const required = REQUIRED_KEYWORDS[category] || [];
+    const isRelevant = (n) => required.length === 0 || required.some(kw => n.includes(kw));
     let rakutenItems = [];
     try {
       const res = await fetchRakutenSearch(q.keyword, q.genreId ?? null, 1);
       rakutenItems = (res.Items || [])
-        .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)));
+        .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)))
+        .filter(item => isRelevant(item.Item.itemName));
     } catch {
       rakutenItems = [];
     }
@@ -1004,7 +1019,8 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
       source = 'Yahoo';
       const yahooKeyword = q.yahooKeyword || q.keyword;
       const yahooItems = (await fetchYahooSearchFallback(yahooKeyword, category))
-        .filter(it => !ngKeywords.some(kw => it.name.includes(kw)));
+        .filter(it => !ngKeywords.some(kw => it.name.includes(kw)))
+        .filter(it => isRelevant(it.name));
       let j = 0;
       for (const it of yahooItems.slice(0, 30)) {
         const product = {
