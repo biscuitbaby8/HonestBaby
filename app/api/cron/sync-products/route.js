@@ -432,7 +432,10 @@ async function fetchWithRetry(url, maxRetries = 1) {
 }
 
 async function fetchRakutenSearch(keyword, genreId, page = 1) {
-  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+  // genreId が指定されたときだけジャンルで絞る。サブカテゴリ補完は genreId 無しで広く探す
+  // （ニッチ商品が隣接ジャンルに居て取りこぼすため。sub_category は呼び出し側で確定する）。
+  const genrePart = genreId ? `&genreId=${genreId}` : '';
+  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1${genrePart}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
   return fetchWithRetry(url);
 }
 
@@ -952,10 +955,10 @@ async function runWithConcurrency(items, worker, { concurrency = 2, gapMs = 0, d
 // popularity_rank を付与（広い検索の人気商品=1〜を上位に保ちつつ、サブ専用品も順序付きで表示）。
 async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQueries, emoji, deadline }) {
   const worker = async (q, qIdx) => {
-    // 1) 楽天を試す
+    // 1) 楽天を試す（サブ補完はジャンル非constraintで広く探す。q.genreId 指定時のみ絞る）
     let rakutenItems = [];
     try {
-      const res = await fetchRakutenSearch(q.keyword, genreId, 1);
+      const res = await fetchRakutenSearch(q.keyword, q.genreId ?? null, 1);
       rakutenItems = (res.Items || [])
         .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)));
     } catch {
