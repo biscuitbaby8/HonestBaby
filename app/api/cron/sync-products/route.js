@@ -85,7 +85,7 @@ const CATEGORIES = [
   { name: "おもちゃ", genreId: "101074", keyword: "赤ちゃん おもちゃ 知育", subs: [
     { sub: "0ヶ月〜", keywords: ["ベビー おもちゃ ガラガラ モービル にぎにぎ 新生児"], yahooKeyword: "ベビー おもちゃ 新生児" },
     { sub: "3ヶ月〜", keywords: ["ベビー おもちゃ 歯固め ラトル にぎにぎ 3ヶ月"], yahooKeyword: "ベビー おもちゃ 3ヶ月" },
-    { sub: "6ヶ月〜", keywords: ["ベビー おもちゃ プレイマット 積み木 ソフトブロック 6ヶ月"], yahooKeyword: "ベビー おもちゃ 6ヶ月 プレイマット" },
+    { sub: "6ヶ月〜", keywords: ["ベビー おもちゃ 6ヶ月", "おもちゃ プレイマット 積み木"], yahooKeyword: "ベビー おもちゃ 6ヶ月 プレイマット" },
     { sub: "1歳〜",   keywords: ["知育玩具 おもちゃ パズル ブロック ぬいぐるみ 1歳"], yahooKeyword: "知育玩具 おもちゃ 1歳" },
   ]},
   { name: "安全グッズ", genreId: "101076", keyword: "ベビー 安全グッズ ゲート", subs: [
@@ -126,7 +126,7 @@ const CATEGORIES = [
     { sub: "スキンケア",       keywords: ["出産祝い スキンケア ベビー ケアセット"], yahooKeyword: "出産祝い スキンケア セット" },
     { sub: "タオル・スタイ",   keywords: ["出産祝い タオル スタイ ガーゼ"], yahooKeyword: "出産祝い タオル スタイ" },
     { sub: "食器・哺乳瓶",     keywords: ["出産祝い 食器セット 哺乳瓶 マグ"], yahooKeyword: "出産祝い 食器セット" },
-    { sub: "ブランドギフト",   keywords: ["出産祝い ミキハウス ファミリア ブランド ギフト"], yahooKeyword: "出産祝い ブランド ギフト" },
+    { sub: "ブランドギフト",   keywords: ["出産祝い ブランド", "出産祝い ミキハウス"], yahooKeyword: "出産祝い ブランド ギフト" },
   ]},
 ];
 
