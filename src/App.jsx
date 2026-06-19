@@ -417,6 +417,14 @@ const App = () => {
   const [selectedSubCategory, setSelectedSubCategory] = useState("すべて");
   const [selectedSubSubCategory, setSelectedSubSubCategory] = useState("すべて");
   const [sortOrder, setSortOrder] = useState("standard");
+  const HOME_PAGE_SIZE = 40;
+  const [homeVisibleCount, setHomeVisibleCount] = useState(HOME_PAGE_SIZE);
+
+  // カテゴリ/絞り込み/並び替えが変わったら表示件数を最初のページにリセット
+  // (一覧を全件レンダリングすると数千件のカードを一度に描画してしまい重くなるため)
+  useEffect(() => {
+    setHomeVisibleCount(HOME_PAGE_SIZE);
+  }, [selectedCategory, selectedSubCategory, selectedSubSubCategory, sortOrder]);
   const [searchTerm, setSearchTerm] = useState("");
   const [giftBudgetFilter, setGiftBudgetFilter] = useState("すべて");
   const [giftSceneFilter, setGiftSceneFilter] = useState("すべて");
@@ -2882,7 +2890,8 @@ ${userText}
 
         <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4 xl:grid-cols-5">
           {/* DB商品を優先表示（Cronバッチで毎晩自動更新） */}
-          {filtered.length > 0 && applySortOrder(filtered).map((p) => (
+          {/* 一覧が数千件になる場合があるため、一度に描画する件数を絞り「もっと見る」で追加表示する */}
+          {filtered.length > 0 && applySortOrder(filtered).slice(0, homeVisibleCount).map((p) => (
             <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
           ))}
 
@@ -2904,6 +2913,17 @@ ${userText}
             <div className="col-span-2 py-20 text-center text-[#A5A19E] text-xs font-bold uppercase tracking-widest leading-loose">該当する商品は見つかりませんでした</div>
           )}
         </div>
+
+        {filtered.length > homeVisibleCount && (
+          <div className="flex justify-center mb-8">
+            <button
+              onClick={() => setHomeVisibleCount(c => c + HOME_PAGE_SIZE)}
+              className="bg-white border border-[#F4EFEB] text-[#5A4C4C] px-8 py-3 rounded-full text-xs font-black shadow-sm active:scale-95 transition-all"
+            >
+              もっと見る（残り{filtered.length - homeVisibleCount}件）
+            </button>
+          </div>
+        )}
 
         {/* ─── レンタル・サブスクサービス ─── */}
         {selectedCategory === 'すべて' && (
