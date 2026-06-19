@@ -1281,15 +1281,19 @@ const App = () => {
         };
         fetchReviewsFromDb();
 
-        const [rakutenResult, yahooResult] = await Promise.allSettled([
-          fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1`).then(r => r.json()),
-          fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}&noFilter=1`).then(r => r.json())
-        ]);
+        const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        const safeFetchJson = (url) => fetch(url).then(r => r.json()).catch(() => null);
+
+        // 楽天APIはレート制限があり、同時に複数リクエストを送ると403/429で弾かれるため
+        // 楽天向けのリクエストは1件ずつ間隔を空けて順番に実行する（Yahooは別APIなので並列でOK）
+        const yahooPromise = safeFetchJson(`/api/yahoo?query=${encodeURIComponent(keyword)}&noFilter=1`);
+        const rakutenData = await safeFetchJson(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1`);
+        const yahooData = await yahooPromise;
 
         const newShops = [...cachedShops];
 
-        if (rakutenResult.status === 'fulfilled' && rakutenResult.value.products) {
-          const items = rakutenResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
+        if (rakutenData?.products) {
+          const items = rakutenData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || '楽天市場';
@@ -1303,8 +1307,8 @@ const App = () => {
           }
         }
 
-        if (yahooResult.status === 'fulfilled' && yahooResult.value.products) {
-          const items = yahooResult.value.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
+        if (yahooData?.products) {
+          const items = yahooData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || 'Yahoo!ショッピング';
@@ -1318,18 +1322,16 @@ const App = () => {
         }
 
         // ベビー専門店: shopCode 検索で在庫確認し、公式URLでカード追加
-        const specialtyResults = await Promise.allSettled(
-          SPECIALTY_SHOPS.map(sp =>
-            fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1&shopCode=${sp.shopCode}`)
-              .then(r => r.json())
-              .then(data => ({ ...sp, data }))
-              .catch(() => ({ ...sp, data: { products: [] } }))
-          )
-        );
+        // これも楽天APIを使うため、レート制限を避けて1件ずつ順番に実行する
+        const specialtyResults = [];
+        for (const sp of SPECIALTY_SHOPS) {
+          await sleep(350);
+          const data = await safeFetchJson(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1&shopCode=${sp.shopCode}`);
+          specialtyResults.push({ ...sp, data: data || { products: [] } });
+        }
 
         for (const result of specialtyResults) {
-          if (result.status !== 'fulfilled') continue;
-          const { name, source, domain, data } = result.value;
+          const { name, source, domain, data } = result;
           if (!data.products?.length) continue;
           const items = data.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
           if (items.length === 0) continue;
