@@ -1,3 +1,31 @@
+import { request as httpsRequest } from 'node:https';
+
+// /api/rakuten と同様、新・楽天APIはReferer/Originが一致しないと403になる。
+// fetch()はこれらを禁止ヘッダーとして送信しないため node:https を使う。
+const RAKUTEN_REFERER = process.env.RAKUTEN_REFERER || 'https://honestbaby-care.com';
+
+function nodeHttpsGet(url) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const req = httpsRequest({
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': RAKUTEN_REFERER,
+        'Origin': RAKUTEN_REFERER,
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => resolve({ statusCode: res.statusCode, text: data }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
@@ -29,17 +57,11 @@ export async function GET(request) {
   const url = `https://openapi.rakuten.co.jp/ichibaproduct/api/Product/Search/20250801?${params}`;
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        Referer: request.headers.get('referer') || request.headers.get('origin') || 'https://honestbaby-care.com',
-        'User-Agent': 'Mozilla/5.0',
-      },
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      return Response.json({ error: errorText }, { status: response.status, headers });
+    const { statusCode, text } = await nodeHttpsGet(url);
+    if (statusCode !== 200) {
+      return Response.json({ error: text }, { status: statusCode, headers });
     }
-    const data = await response.json();
+    const data = JSON.parse(text);
 
     const products = (data.Products || []).map((entry) => {
       const p = entry.Product;

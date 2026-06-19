@@ -1,3 +1,34 @@
+import { request as httpsRequest } from 'node:https';
+
+// 新・楽天API(openapi.rakuten.co.jp)は Referer と Origin の両方が
+// アプリ登録時の「許可するWebサイト」と一致しないと
+// REQUEST_CONTEXT_BODY_HTTP_REFERRER_MISSING (403) になる。
+// fetch() は Referer/Origin を「禁止ヘッダー」として実際には送信しないため、
+// node:https を直接使ってヘッダーを確実に送る。
+const RAKUTEN_REFERER = process.env.RAKUTEN_REFERER || 'https://honestbaby-care.com';
+
+function nodeHttpsGet(url) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const req = httpsRequest({
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': RAKUTEN_REFERER,
+        'Origin': RAKUTEN_REFERER,
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => resolve({ statusCode: res.statusCode, text: data }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
@@ -27,18 +58,12 @@ export async function GET(request) {
   const shopCodeParam = shopCode ? `&shopCode=${encodeURIComponent(shopCode)}` : '';
   const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1${filterParams}${shopCodeParam}&affiliateId=${affiliateId || ''}`;
 
-  const clientReferer =
-    request.headers.get('referer') || request.headers.get('origin') || 'https://honestbaby-care.com';
-
   try {
-    const response = await fetch(url, {
-      headers: { Referer: clientReferer, 'User-Agent': 'Mozilla/5.0' },
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      return Response.json({ error: errorText }, { status: response.status, headers });
+    const { statusCode, text } = await nodeHttpsGet(url);
+    if (statusCode !== 200) {
+      return Response.json({ error: text }, { status: statusCode, headers });
     }
-    const data = await response.json();
+    const data = JSON.parse(text);
 
     const products = (data.Items || []).map((item) => ({
       id: `rakuten-${item.Item.itemCode}`,
