@@ -5,6 +5,7 @@ import { formatDbProduct, getLowestPrice, CAT_META } from '@/src/lib/products';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
+import ProductClient from './ProductClient';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -147,10 +148,14 @@ export default async function ProductPage({ params }) {
   const jsonLd = [productLd, breadcrumbLd];
 
   return (
-    <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
-      <SiteHeader />
-      <main className="max-w-3xl mx-auto px-4 py-8">
-        <nav className="text-[11px] text-[#A5A19E] font-bold mb-4">
+    <>
+      {/* 構造化データは常時出力（アプリ起動後にSSRページが入れ替わってもSEOには影響しない） */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <ProductClient productId={product.id}>
+        <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
+          <SiteHeader />
+          <main className="max-w-3xl mx-auto px-4 py-8">
+            <nav className="text-[11px] text-[#A5A19E] font-bold mb-4">
           <Link href="/" className="hover:text-[#7B8E76]">ホーム</Link>
           {product.category && CAT_META[product.category] && (
             <>
@@ -239,10 +244,11 @@ export default async function ProductPage({ params }) {
             </div>
           </section>
         )}
-      </main>
+          </main>
 
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <SpaBottomNav />
-    </div>
+          <SpaBottomNav />
+        </div>
+      </ProductClient>
+    </>
   );
 }
