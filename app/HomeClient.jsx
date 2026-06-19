@@ -13,7 +13,17 @@ export default function HomeClient({ children }) {
 
   return (
     <>
-      {!ready && children}
+      {!ready && (
+        <>
+          {children}
+          {/* SSRコンテンツはクローラー向けにそのまま残しつつ、ユーザーには
+              アプリ起動までの間ブランドに合わせたスプラッシュを重ねて見せる。
+              空の画像枠など未スタイルのSSR内容が一瞬見えてしまうのを防ぐ。 */}
+          <div className="fixed inset-0 z-50 bg-[#FFFDFB] flex items-center justify-center">
+            <div className="w-10 h-10 border-4 border-[#F2ABAC]/20 border-t-[#F2ABAC] rounded-full animate-spin"></div>
+          </div>
+        </>
+      )}
       <App />
     </>
   );
