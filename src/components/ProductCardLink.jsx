@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getHighResImage, getLowestPrice } from '../lib/products';
+import { getCardImage, getLowestPrice } from '../lib/products';
 
 // サーバーコンポーネント: 商品カードを /product/[id] への <a> リンクとして描画。
 // Google がクロールできる実HTMLのリンク・商品情報を提供する。
@@ -12,9 +12,11 @@ export default function ProductCardLink({ product }) {
     >
       <div className="relative aspect-square bg-[#F9F6F3] p-4">
         <img
-          src={getHighResImage(product.image)}
+          src={getCardImage(product.image)}
           className="w-full h-full object-cover rounded-[1.5rem]"
           alt={product.name}
+          loading="lazy"
+          decoding="async"
         />
         {product.subCategory && (
           <div className="absolute bottom-6 left-6 px-2.5 py-1 rounded-full text-[9px] font-bold tracking-wider bg-[#7B8E76] text-white">

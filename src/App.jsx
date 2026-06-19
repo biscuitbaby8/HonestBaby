@@ -1001,8 +1001,7 @@ const App = () => {
             .from('products')
             .select(`
               *,
-              shops:shops_prices(*),
-              honestReviews:reviews(*)
+              shops:shops_prices(*)
             `)
             .or('is_blocked.is.null,is_blocked.eq.false')
             .order('popularity_rank', { ascending: true, nullsFirst: false })

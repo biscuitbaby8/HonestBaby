@@ -1,6 +1,6 @@
 'use client';
 import { Heart, Star, Award, ShieldCheck } from 'lucide-react';
-import { getHighResImage, getLowestPrice } from '../lib/products';
+import { getCardImage, getLowestPrice } from '../lib/products';
 
 const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock }) => (
   <div
@@ -12,10 +12,12 @@ const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favo
   >
     <div className="relative aspect-square bg-[#F9F6F3] p-4">
       <img
-        src={getHighResImage(product.image)}
+        src={getCardImage(product.image)}
         onError={(e) => { e.target.onerror = null; e.target.src = product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }}
         className="w-full h-full object-cover rounded-[1.5rem]"
         alt={product.name}
+        loading="lazy"
+        decoding="async"
       />
       <button
         onClick={(e) => onToggleFavorite(e, product)}

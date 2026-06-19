@@ -63,6 +63,21 @@ export const getHighResImage = (url) => {
   }
 };
 
+// 商品一覧カードのサムネイル用（縮小版）。詳細表示は getHighResImage の1000x1000を使う。
+// 楽天画像は ?_ex= で表示サイズを指定できるため、カード表示には400x400で十分。
+// Yahoo(yimg)はサイズコードの安全な縮小方法が未確認のため、元のまま返す。
+export const getCardImage = (url) => {
+  if (!url) return 'https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby';
+  try {
+    if (url.indexOf('rakuten.co.jp') !== -1) {
+      return url.split('?_ex=')[0] + '?_ex=400x400';
+    }
+    return getHighResImage(url);
+  } catch {
+    return url;
+  }
+};
+
 // shops 配列から最安値を取得（表示用、official正規化なしの軽量版）
 export const getLowestPrice = (shops) => {
   if (!shops || shops.length === 0) return 0;
