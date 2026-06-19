@@ -25,7 +25,7 @@ export async function GET(request) {
   // noFilter=1 (クロスプラットフォーム価格比較用): フィルタなし
   const filterParams = noFilter === '1' ? '' : '&genreId=566382&minPrice=500';
   const shopCodeParam = shopCode ? `&shopCode=${encodeURIComponent(shopCode)}` : '';
-  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1${filterParams}${shopCodeParam}&affiliateId=${affiliateId || ''}`;
+  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1${filterParams}${shopCodeParam}&affiliateId=${affiliateId || ''}`;
 
   const clientReferer =
     request.headers.get('referer') || request.headers.get('origin') || 'https://honestbaby-care.com';
