@@ -250,6 +250,17 @@ const SPECIALTY_SHOPS = [
   { shopCode: 'toysrus',      name: 'ベビーザらス',     source: 'toysrus',      domain: 'toysrus.co.jp' },
 ];
 
+// カードの見出しは出店ショップ名ではなく必ずプラットフォーム名で統一する
+// （同じ出店ショップが楽天・Yahoo両方にあると見出しが同名で重複して見えるため）
+const PLATFORM_LABEL = {
+  rakuten: '楽天市場',
+  yahoo: 'Yahoo!ショッピング',
+  amazon: 'Amazon.co.jp',
+  akachan: 'アカチャンホンポ',
+  nishimatsuya: '西松屋',
+  toysrus: 'ベビーザらス',
+};
+
 const detectOfficialShop = (shop) => {
   const target = `${shop?.name || ''} ${shop?.url || ''}`;
   for (const rule of OFFICIAL_SHOP_RULES) {
@@ -3962,6 +3973,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   if (!shopByKey.has('amazon.co.jp') && !shopByKey.has('amazon')) {
                     shopByKey.set('amazon', {
                       name: 'Amazon.co.jp',
+                      source: 'amazon',
                       type: 'mall',
                       lowestPrice: 0,
                       url: getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ')),
@@ -3975,7 +3987,16 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     return targets.some(t => RENTAL_KW.some(k => t.toLowerCase().includes(k)));
                   };
                   return Array.from(shopByKey.values())
-                    .map(s => ({ ...s, _isRental: checkRental(s) }))
+                    .map(s => {
+                      const sellerName = s.name || s.shop_name || '';
+                      const platformLabel = PLATFORM_LABEL[s.source];
+                      return {
+                        ...s,
+                        _isRental: checkRental(s),
+                        _displayName: platformLabel || sellerName,
+                        _sellerLabel: platformLabel && platformLabel !== sellerName ? sellerName : null,
+                      };
+                    })
                     .sort((a, b) => {
                       if (a._isRental !== b._isRental) return a._isRental ? 1 : -1;
                       if (a.lowestPrice === 0) return 1;
@@ -3984,14 +4005,14 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     });
                 })().map((shop, idx) => (
                   <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
-                    <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`} 
-                      onClick={() => shop.sellers?.length > 0 ? setExpandedMall(expandedMall === (shop.name || shop.shop_name) ? null : (shop.name || shop.shop_name)) : window.open(shop.url, '_blank')}>
+                    <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`}
+                      onClick={() => shop.sellers?.length > 0 ? setExpandedMall(expandedMall === shop._displayName ? null : shop._displayName) : window.open(shop.url, '_blank')}>
                       <div className="flex-1 pr-4">
                         <div className="flex items-center flex-wrap gap-2 mb-1.5">
                           <div className="w-5 h-5 rounded-md flex items-center justify-center overflow-hidden border border-[#F4EFEB] bg-white">
-                            {(shop.name || shop.shop_name).includes('楽天') ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
-                             (shop.name || shop.shop_name).includes('Yahoo') ? <img src="https://shopping.yahoo.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
-                             (shop.name || shop.shop_name).toLowerCase().includes('amazon') ? <img src="https://www.amazon.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
+                            {shop.source === 'rakuten' ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
+                             shop.source === 'yahoo' ? <img src="https://shopping.yahoo.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
+                             shop.source === 'amazon' ? <img src="https://www.amazon.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
                              (() => {
                                const sp = SPECIALTY_SHOPS.find(s => s.source === (shop.source || ''));
                                return sp
@@ -3999,7 +4020,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                                  : <Store className="w-3.5 h-3.5 text-[#A5A19E]" />;
                              })()}
                           </div>
-                          <p className="text-base font-black text-[#5A4C4C]">{shop.name || shop.shop_name}</p>
+                          <p className="text-base font-black text-[#5A4C4C]">{shop._displayName}</p>
                           {shop.type === 'official' && (
                             <span className="bg-gradient-to-r from-[#F2ABAC] to-[#F78CA0] text-white text-[9px] font-black px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
                               <ShieldCheck className="w-2.5 h-2.5" /> 公式
@@ -4012,7 +4033,10 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           )}
                         </div>
                         <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">
-                          {shop._isRental ? 'レンタル料金（新品購入ではありません）' : shop.lowestPrice > 0 ? `出品者: ${Math.max(1, (shop.sellers || []).length)}店舗` : "最新の価格・在庫をチェック"}
+                          {shop._isRental ? 'レンタル料金（新品購入ではありません）'
+                            : shop.lowestPrice > 0 && shop._sellerLabel ? `最安ショップ: ${shop._sellerLabel}`
+                            : shop.lowestPrice > 0 ? `出品者: ${Math.max(1, (shop.sellers || []).length)}店舗`
+                            : "最新の価格・在庫をチェック"}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
@@ -4020,13 +4044,13 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           {shop.lowestPrice > 0 ? `¥${shop.lowestPrice.toLocaleString()}` : '最安値をチェック'}
                         </span>
                         <div className="text-[#A5A19E] bg-white p-1 rounded-full shadow-sm">
-                          {shop.sellers?.length > 0 ? (expandedMall === (shop.name || shop.shop_name) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />) : <ExternalLink className="w-4 h-4 opacity-30" />}
+                          {shop.sellers?.length > 0 ? (expandedMall === shop._displayName ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />) : <ExternalLink className="w-4 h-4 opacity-30" />}
                         </div>
                       </div>
                     </div>
 
                     {/* 出品者アコーディオン（公式/最安値/高評価 をラベル付きで表示） */}
-                    {expandedMall === (shop.name || shop.shop_name) && shop.sellers?.length > 0 && (
+                    {expandedMall === shop._displayName && shop.sellers?.length > 0 && (
                       <div className="bg-[#F9F6F3] border-t border-[#F4EFEB] p-4 space-y-3">
                         {[...shop.sellers]
                           .sort((a, b) => {
