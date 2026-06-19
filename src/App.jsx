@@ -995,22 +995,33 @@ const App = () => {
         // 一部しか読めずホームのサブカテゴリが空に見えるため、range でページング取得して全件読む。
         // popularity_rank 昇順で取得し、定番（rank=1〜）を先頭に揃える。
         const PAGE_SIZE = 1000;
-        let data = [];
-        for (let from = 0; ; from += PAGE_SIZE) {
-          const { data: page, error } = await supabase
-            .from('products')
-            .select(`
-              *,
-              shops:shops_prices(*)
-            `)
-            .or('is_blocked.is.null,is_blocked.eq.false')
-            .order('popularity_rank', { ascending: true, nullsFirst: false })
-            .range(from, from + PAGE_SIZE - 1);
+        const { count, error: countError } = await supabase
+          .from('products')
+          .select('id', { count: 'exact', head: true })
+          .or('is_blocked.is.null,is_blocked.eq.false');
 
+        if (countError) throw countError;
+
+        const pageCount = Math.max(1, Math.ceil((count || 0) / PAGE_SIZE));
+        const pages = await Promise.all(
+          Array.from({ length: pageCount }, (_, i) => {
+            const from = i * PAGE_SIZE;
+            return supabase
+              .from('products')
+              .select(`
+                *,
+                shops:shops_prices(*)
+              `)
+              .or('is_blocked.is.null,is_blocked.eq.false')
+              .order('popularity_rank', { ascending: true, nullsFirst: false })
+              .range(from, from + PAGE_SIZE - 1);
+          })
+        );
+
+        let data = [];
+        for (const { data: page, error } of pages) {
           if (error) throw error;
-          if (!page || page.length === 0) break;
-          data = data.concat(page);
-          if (page.length < PAGE_SIZE) break;
+          if (page) data = data.concat(page);
         }
 
         if (data) {
