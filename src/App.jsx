@@ -421,6 +421,11 @@ const App = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [activeTab]);
+  // ロゴクリック: ホームタブへ切り替え、既にホームなら最上部までスクロール
+  const goHome = () => {
+    setActiveTab('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Category & Filter States
@@ -3305,7 +3310,7 @@ ${userText}
       <aside className="hidden lg:flex flex-col fixed top-0 left-0 h-screen w-60 bg-white border-r border-[#F4EFEB] z-40">
         {/* ロゴ */}
         <div className="px-6 py-6 border-b border-[#F4EFEB]">
-          <h1 className="text-xl font-black text-[#7B8E76] tracking-tight cursor-pointer font-serif" onClick={() => setActiveTab('home')}>
+          <h1 className="text-xl font-black text-[#7B8E76] tracking-tight cursor-pointer font-serif" onClick={goHome}>
             Honest Baby<span className="text-[#F2ABAC] text-3xl leading-[0] relative top-1">.</span>
           </h1>
           <p className="text-[10px] text-[#A5A19E] font-bold mt-1">忖度なしのベビー用品比較</p>
@@ -3364,7 +3369,7 @@ ${userText}
 
       {/* 上部ヘッダー (スマホのみ) */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB] lg:hidden">
-        <h1 className="text-2xl font-black text-[#7B8E76] tracking-tight cursor-pointer font-serif" onClick={() => setActiveTab('home')}>
+        <h1 className="text-2xl font-black text-[#7B8E76] tracking-tight cursor-pointer font-serif" onClick={goHome}>
           Honest Baby<span className="text-[#F2ABAC] text-4xl leading-[0] relative top-1">.</span>
         </h1>
         <div className="flex items-center gap-2">
