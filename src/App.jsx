@@ -168,14 +168,16 @@ const PROMO_NOISE_PHRASES = [
   '最新作', '最新型', '最新モデル', '最新版', '最新',
   '新作', '新型',
 ];
+// ＼／＜＞≪≫は装飾的な販促バッジにも、商品の正当な説明（＜2枚セット＞等）にも使われるため、
+// 中身に販促語を含む場合のみ丸ごと除去する
+const PROMO_BRACKET_RE = /レビュー|特典|最新|新作|新型|クーポン|セール|SALE|sale|ポイント|プレゼント|限定|半額|OFF|off|％|%|円/;
+const stripPromoBrackets = (s) =>
+  s.replace(/(＼[^／]{0,60}／|＜[^＞]{0,60}＞|≪[^≫]{0,60}≫)/g, (m) => (PROMO_BRACKET_RE.test(m) ? '' : m));
 
 const cleanName = (name) => {
   if (!name) return '';
-  let s = name
+  let s = stripPromoBrackets(name)
     .replace(/[【［\[「『〈《][^】］\]」』〉》]{0,60}[】］\]」』〉》]/g, '')
-    .replace(/＼[^／]{0,60}／/g, '')
-    .replace(/＜[^＞]{0,60}＞/g, '')
-    .replace(/≪[^≫]{0,60}≫/g, '')
     .replace(/[★◆▼■●▲☆◇▽□○△♪♥♡※◎◯！!✓]+/g, '')
     .replace(/^(楽天|第)?\s*[0-9０-９]+\s*位(受賞)?\s*/g, '')
     .replace(/[0-9０-９]{2,4}年?\s*(?=最新|新型|新作)/g, '');
