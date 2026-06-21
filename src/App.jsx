@@ -9,7 +9,7 @@ import {
   Package, Layers, ChevronDown, ChevronUp, Calculator,
   Store, Gift, ChevronLeft, ShieldCheck, Baby, BellRing, Edit3,
   FileText, Shield, Info, Edit2, Camera, Mail,
-  LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2
+  LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
 import { CATEGORY_TREE, CATEGORIES } from './lib/products';
@@ -33,6 +33,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
     case 'マタニティ': return <Leaf className={className} />;
     case 'ゴミ箱・袋': return <Trash2 className={className} />;
     case 'ギフトセット': return <Gift className={className} />;
+    case 'レンタル': return <Repeat className={className} />;
     default: return <Package className={className} />;
   }
 };
@@ -2600,6 +2601,8 @@ ${userText}
         if (blocklist.has(code)) return false;
         // ギフトセットはギフトページ専用。「すべて」ホームには表示しない
         if (selectedCategory === "すべて" && p.category === "ギフトセット") return false;
+        // レンタルは専用コーナーで表示するため、「すべて」の通常ランキングには重複表示しない
+        if (selectedCategory === "すべて" && p.category === "レンタル") return false;
         // ゴミ箱・袋はDBではカテゴリ"ゴミ箱・袋"で保存されるが、UIではおむつのサブカテゴリとして扱う
         const matchCat = selectedCategory === "すべて"
           || p.category === selectedCategory
@@ -2759,6 +2762,36 @@ ${userText}
             );
           })()}
         </div>
+
+        {/* ─── レンタル特集（楽天市場のレンタル商品。DB連動でホームと同じ仕組み） ─── */}
+        {(() => {
+          const rentalItems = dbProducts
+            .filter(p => p.category === 'レンタル')
+            .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+            .slice(0, 10);
+          if (rentalItems.length === 0) return null;
+          return (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-2">
+                  <Repeat className="w-3.5 h-3.5 text-[#7B8E76]" />
+                  <span className="text-[10px] font-black text-[#7B8E76] uppercase tracking-widest">Rental</span>
+                  <span className="text-xs font-bold text-[#5A4C4C]">楽天市場のレンタル特集</span>
+                </div>
+                <button onClick={() => handleCategoryChange('レンタル')} className="text-[10px] font-black text-[#A5A19E] flex items-center gap-0.5 flex-shrink-0">
+                  もっと見る <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4">
+                {rentalItems.map(p => (
+                  <div key={p.id} className="flex-shrink-0 w-40">
+                    <ProductCard product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
         {babyInfo && babyAgeMonths != null && (() => {
