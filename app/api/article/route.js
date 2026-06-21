@@ -99,7 +99,7 @@ function inlineFormat(text) {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code>$1</code>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" style="color:#F2ABAC;font-weight:700;text-decoration:underline;" target="_blank" rel="noopener">$1</a>');
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+|\/[^\)]+)\)/g, '<a href="$2" style="color:#F2ABAC;font-weight:700;text-decoration:underline;" target="_blank" rel="noopener">$1</a>');
 }
 
 function notFoundHtml() {
