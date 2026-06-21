@@ -54,13 +54,6 @@ const AGE_CATEGORY_MAP = [
   { minM: 24,  maxM: 999, label: '2歳〜',          cats: ['ウェア', 'トイレ用品', '車用品', 'おもちゃ'] },
 ];
 
-// レンタル・サブスクサービス（提携前のため現状は外部サイトへの直接リンク）
-const RENTAL_SERVICES = [
-  { name: 'ベビレンタ', desc: 'ベビーカー・チャイルドシートなど', tag: 'レンタル', color: '#FFF5F5', tagColor: '#F2ABAC', url: 'https://babyrenta.com/' },
-  { name: 'Toysub！', desc: 'おもちゃのサブスク 月額3,980円〜', tag: 'サブスク', color: '#EBF0EA', tagColor: '#7B8E76', url: 'https://toysub.net/' },
-  { name: 'ナイスベビー', desc: 'ベビー用品レンタル専門店', tag: 'レンタル', color: '#FFF5F5', tagColor: '#F2ABAC', url: 'https://www.nicebaby.co.jp/' },
-];
-
 // 月齢→おむつサイズのマッピング（体重個人差あり、目安として利用）
 const DIAPER_SIZE_BY_AGE = [
   { maxM: 1,   size: '新生児', sub: 'テープタイプ', label: '新生児サイズ' },
@@ -2765,41 +2758,6 @@ ${userText}
               </div>
             );
           })()}
-        </div>
-
-        {/* ─── レンタル・サブスクサービス（モバイル: 横スクロールカード） ─── */}
-        <div className="mb-6 lg:hidden">
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <span className="text-[10px] font-black text-[#7B8E76] uppercase tracking-widest">Services</span>
-            <span className="text-xs font-bold text-[#5A4C4C]">レンタル・サブスクで賢く育児</span>
-          </div>
-          <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-2">
-            {RENTAL_SERVICES.map(s => (
-              <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer nofollow"
-                className="flex-shrink-0 w-44 rounded-[1.75rem] p-4 border border-[#F4EFEB] shadow-sm active:scale-95 transition-transform"
-                style={{ background: s.color }}>
-                <span className="text-[9px] font-black rounded-full px-2 py-0.5" style={{ background: s.tagColor, color: '#fff' }}>{s.tag}</span>
-                <div className="font-black text-[#5A4C4C] text-sm mt-2 mb-1">{s.name}</div>
-                <div className="text-[10px] text-[#8E8282] font-bold leading-snug">{s.desc}</div>
-              </a>
-            ))}
-          </div>
-        </div>
-
-        {/* ─── レンタル・サブスクサービス（PC: 3カラムグリッド） ─── */}
-        <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4 mb-8">
-          {RENTAL_SERVICES.map(s => (
-            <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer nofollow"
-              className="rounded-[2rem] p-6 border border-[#F4EFEB] shadow-sm active:scale-[0.98] transition-transform flex items-center gap-4"
-              style={{ background: s.color }}>
-              <div className="flex-1 min-w-0">
-                <span className="text-[9px] font-black rounded-full px-2 py-0.5" style={{ background: s.tagColor, color: '#fff' }}>{s.tag}</span>
-                <div className="font-black text-[#5A4C4C] text-base mt-2 mb-1">{s.name}</div>
-                <div className="text-xs text-[#8E8282] font-bold leading-snug">{s.desc}</div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-[#A5A19E] flex-shrink-0" />
-            </a>
-          ))}
         </div>
 
         {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
