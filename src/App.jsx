@@ -2763,33 +2763,24 @@ ${userText}
           })()}
         </div>
 
-        {/* ─── レンタル特集（楽天市場のレンタル商品。DB連動でホームと同じ仕組み） ─── */}
+        {/* ─── レンタル特集バナー（楽天市場のレンタル商品一覧ページへの導線。DB連動でホームと同じ仕組み） ─── */}
         {(() => {
-          const rentalItems = dbProducts
-            .filter(p => p.category === 'レンタル')
-            .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-            .slice(0, 10);
-          if (rentalItems.length === 0) return null;
+          const hasRentalItems = dbProducts.some(p => p.category === 'レンタル');
+          if (!hasRentalItems) return null;
           return (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3 px-1">
-                <div className="flex items-center gap-2">
-                  <Repeat className="w-3.5 h-3.5 text-[#7B8E76]" />
-                  <span className="text-[10px] font-black text-[#7B8E76] uppercase tracking-widest">Rental</span>
-                  <span className="text-xs font-bold text-[#5A4C4C]">楽天市場のレンタル特集</span>
-                </div>
-                <button onClick={() => handleCategoryChange('レンタル')} className="text-[10px] font-black text-[#A5A19E] flex items-center gap-0.5 flex-shrink-0">
-                  もっと見る <ChevronRight className="w-3 h-3" />
-                </button>
+            <button
+              onClick={() => handleCategoryChange('レンタル')}
+              className="w-full bg-[#EBF0EA] rounded-[1.75rem] p-4 mb-6 flex items-center gap-3 shadow-sm active:scale-[0.98] transition-transform border border-[#D4DDD2]"
+            >
+              <div className="bg-white p-2 rounded-full shadow-sm flex-shrink-0">
+                <Repeat className="w-4 h-4 text-[#7B8E76]" />
               </div>
-              <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4">
-                {rentalItems.map(p => (
-                  <div key={p.id} className="flex-shrink-0 w-40">
-                    <ProductCard product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
-                  </div>
-                ))}
+              <div className="flex-1 text-left">
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#7B8E76] mb-0.5">Rental</p>
+                <p className="text-sm font-black text-[#5A4C4C] leading-tight">楽天市場のレンタル特集を見る</p>
               </div>
-            </div>
+              <ChevronRight className="w-4 h-4 text-[#7B8E76] flex-shrink-0" />
+            </button>
           );
         })()}
 
