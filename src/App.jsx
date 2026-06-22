@@ -1331,10 +1331,12 @@ const App = () => {
         const safeFetchJson = (url) => fetch(url).then(r => r.json()).catch(() => null);
 
         // 楽天APIはレート制限があり、同時に複数リクエストを送ると403/429で弾かれるため
-        // 楽天向けのリクエストは1件ずつ間隔を空けて順番に実行する（Yahooは別APIなので並列でOK）
+        // 楽天向けのリクエストは1件ずつ間隔を空けて順番に実行する（Yahoo・Amazonは別APIなので並列でOK）
         const yahooPromise = safeFetchJson(`/api/yahoo?query=${encodeURIComponent(keyword)}&noFilter=1`);
+        const amazonPromise = safeFetchJson(`/api/amazon?query=${encodeURIComponent(keyword)}`);
         const rakutenData = await safeFetchJson(`/api/rakuten?query=${encodeURIComponent(keyword)}&noFilter=1`);
         const yahooData = await yahooPromise;
+        const amazonData = await amazonPromise;
 
         const newShops = [...cachedShops];
 
@@ -1362,6 +1364,22 @@ const App = () => {
             const shopData = {
               name: shopName, type: 'mall', lowestPrice: best.price, source: 'yahoo',
               sellers: [{ name: shopName, price: best.price, shipping: 0, points: 0, url: best.url, note: '' }]
+            };
+            if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
+          }
+        }
+
+        if (amazonData?.products) {
+          const items = amazonData.products.filter(item =>
+            nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name)
+            && (!item.condition || item.condition === 'New')
+          );
+          if (items.length > 0) {
+            const best = items.sort((a, b) => a.price - b.price)[0];
+            const idx = newShops.findIndex(s => s.source === 'amazon');
+            const shopData = {
+              name: 'Amazon.co.jp', type: 'mall', lowestPrice: best.price, source: 'amazon', url: best.url,
+              sellers: [{ name: 'Amazon.co.jp', price: best.price, shipping: 0, points: 0, url: best.url, note: '' }]
             };
             if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
           }
@@ -4101,6 +4119,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   // crossPlatformShops はAPIから取得した正確なURLを持つため優先
                   const hasCrossRakuten = crossPlatformShops.some(s => s.source === 'rakuten');
                   const hasCrossYahoo = crossPlatformShops.some(s => s.source === 'yahoo');
+                  const hasCrossAmazon = crossPlatformShops.some(s => s.source === 'amazon');
 
                   for (const s of crossPlatformShops.filter(isReasonablePrice)) {
                     const key = shopKey(s);
@@ -4122,16 +4141,19 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     }
                   }
                   
-                  // Amazonを統合
-                  if (!shopByKey.has('amazon.co.jp') && !shopByKey.has('amazon')) {
-                    shopByKey.set('amazon', {
-                      name: 'Amazon.co.jp',
-                      source: 'amazon',
-                      type: 'mall',
-                      lowestPrice: 0,
-                      url: getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ')),
-                      sellers: []
-                    });
+                  // Amazonの実データが取れていない場合のみ、検索リンクの静的プレースホルダーを表示
+                  if (!hasCrossAmazon) {
+                    const amazonKey = shopKey({ source: 'amazon', name: 'amazon.co.jp' });
+                    if (!shopByKey.has(amazonKey)) {
+                      shopByKey.set(amazonKey, {
+                        name: 'Amazon.co.jp',
+                        source: 'amazon',
+                        type: 'mall',
+                        lowestPrice: 0,
+                        url: getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ')),
+                        sellers: []
+                      });
+                    }
                   }
 
                   const RENTAL_KW = ['レンタル', 'rental', 'レンタ', 'リース'];

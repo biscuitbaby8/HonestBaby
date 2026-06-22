@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
+import { isAmazonConfigured, searchAmazonItems } from '@/lib/amazonApi';
 import { request as httpsRequest } from 'node:https';
 
 export const maxDuration = 60;
@@ -848,6 +849,7 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
     limitCount = 30,
     includeYahooSupplement = true,
     includeYahooPrice = true,
+    includeAmazonPrice = false,
     deadline = 0,
   } = opts;
 
@@ -1044,6 +1046,38 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
               source: 'yahoo',
               sellers: JSON.stringify(rankedYahoo.slice(0, 5).map(serializeSeller))
             }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+        }
+      }
+
+      // --- Amazon価格を取得（上位5件のみ、PA-APIレート制限への安全マージンを空けて順次取得） ---
+      if (includeAmazonPrice && isAmazonConfigured() && i < 5) {
+        await new Promise(r => setTimeout(r, 1100));
+        const searchKeyword = product.name.split(/[\s　]+/).slice(0, 3).join(' ');
+        try {
+          const amazonItems = (await searchAmazonItems(searchKeyword, 3))
+            .filter(it => !it.condition || it.condition === 'New');
+          if (amazonItems.length > 0) {
+            const best = amazonItems.sort((a, b) => (a.price || Infinity) - (b.price || Infinity))[0];
+            const refPrice = rakutenLowest || product.price || 0;
+            // 価格レンジガード: 参考価格の0.2〜5倍から外れた値は誤マッチとして保存しない
+            if (best.price && (refPrice === 0 || (best.price >= refPrice * 0.2 && best.price <= refPrice * 5))) {
+              await supabase
+                .from('shops_prices')
+                .upsert([{
+                  product_id: productId,
+                  shop_name: 'Amazon.co.jp',
+                  shop_type: 'mall',
+                  lowest_price: best.price,
+                  source: 'amazon',
+                  sellers: JSON.stringify([{
+                    name: 'Amazon.co.jp', price: best.price, url: best.url,
+                    shipping: 0, points: 0, rating: 0, reviews_count: 0, role: null, isOfficial: false,
+                  }])
+                }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+            }
+          }
+        } catch (e) {
+          log.push(`  ⚠️ Amazon PA-API取得失敗（スキップ）: ${e.message}`);
         }
       }
 
@@ -1407,8 +1441,8 @@ export async function GET(request) {
   // カテゴリ指定あり = 単発テスト用（軽量処理）、それ以外 = 通常同期（フル処理）
   const isSingleCategory = !!filterCat;
   const opts = isSingleCategory
-    ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false, deadline }
-    : { limitCount: 30, includeYahooSupplement: true, includeYahooPrice: false, deadline };
+    ? { limitCount: 20, includeYahooSupplement: false, includeYahooPrice: false, includeAmazonPrice: false, deadline }
+    : { limitCount: 30, includeYahooSupplement: true, includeYahooPrice: false, includeAmazonPrice: false, deadline };
 
   // カテゴリを並列処理（楽天レート制限回避のため1.5秒ずつずらして開始）
   const results = await Promise.allSettled(
