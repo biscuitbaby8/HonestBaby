@@ -192,19 +192,36 @@ export default async function ProductPage({ params }) {
               <div className="mb-6">
                 <h2 className="text-sm font-black mb-3">ショップ価格比較</h2>
                 <ul className="space-y-2">
-                  {shops.map((s, i) => (
-                    <li key={i} className="flex items-center justify-between bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
-                      <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
-                      <span className="flex items-center gap-3">
-                        <span className="text-sm font-black text-[#7B8E76]">¥{Number(s.lowestPrice).toLocaleString()}</span>
-                        {s.url && (
-                          <a href={s.url} target="_blank" rel="noopener noreferrer sponsored" className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full">
-                            見る
-                          </a>
+                  {shops.map((s, i) => {
+                    const periodSellers = (s.sellers || [])
+                      .filter((sl) => sl.period && Number(sl.price) > 0)
+                      .sort((a, b) => Number(a.price) - Number(b.price));
+                    return (
+                      <li key={i} className="bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
+                          <span className="flex items-center gap-3">
+                            <span className="text-sm font-black text-[#7B8E76]">¥{Number(s.lowestPrice).toLocaleString()}</span>
+                            {s.url && (
+                              <a href={s.url} target="_blank" rel="noopener noreferrer sponsored" className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full">
+                                見る
+                              </a>
+                            )}
+                          </span>
+                        </div>
+                        {periodSellers.length > 1 && (
+                          <ul className="mt-2 pt-2 border-t border-[#EFE7E0] space-y-1">
+                            {periodSellers.map((sl, j) => (
+                              <li key={j} className="flex items-center justify-between text-[11px]">
+                                <span className="text-[#8E8282] font-bold">{sl.period}</span>
+                                <span className="text-[#5A4C4C] font-black">¥{Number(sl.price).toLocaleString()}</span>
+                              </li>
+                            ))}
+                          </ul>
                         )}
-                      </span>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}

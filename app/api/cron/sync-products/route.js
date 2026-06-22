@@ -424,6 +424,25 @@ function parseDiaperCount(name) {
   return m ? parseInt(m[1]) : null;
 }
 
+// レンタル期間パーサー（同一商品が期間ごとに別アイテムコードで出品されるため、
+// 商品名から期間トークンを抜き出し、商品名統合 → 期間別価格表示に使う）
+const RENTAL_PERIOD_RE = /延長[0-9０-９]+(?:ヶ月|か月|カ月|箇月)|[0-9０-９]+(?:ヶ月|か月|カ月|箇月)分?|[0-9０-９]+泊[0-9０-９]+日|[0-9０-９]+週間|[0-9０-９]+日間/;
+const toHalfWidthDigits = (s) => s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+
+function extractRentalPeriod(name) {
+  if (!name) return null;
+  const m = name.match(RENTAL_PERIOD_RE);
+  return m ? toHalfWidthDigits(m[0]) : null;
+}
+
+function stripRentalPeriod(name) {
+  if (!name) return name;
+  return name
+    .replace(new RegExp(RENTAL_PERIOD_RE, 'g'), ' ')
+    .replace(/[\s　]+/g, ' ')
+    .trim();
+}
+
 // サブカテゴリ推定ロジック（全カテゴリ対応）
 function extractSubCategory(category, itemName) {
   const rules = {
@@ -618,7 +637,9 @@ async function fetchRakutenRanking(genreId) {
 // --- Yahoo商品データを正規化（共通化） ---
 function normalizeYahooItem(item, category) {
   const rawName = item.name;
-  const name = cleanName(rawName);
+  const period = category === 'レンタル' ? extractRentalPeriod(rawName) : null;
+  const nameForClean = period ? stripRentalPeriod(rawName) : rawName;
+  const name = cleanName(nameForClean);
   const brand = extractBrand(rawName);
   const subCategory = extractSubCategory(category, rawName);
   const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
@@ -648,6 +669,8 @@ function normalizeYahooItem(item, category) {
       points: 0,
       rating: parseFloat(item.review?.rate) || 0,
       reviews_count: parseInt(item.review?.count) || 0,
+      period,
+      rakuten_item_code: `yahoo-${item.code}`,
     }
   };
 }
@@ -732,7 +755,10 @@ function normalizeRakutenItems(items, category) {
     .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.Item.itemName.includes(kw)))
     .map((item, idx) => {
       const rawName = item.Item.itemName;
-      const name = cleanName(rawName);
+      // レンタル: 期間トークンを商品名から抜く前に保持（同一商品の期間バリアントを1商品に統合するため）
+      const period = category === 'レンタル' ? extractRentalPeriod(rawName) : null;
+      const nameForClean = period ? stripRentalPeriod(rawName) : rawName;
+      const name = cleanName(nameForClean);
       const brand = extractBrand(rawName);
       const subCategory = extractSubCategory(category, rawName);
       const unitCount = category === 'おむつ' ? parseDiaperCount(rawName) : null;
@@ -761,6 +787,8 @@ function normalizeRakutenItems(items, category) {
           points: item.Item.pointRate || 0,
           rating: parseFloat(item.Item.reviewAverage) || 0,
           reviews_count: parseInt(item.Item.reviewCount) || 0,
+          period,
+          rakuten_item_code: item.Item.itemCode,
         }
       };
     });
@@ -788,14 +816,16 @@ function deduplicateProducts(products) {
 // --- 複数 seller にロール（公式/最安値/高評価）を付与 ---
 function assignRoles(sellers) {
   if (!sellers || sellers.length === 0) return [];
-  // 同一ショップ名は除去（同じ店が複数入るのを防ぐ）
+  // 同一ショップ名は除去（同じ店が複数入るのを防ぐ）。
+  // レンタル商品は同じ店が期間バリアントごとに複数seller化するため、期間も含めてキー化する。
   const unique = [];
   const seen = new Set();
   for (const s of sellers) {
-    const key = (s.shop_name || s.name || '').trim();
-    if (!key || seen.has(key)) continue;
+    const shopKey = (s.shop_name || s.name || '').trim();
+    const key = shopKey + '|' + (s.period || '');
+    if (!shopKey || seen.has(key)) continue;
     seen.add(key);
-    unique.push({ ...s, isOfficial: /公式|直営|メーカー/.test(key) });
+    unique.push({ ...s, isOfficial: /公式|直営|メーカー/.test(shopKey) });
   }
 
   const withPrice = unique.filter(s => (s.price || 0) > 0);
@@ -834,7 +864,53 @@ function serializeSeller(s) {
     reviews_count: s.reviews_count || 0,
     role: s.role || null,
     isOfficial: !!s.isOfficial,
+    period: s.period || null,
+    rakuten_item_code: s.rakuten_item_code || null,
   };
+}
+
+// --- レンタル専用: 既存sellers（DB保存済み）と新規取得sellersを期間バリアント単位でマージ。
+// Rakutenの日次検索結果は期間バリアントを毎回全件返さないため、欠落分をDBの既存データから補う。
+function mergeRentalSellers(existingSerialized, newRawSellers) {
+  const merged = new Map();
+  // assignRolesの重複判定キーと揃える（ショップ名+期間）。rakuten_item_codeは旧データに無いため使わない
+  const keyOf = (s) => (s.shop_name || s.name || '').trim() + '|' + (s.period || '');
+  for (const s of (existingSerialized || [])) {
+    merged.set(keyOf(s), { ...s, role: null });
+  }
+  for (const s of (newRawSellers || [])) {
+    merged.set(keyOf(s), { ...s, role: null });
+  }
+  return assignRoles(Array.from(merged.values()));
+}
+
+// --- レンタル専用: 同名・同ショップの既存商品（正規商品）を検索。
+// rakuten_item_codeは「shopCode:itemId」形式のため、ショップ部分が一致するものだけを正規商品とみなす
+// （異なるショップが同名商品を扱う場合は別商品として区別する）。 ---
+async function findRentalSiblingByName(name, rakutenItemCode) {
+  const shopPrefix = (rakutenItemCode || '').split(':')[0];
+  if (!shopPrefix) return null;
+  const { data: rows } = await supabase
+    .from('products')
+    .select('id, sub_category, rakuten_item_code')
+    .eq('category', 'レンタル')
+    .eq('name', name);
+  return (rows || []).find(r => (r.rakuten_item_code || '').split(':')[0] === shopPrefix) || null;
+}
+
+// --- レンタル専用: shops_pricesに保存済みのsellers(JSONB)を読み出して配列化 ---
+async function fetchExistingSellers(productId, shopName) {
+  const { data } = await supabase
+    .from('shops_prices')
+    .select('sellers')
+    .eq('product_id', productId)
+    .eq('shop_name', shopName)
+    .single();
+  let sellers = data?.sellers;
+  if (typeof sellers === 'string') {
+    try { sellers = JSON.parse(sellers); } catch { sellers = []; }
+  }
+  return Array.isArray(sellers) ? sellers : [];
 }
 
 // --- 商品名キー化（重複判定用） ---
@@ -956,11 +1032,17 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
     try {
       // 既存商品をrakuten_item_codeで検索
       let productId;
-      const { data: existing } = await supabase
+      let { data: existing } = await supabase
         .from('products')
         .select('id, sub_category')
         .eq('rakuten_item_code', product.rakuten_item_code)
         .single();
+
+      // レンタル: 期間バリアントはアイテムコードが日替わりで変わるため、
+      // コード不一致でも同名・同ショップの既存商品（正規商品）があればそれに統合する
+      if (!existing && cat.name === 'レンタル') {
+        existing = await findRentalSiblingByName(product.name, product.rakuten_item_code);
+      }
 
       if (existing) {
         // 更新
@@ -998,7 +1080,10 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
       }
 
       // --- 楽天ショップ情報をshops_pricesに保存（同一商品の複数seller を集約） ---
-      const rankedRakuten = assignRoles(allRakutenSellers);
+      // レンタルは日次取得で期間バリアントが揃わないことがあるため、既存保存分とマージしてから役割を再計算する
+      const rankedRakuten = cat.name === 'レンタル'
+        ? mergeRentalSellers(await fetchExistingSellers(productId, '楽天市場'), allRakutenSellers)
+        : assignRoles(allRakutenSellers);
       const rakutenPrices = rankedRakuten.filter(s => (s.price || 0) > 0).map(s => s.price);
       const rakutenLowest = rakutenPrices.length > 0 ? Math.min(...rakutenPrices) : (shopInfo?.price || 0);
       const rakutenHasOfficial = rankedRakuten.some(s => s.isOfficial);
@@ -1063,9 +1148,15 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
 // --- サブカテゴリ補完: 1商品をproducts/shops_pricesに保存（sub_categoryは呼び出し側で確定済み） ---
 async function saveSubCatProduct(product, seller, source, shopName) {
   try {
-    const { data: existing } = await supabase
+    let { data: existing } = await supabase
       .from('products').select('id')
       .eq('rakuten_item_code', product.rakuten_item_code).single();
+
+    // レンタル: 期間バリアントはアイテムコードが日替わりで変わるため、
+    // コード不一致でも同名・同ショップの既存商品（正規商品）があればそれに統合する
+    if (!existing && product.category === 'レンタル') {
+      existing = await findRentalSiblingByName(product.name, product.rakuten_item_code);
+    }
 
     let productId;
     if (existing) {
@@ -1085,13 +1176,26 @@ async function saveSubCatProduct(product, seller, source, shopName) {
       productId = inserted[0].id;
     }
 
+    let sellersOut;
+    let lowestPrice;
+    if (product.category === 'レンタル') {
+      // 既存保存分とマージしてから役割・最安値を再計算（期間バリアントの消失を防ぐ）
+      const merged = mergeRentalSellers(await fetchExistingSellers(productId, shopName), [seller]);
+      sellersOut = merged.slice(0, 5).map(serializeSeller);
+      const prices = merged.filter(s => (s.price || 0) > 0).map(s => s.price);
+      lowestPrice = prices.length > 0 ? Math.min(...prices) : seller.price;
+    } else {
+      sellersOut = [serializeSeller(seller)];
+      lowestPrice = seller.price;
+    }
+
     await supabase.from('shops_prices').upsert([{
       product_id: productId,
       shop_name: shopName,
       shop_type: 'mall',
-      lowest_price: seller.price,
+      lowest_price: lowestPrice,
       source,
-      sellers: JSON.stringify([serializeSeller(seller)]),
+      sellers: JSON.stringify(sellersOut),
     }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
 
     return true;
@@ -1155,9 +1259,11 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
       for (const item of rakutenItems.slice(0, 20)) {
         if (deadline && Date.now() > deadline) break; // 時間切れは打ち切り（504回避）
         const rawName = item.Item.itemName;
+        const period = category === 'レンタル' ? extractRentalPeriod(rawName) : null;
+        const nameForClean = period ? stripRentalPeriod(rawName) : rawName;
         const rawImg = item.Item.largeImageUrls?.[0]?.imageUrl || item.Item.mediumImageUrls?.[0]?.imageUrl || '';
         const product = {
-          name: cleanName(rawName),
+          name: cleanName(nameForClean),
           category,
           sub_category: q.sub,
           brand: extractBrand(rawName),
@@ -1177,6 +1283,8 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
           points: item.Item.pointRate || 0,
           rating: parseFloat(item.Item.reviewAverage) || 0,
           reviews_count: parseInt(item.Item.reviewCount) || 0,
+          period,
+          rakuten_item_code: item.Item.itemCode,
         };
         if (await saveSubCatProduct(product, seller, 'rakuten', '楽天市場')) saved++;
         j++;

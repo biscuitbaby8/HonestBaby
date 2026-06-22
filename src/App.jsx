@@ -4061,7 +4061,10 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           )}
                         </div>
                         <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">
-                          {shop._isRental ? 'レンタル料金（新品購入ではありません）'
+                          {shop._isRental
+                            ? ((shop.sellers || []).filter(sl => sl.period).length > 1
+                                ? 'レンタル料金（期間により異なります・タップで詳細）'
+                                : 'レンタル料金（新品購入ではありません）')
                             : shop.lowestPrice > 0 && shop._sellerLabel ? `最安ショップ: ${shop._sellerLabel}`
                             : shop.lowestPrice > 0 ? `出品者: ${Math.max(1, (shop.sellers || []).length)}店舗`
                             : "最新の価格・在庫をチェック"}
@@ -4093,10 +4096,19 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                             return (
                               <div key={sIdx} className="bg-white p-5 rounded-[1.5rem] flex items-center justify-between shadow-sm">
                                 <div className="flex-1 pr-4">
-                                  {roleLabel && (
-                                    <span className={`inline-block text-white text-[9px] font-black px-2 py-0.5 rounded mb-1.5 ${roleLabel.bg}`}>
-                                      {roleLabel.text}
-                                    </span>
+                                  {(seller.period || roleLabel) && (
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                      {seller.period && (
+                                        <span className="inline-block text-white text-[9px] font-black px-2 py-0.5 rounded bg-[#7BA7CC]">
+                                          {seller.period}
+                                        </span>
+                                      )}
+                                      {roleLabel && (
+                                        <span className={`inline-block text-white text-[9px] font-black px-2 py-0.5 rounded ${roleLabel.bg}`}>
+                                          {roleLabel.text}
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                   <p className="text-xs font-black text-[#5A4C4C] line-clamp-1">{seller.name}</p>
                                   <div className="flex flex-wrap gap-2 mt-2 text-[9px] font-bold">
