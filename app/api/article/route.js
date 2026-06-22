@@ -120,7 +120,7 @@ export async function GET(request) {
     if (searchParams.get('list') === '1') {
       const { data, error } = await supabase
         .from('articles')
-        .select('slug, title, meta_description, created_at')
+        .select('slug, title, meta_description, created_at, age_min_months, age_max_months, is_maternity')
         .eq('published', true)
         .order('created_at', { ascending: false });
       if (error) {

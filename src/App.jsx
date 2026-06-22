@@ -55,6 +55,14 @@ const AGE_CATEGORY_MAP = [
   { minM: 24,  maxM: 999, label: '2歳〜',          cats: ['ウェア', 'トイレ用品', '車用品', 'おもちゃ'] },
 ];
 
+// 出産予定までの週数→おすすめカテゴリのマッピング（マタニティモード）
+const PREGNANCY_STAGE_MAP = [
+  { minW: 28, maxW: 999, label: '妊娠初期〜中期', cats: ['マタニティ', 'ウェア', 'おむつ', '寝具・ベッド'] },
+  { minW: 14, maxW: 28,  label: '妊娠後期に向けて', cats: ['マタニティ', 'ベビーカー', '抱っこ紐', 'お風呂用品'] },
+  { minW: 4,  maxW: 14,  label: '出産準備本番',   cats: ['マタニティ', 'おむつ', 'ミルク・授乳', '寝具・ベッド'] },
+  { minW: 0,  maxW: 4,   label: '臨月・入院準備',  cats: ['マタニティ', 'おむつ', 'ウェア', 'お風呂用品'] },
+];
+
 // 月齢→おむつサイズのマッピング（体重個人差あり、目安として利用）
 const DIAPER_SIZE_BY_AGE = [
   { maxM: 1,   size: '新生児', sub: 'テープタイプ', label: '新生児サイズ' },
@@ -495,7 +503,7 @@ const App = () => {
   const [articleAdminError, setArticleAdminError] = useState('');
   const [articleList, setArticleList] = useState([]);
   const [articleAdminView, setArticleAdminView] = useState('list'); // 'list' | 'edit'
-  const [articleForm, setArticleForm] = useState({ slug: '', title: '', meta_description: '', content: '', published: true });
+  const [articleForm, setArticleForm] = useState({ slug: '', title: '', meta_description: '', content: '', published: true, age_min_months: '', age_max_months: '', is_maternity: false });
   const [articleSaving, setArticleSaving] = useState(false);
   // 記事エディタ内商品検索
   const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -618,19 +626,21 @@ const App = () => {
         // DBにあれば localStorage を上書き
         setBabyInfo({
           name: dbProfile.name || '',
-          birthYear: dbProfile.birth_year,
-          birthMonth: dbProfile.birth_month,
+          birthYear: dbProfile.birth_year || undefined,
+          birthMonth: dbProfile.birth_month || undefined,
+          dueDate: dbProfile.due_date || undefined,
           gender: dbProfile.gender || '',
         });
       } else {
         // DBに無い & localStorageにあれば DB へ push
         const local = JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null');
-        if (local && local.birthYear) {
+        if (local && (local.birthYear || local.dueDate)) {
           await supabase.from('baby_profiles').upsert({
             user_id: userId,
             name: local.name || null,
-            birth_year: local.birthYear,
-            birth_month: local.birthMonth,
+            birth_year: local.birthYear || null,
+            birth_month: local.birthMonth || null,
+            due_date: local.dueDate || null,
             gender: local.gender || null,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'user_id' });
@@ -644,8 +654,9 @@ const App = () => {
       await supabase.from('baby_profiles').upsert({
         user_id: userId,
         name: info.name || null,
-        birth_year: info.birthYear,
-        birth_month: info.birthMonth,
+        birth_year: info.birthYear || null,
+        birth_month: info.birthMonth || null,
+        due_date: info.dueDate || null,
         gender: info.gender || null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
@@ -736,15 +747,22 @@ const App = () => {
     try { return JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null'); } catch { return null; }
   });
 
-  // 月齢・年齢計算（全画面・AI から参照できるようトップレベルで計算）
+  // 月齢・年齢・妊娠週数計算（全画面・AI から参照できるようトップレベルで計算）
   const _now = new Date();
-  const babyAgeMonths = babyInfo
+  const isPregnant = !!(babyInfo && babyInfo.dueDate && !babyInfo.birthYear);
+  const weeksUntilDue = isPregnant
+    ? Math.ceil((new Date(babyInfo.dueDate) - _now) / (7 * 24 * 60 * 60 * 1000))
+    : null;
+  const babyAgeMonths = (babyInfo && babyInfo.birthYear)
     ? ((_now.getFullYear() - babyInfo.birthYear) * 12 + (_now.getMonth() + 1 - babyInfo.birthMonth))
     : null;
   const babyAgeLabel = babyAgeMonths != null
     ? babyAgeMonths < 12
       ? `${babyAgeMonths}ヶ月`
       : `${Math.floor(babyAgeMonths / 12)}歳${babyAgeMonths % 12 ? `${babyAgeMonths % 12}ヶ月` : ''}`
+    : null;
+  const pregnancyCountdownLabel = weeksUntilDue != null
+    ? (weeksUntilDue > 0 ? `出産予定まであと${weeksUntilDue}週` : '出産予定日を過ぎています')
     : null;
 
   const [recentlyViewed, setRecentlyViewed] = useState(() => {
@@ -770,7 +788,7 @@ const App = () => {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
-  const [babyForm, setBabyForm] = useState({ name: '', birthYear: new Date().getFullYear(), birthMonth: 1, gender: '' });
+  const [babyForm, setBabyForm] = useState({ mode: 'born', name: '', birthYear: new Date().getFullYear(), birthMonth: 1, gender: '', dueDate: '' });
   const [alertTargetPrice, setAlertTargetPrice] = useState('');
   const [saveSearchLabel, setSaveSearchLabel] = useState('');
 
@@ -1984,8 +2002,10 @@ const App = () => {
       const isExpert = userText.includes('[商品詳細データ]');
 
       // マイベビー情報をコンテキストとして注入
-      const babyContext = babyInfo && babyAgeLabel
-        ? `【お子さま情報】${babyInfo.name ? `名前: ${babyInfo.name} / ` : ''}月齢: ${babyAgeLabel}${babyInfo.gender ? ` / 性別: ${babyInfo.gender}` : ''}\nこの月齢・状況に合った提案を心がけてください。\n\n`
+      const babyContext = babyInfo && (babyAgeLabel || pregnancyCountdownLabel)
+        ? `【お子さま情報】${babyInfo.name ? `名前: ${babyInfo.name} / ` : ''}${
+            isPregnant ? `${pregnancyCountdownLabel}（妊娠中）` : `月齢: ${babyAgeLabel}`
+          }${babyInfo.gender ? ` / 性別: ${babyInfo.gender}` : ''}\nこの${isPregnant ? '妊娠週数' : '月齢'}・状況に合った提案を心がけてください。\n\n`
         : '';
 
       if (isExpert) {
@@ -2343,7 +2363,7 @@ ${userText}
       const data = await articleAdminCall('list');
       setArticleList(data.articles || []);
       setArticleAdminView('list');
-      setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true });
+      setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true, age_min_months: '', age_max_months: '', is_maternity: false });
     } catch (e) {
       alert(e.message);
     } finally {
@@ -2380,6 +2400,9 @@ ${userText}
         meta_description: full.meta_description || '',
         content: full.content || '',
         published: full.published ?? true,
+        age_min_months: full.age_min_months ?? '',
+        age_max_months: full.age_max_months ?? '',
+        is_maternity: full.is_maternity ?? false,
       });
       setArticleAdminView('edit');
     } catch (e) {
@@ -2812,6 +2835,67 @@ ${userText}
           );
         })()}
 
+        {/* ─── マイベビー妊娠週別おすすめカテゴリ（マタニティモード） ─── */}
+        {isPregnant && weeksUntilDue != null && (() => {
+          const stage = PREGNANCY_STAGE_MAP.find(s => weeksUntilDue >= s.minW && weeksUntilDue < s.maxW);
+          if (!stage) return null;
+          return (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-widest">My Baby</span>
+                <span className="text-xs font-bold text-[#5A4C4C] truncate">
+                  {pregnancyCountdownLabel}（{stage.label}）に必要なもの
+                </span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+                {stage.cats.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => handleCategoryChange(cat)}
+                    className="flex-shrink-0 flex items-center gap-1.5 bg-white border border-[#F4EFEB] rounded-full px-4 py-2.5 text-xs font-bold text-[#5A4C4C] shadow-sm active:scale-95 transition-transform"
+                  >
+                    <CategoryIcon name={cat} className="w-3.5 h-3.5 text-[#7B8E76]" />
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ─── マイベビー月齢・マタニティ向け記事レコメンド ─── */}
+        {publishedArticles.length > 0 && (babyAgeMonths != null || isPregnant) && (() => {
+          const relevant = publishedArticles.filter(a =>
+            isPregnant
+              ? a.is_maternity
+              : (a.age_min_months != null && a.age_max_months != null
+                  && babyAgeMonths >= a.age_min_months && babyAgeMonths < a.age_max_months)
+          ).slice(0, 3);
+          if (relevant.length === 0) return null;
+          return (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className="text-[10px] font-black text-[#F2ABAC] uppercase tracking-widest">My Baby</span>
+                <span className="text-xs font-bold text-[#5A4C4C] truncate">今のあなたにおすすめの記事</span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {relevant.map(a => (
+                  <a key={a.slug} href={`/article/${a.slug}`}
+                     className="flex items-center gap-3 bg-white border border-[#F4EFEB] rounded-2xl p-4 shadow-sm active:scale-[0.98] transition-transform">
+                    <div className="w-10 h-10 bg-[#FFF9E6] rounded-xl flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-5 h-5 text-[#D4AF37]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-xs font-black text-[#5A4C4C] leading-snug truncate">{a.title}</h3>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-[#A5A19E] flex-shrink-0" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="relative">
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
             {CATEGORY_TREE.map(cat => (
@@ -3154,19 +3238,30 @@ ${userText}
                 {user?.user_metadata?.full_name || (babyInfo?.name ? `${babyInfo.name}のママ・パパ` : 'ゲスト様')}
               </h3>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                {babyAgeLabel && (
-                  <span className="text-[10px] text-white bg-[#F2ABAC] px-2 py-0.5 rounded-md font-bold">{babyAgeLabel}</span>
+                {(babyAgeLabel || pregnancyCountdownLabel) && (
+                  <span className="text-[10px] text-white bg-[#F2ABAC] px-2 py-0.5 rounded-md font-bold">{isPregnant ? pregnancyCountdownLabel : babyAgeLabel}</span>
                 )}
                 {babyInfo?.gender && (
                   <span className="text-[10px] text-white bg-[#7B8E76] px-2 py-0.5 rounded-md font-bold">{babyInfo.gender}</span>
                 )}
                 <button onClick={() => {
                   const today = new Date();
-                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
+                  setBabyForm(babyInfo
+                    ? { mode: babyInfo.dueDate ? 'pregnant' : 'born', name: babyInfo.name || '', birthYear: babyInfo.birthYear || today.getFullYear(), birthMonth: babyInfo.birthMonth || today.getMonth() + 1, gender: babyInfo.gender || '', dueDate: babyInfo.dueDate || '' }
+                    : { mode: 'born', name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '', dueDate: '' });
                   setShowBabyModal(true);
                 }} className="text-[10px] text-[#A5A19E] flex items-center gap-0.5 font-bold hover:text-[#5A4C4C] transition-colors">
                   {babyInfo ? '編集' : 'プロフィール登録'} <Edit3 className="w-3 h-3" />
                 </button>
+                {isPregnant && (
+                  <button onClick={() => {
+                    const today = new Date();
+                    setBabyForm({ mode: 'born', name: babyInfo?.name || '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: babyInfo?.gender || '', dueDate: '' });
+                    setShowBabyModal(true);
+                  }} className="text-[10px] text-white bg-[#7B8E76] px-3 py-1.5 rounded-full font-black active:scale-95 transition-transform">
+                    出産しました 🎉
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -3182,7 +3277,9 @@ ${userText}
           </div>
           <div onClick={() => {
             const today = new Date();
-            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
+            setBabyForm(babyInfo
+              ? { mode: babyInfo.dueDate ? 'pregnant' : 'born', name: babyInfo.name || '', birthYear: babyInfo.birthYear || today.getFullYear(), birthMonth: babyInfo.birthMonth || today.getMonth() + 1, gender: babyInfo.gender || '', dueDate: babyInfo.dueDate || '' }
+              : { mode: 'born', name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '', dueDate: '' });
             setShowBabyModal(true);
           }} className="bg-[#FFF5F5] border border-[#FFEBEB] p-5 rounded-[2rem] shadow-sm flex items-center justify-between active:scale-95 transition-transform cursor-pointer relative overflow-hidden group">
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#F2ABAC] rounded-l-[2rem]"></div>
@@ -3191,7 +3288,7 @@ ${userText}
                 <>
                   <p className="text-[10px] font-bold text-[#8E8282] mb-1">登録済み</p>
                   <p className="text-sm font-black text-[#5A4C4C]">
-                    {babyInfo.name || 'お子さん'} · {babyAgeLabel} · {babyInfo.gender || '性別未設定'}
+                    {babyInfo.name || 'お子さん'} · {isPregnant ? pregnancyCountdownLabel : babyAgeLabel} · {babyInfo.gender || '性別未設定'}
                   </p>
                 </>
               ) : (
@@ -3639,7 +3736,7 @@ ${userText}
               {articleAdminAuthed && articleAdminView === 'list' && (
                 <div>
                   <button
-                    onClick={() => { setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true }); setArticleAdminView('edit'); }}
+                    onClick={() => { setArticleForm({ slug: '', title: '', meta_description: '', content: '', published: true, age_min_months: '', age_max_months: '', is_maternity: false }); setArticleAdminView('edit'); }}
                     className="w-full py-3 border-2 border-dashed border-[#D4DDD2] rounded-2xl text-sm font-black text-[#7B8E76] mb-5 active:scale-95 transition-transform"
                   >＋ 新規記事を追加</button>
                   {articleList.length === 0 && (
@@ -3698,6 +3795,34 @@ ${userText}
                       />
                     </div>
                   ))}
+                  <div>
+                    <label className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-1 block">ホームレコメンド対象（月齢・任意）</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="number"
+                        value={articleForm.age_min_months}
+                        onChange={e => setArticleForm(prev => ({ ...prev, age_min_months: e.target.value }))}
+                        placeholder="下限（ヶ月）"
+                        className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76]"
+                      />
+                      <input
+                        type="number"
+                        value={articleForm.age_max_months}
+                        onChange={e => setArticleForm(prev => ({ ...prev, age_max_months: e.target.value }))}
+                        placeholder="上限（ヶ月）"
+                        className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76]"
+                      />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!articleForm.is_maternity}
+                      onChange={e => setArticleForm(prev => ({ ...prev, is_maternity: e.target.checked }))}
+                      className="w-4 h-4 accent-[#7B8E76]"
+                    />
+                    <span className="text-xs font-black text-[#5A4C4C]">マタニティ向け記事</span>
+                  </label>
                   <div>
                     <label className="text-[10px] font-black text-[#A5A19E] uppercase tracking-widest mb-1 block">本文（Markdown）</label>
                     {/* 商品リンク挿入 */}
@@ -4590,27 +4715,41 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               <button onClick={() => setShowBabyModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-5">
+              <div className="flex gap-3">
+                {[{ key: 'pregnant', label: '妊娠中' }, { key: 'born', label: 'もう生まれている' }].map(m => (
+                  <button key={m.key} onClick={() => setBabyForm(p => ({ ...p, mode: m.key }))}
+                    className={`flex-1 py-3 rounded-[1rem] text-xs font-black transition-all ${babyForm.mode === m.key ? 'bg-[#5A4C4C] text-white' : 'bg-[#F9F6F3] text-[#A5A19E]'}`}>{m.label}</button>
+                ))}
+              </div>
               <div>
                 <label className="text-xs font-black text-[#5A4C4C] mb-2 block">赤ちゃんのお名前（任意）</label>
                 <input value={babyForm.name} onChange={e => setBabyForm(p => ({ ...p, name: e.target.value }))}
                   placeholder="例：はな" className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#F2ABAC]" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              {babyForm.mode === 'pregnant' ? (
                 <div>
-                  <label className="text-xs font-black text-[#5A4C4C] mb-2 block">生まれた年</label>
-                  <select value={babyForm.birthYear} onChange={e => setBabyForm(p => ({ ...p, birthYear: Number(e.target.value) }))}
-                    className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#F2ABAC] bg-white">
-                    {Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i).map(y => <option key={y} value={y}>{y}年</option>)}
-                  </select>
+                  <label className="text-xs font-black text-[#5A4C4C] mb-2 block">出産予定日</label>
+                  <input type="date" value={babyForm.dueDate} onChange={e => setBabyForm(p => ({ ...p, dueDate: e.target.value }))}
+                    className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#F2ABAC] bg-white" />
                 </div>
-                <div>
-                  <label className="text-xs font-black text-[#5A4C4C] mb-2 block">生まれた月</label>
-                  <select value={babyForm.birthMonth} onChange={e => setBabyForm(p => ({ ...p, birthMonth: Number(e.target.value) }))}
-                    className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#F2ABAC] bg-white">
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
-                  </select>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-black text-[#5A4C4C] mb-2 block">生まれた年</label>
+                    <select value={babyForm.birthYear} onChange={e => setBabyForm(p => ({ ...p, birthYear: Number(e.target.value) }))}
+                      className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#F2ABAC] bg-white">
+                      {Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i).map(y => <option key={y} value={y}>{y}年</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-[#5A4C4C] mb-2 block">生まれた月</label>
+                    <select value={babyForm.birthMonth} onChange={e => setBabyForm(p => ({ ...p, birthMonth: Number(e.target.value) }))}
+                      className="w-full border border-[#F4EFEB] rounded-[1rem] px-4 py-3 text-sm font-bold text-[#5A4C4C] focus:outline-none focus:border-[#F2ABAC] bg-white">
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
+                    </select>
+                  </div>
                 </div>
-              </div>
+              )}
               <div>
                 <label className="text-xs font-black text-[#5A4C4C] mb-2 block">性別</label>
                 <div className="flex gap-3">
@@ -4621,7 +4760,13 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                 </div>
               </div>
               <button onClick={() => {
-                const info = { ...babyForm };
+                if (babyForm.mode === 'pregnant' && !babyForm.dueDate) {
+                  alert('出産予定日を入力してください');
+                  return;
+                }
+                const info = babyForm.mode === 'pregnant'
+                  ? { name: babyForm.name, dueDate: babyForm.dueDate, gender: babyForm.gender }
+                  : { name: babyForm.name, birthYear: babyForm.birthYear, birthMonth: babyForm.birthMonth, gender: babyForm.gender };
                 setBabyInfo(info);
                 if (user) saveBabyProfileToDB(user.id, info);
                 setShowBabyModal(false);

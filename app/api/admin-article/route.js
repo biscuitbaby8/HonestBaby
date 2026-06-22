@@ -43,7 +43,7 @@ export async function POST(request) {
       const { id } = params;
       const { data, error } = await supabase
         .from('articles')
-        .select('id, slug, title, meta_description, content, published')
+        .select('id, slug, title, meta_description, content, published, age_min_months, age_max_months, is_maternity')
         .eq('id', id)
         .single();
       if (error) throw error;
@@ -51,13 +51,22 @@ export async function POST(request) {
     }
 
     if (action === 'save') {
-      const { slug, title, meta_description, content, published } = params;
+      const { slug, title, meta_description, content, published, age_min_months, age_max_months, is_maternity } = params;
       if (!slug || !title || !content) {
         return Response.json({ error: 'slug・title・contentは必須です' }, { status: 400, headers: CORS });
       }
       const { data, error } = await supabase
         .from('articles')
-        .upsert({ slug, title, meta_description, content, published: published ?? true }, { onConflict: 'slug' })
+        .upsert({
+          slug,
+          title,
+          meta_description,
+          content,
+          published: published ?? true,
+          age_min_months: age_min_months === '' || age_min_months == null ? null : Number(age_min_months),
+          age_max_months: age_max_months === '' || age_max_months == null ? null : Number(age_max_months),
+          is_maternity: !!is_maternity,
+        }, { onConflict: 'slug' })
         .select('id, slug, title, published')
         .single();
       if (error) throw error;
