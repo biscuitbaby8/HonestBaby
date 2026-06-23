@@ -1,6 +1,6 @@
 'use client';
-import { useState, useMemo } from 'react';
-import { CATEGORY_TREE, getLowestPrice } from '../lib/products';
+import { useState, useEffect, useMemo } from 'react';
+import { CATEGORY_TREE, DIAPER_SIZE_BY_AGE, getLowestPrice } from '../lib/products';
 import { CATEGORY_GUIDES } from '../lib/categoryGuides';
 import ProductCardLink from './ProductCardLink';
 
@@ -11,6 +11,25 @@ export default function CategoryClient({ products, cat }) {
   const [subCat, setSubCat] = useState('すべて');
   const [subSubCat, setSubSubCat] = useState('すべて');
   const [sortOrder, setSortOrder] = useState('standard');
+
+  // サーバーレンダリング対象のためlocalStorageは初期値に使えず、useEffectで読み込む
+  const [babyInfo, setBabyInfo] = useState(null);
+  useEffect(() => {
+    try { setBabyInfo(JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null')); } catch { setBabyInfo(null); }
+  }, []);
+  const babyAgeMonths = useMemo(() => {
+    if (!babyInfo) return null;
+    const now = new Date();
+    return (now.getFullYear() - babyInfo.birthYear) * 12 + (now.getMonth() + 1 - babyInfo.birthMonth);
+  }, [babyInfo]);
+  const babyAgeLabel = babyAgeMonths != null
+    ? babyAgeMonths < 12
+      ? `${babyAgeMonths}ヶ月`
+      : `${Math.floor(babyAgeMonths / 12)}歳${babyAgeMonths % 12 ? `${babyAgeMonths % 12}ヶ月` : ''}`
+    : null;
+  const diaperSizeEntry = cat === 'おむつ' && babyAgeMonths != null
+    ? DIAPER_SIZE_BY_AGE.find((e) => babyAgeMonths < e.maxM)
+    : null;
 
   const catEntry = CATEGORY_TREE.find((c) => c.name === cat);
   const subs = catEntry?.subs || [];
@@ -38,6 +57,25 @@ export default function CategoryClient({ products, cat }) {
 
   return (
     <>
+      {/* おむつカテゴリ：月齢別サイズ提案バナー */}
+      {diaperSizeEntry && (
+        <div className="flex items-center justify-between bg-[#FFF5F5] border border-[#FFEBEB] rounded-2xl px-4 py-3 mb-4">
+          <p className="text-xs font-bold text-[#5A4C4C] leading-snug">
+            {babyInfo.name || 'お子さま'}（{babyAgeLabel}）は<br />
+            <span className="text-[#F2ABAC] font-black">{diaperSizeEntry.label}頃</span>が目安です
+          </p>
+          <button
+            onClick={() => {
+              if (diaperSizeEntry.sub) setSubCat(diaperSizeEntry.sub);
+              setSubSubCat(diaperSizeEntry.size);
+            }}
+            className="bg-[#F2ABAC] text-white text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform whitespace-nowrap ml-3"
+          >
+            {diaperSizeEntry.label}を見る
+          </button>
+        </div>
+      )}
+
       {/* サブカテゴリタブ */}
       {subNames.length > 0 && (
         <div className="mb-3">

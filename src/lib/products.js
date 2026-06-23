@@ -32,6 +32,15 @@ export const CATEGORY_TREE = [
 
 export const CATEGORIES = CATEGORY_TREE.map((c) => c.name);
 
+// 月齢→おむつサイズのマッピング（体重個人差あり、目安として利用）
+export const DIAPER_SIZE_BY_AGE = [
+  { maxM: 1,   size: '新生児', sub: 'テープタイプ', label: '新生児サイズ' },
+  { maxM: 5,   size: 'S',      sub: 'テープタイプ', label: 'Sサイズ' },
+  { maxM: 13,  size: 'M',      sub: null,           label: 'Mサイズ' },
+  { maxM: 25,  size: 'L',      sub: null,           label: 'Lサイズ' },
+  { maxM: 999, size: 'BIG',    sub: null,           label: 'BIGサイズ' },
+];
+
 // カテゴリごとの SEO メタ情報（タイトル・説明）
 export const CAT_META = {
   'おむつ':       { title: 'おむつ比較・おすすめランキング | HonestBaby', desc: 'テープ・パンツ・布おむつをパパママの口コミと価格で徹底比較。' },

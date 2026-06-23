@@ -12,7 +12,7 @@ import {
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
-import { CATEGORY_TREE, CATEGORIES } from './lib/products';
+import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -53,15 +53,6 @@ const AGE_CATEGORY_MAP = [
   { minM: 8,   maxM: 14,  label: 'ハイハイ・たっち', cats: ['安全グッズ', 'おもちゃ', '離乳食・食器', 'ウェア'] },
   { minM: 12,  maxM: 24,  label: 'よちよち歩き',   cats: ['ウェア', 'おもちゃ', 'トイレ用品', '安全グッズ'] },
   { minM: 24,  maxM: 999, label: '2歳〜',          cats: ['ウェア', 'トイレ用品', '車用品', 'おもちゃ'] },
-];
-
-// 月齢→おむつサイズのマッピング（体重個人差あり、目安として利用）
-const DIAPER_SIZE_BY_AGE = [
-  { maxM: 1,   size: '新生児', sub: 'テープタイプ', label: '新生児サイズ' },
-  { maxM: 5,   size: 'S',      sub: 'テープタイプ', label: 'Sサイズ' },
-  { maxM: 13,  size: 'M',      sub: null,           label: 'Mサイズ' },
-  { maxM: 25,  size: 'L',      sub: null,           label: 'Lサイズ' },
-  { maxM: 999, size: 'BIG',    sub: null,           label: 'BIGサイズ' },
 ];
 
 const LEGAL_PAGES = {
