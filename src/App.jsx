@@ -1029,7 +1029,7 @@ const App = () => {
       ? `${selectedProduct.name} の最安値・価格比較 | HonestBaby`
       : selectedCategory !== 'すべて'
         ? `${selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby`
-        : 'HonestBaby | 忖度なしのベビー用品比較・最安値検索';
+        : 'HonestBaby - 子育てグッズの忖度なし比較・レビュー';
     if (typeof document !== 'undefined') document.title = title;
   }, [selectedProduct, selectedCategory]);
 
@@ -2492,7 +2492,10 @@ ${userText}
     setSelectedProduct(product);
     // SPA内ではモーダル表示を維持しつつURLだけ更新（直リンク・共有用）。
     // /product/[id] への実遷移はSSRページ（Google・直アクセス向け）が担う。
-    if (typeof window !== 'undefined') {
+    // ただしremote-始まりのIDはDB未登録の一時商品（AIフォールバック検索結果）のため、
+    // SSRページが存在せず404になる。URL書き換え・共有リンクの対象から除外する。
+    const isPersisted = !String(product.id).startsWith('remote-');
+    if (isPersisted && typeof window !== 'undefined') {
       window.history.replaceState(null, '', `/product/${encodeURIComponent(product.id)}`);
     }
 
@@ -3838,6 +3841,8 @@ ${userText}
               </div>
             </div>
 
+            {/* remote-始まりのID（DB未登録の一時商品）は共有先URLが404になるため、シェアボタンを出さない */}
+            {!String(selectedProduct.id).startsWith('remote-') && (
             <div className="flex gap-3 mb-8 px-1">
               <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(`https://honestbaby-care.com/product/${selectedProduct.id}`)}`}
                  target="_blank" rel="noopener noreferrer"
@@ -3850,6 +3855,7 @@ ${userText}
                 X でシェア
               </a>
             </div>
+            )}
 
             {selectedProduct.description && (
               <section className="mb-10 bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">

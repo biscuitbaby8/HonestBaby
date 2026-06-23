@@ -1,6 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { CATEGORY_TREE, getLowestPrice } from '../lib/products';
+import { CATEGORY_GUIDES } from '../lib/categoryGuides';
 import ProductCardLink from './ProductCardLink';
 
 // subs は string | { name, subsubs? } の混在
@@ -17,6 +18,8 @@ export default function CategoryClient({ products, cat }) {
 
   const currentSubEntry = subs.find((s) => getSubName(s) === subCat);
   const subsubs = currentSubEntry?.subsubs || [];
+
+  const guide = CATEGORY_GUIDES[cat];
 
   const filtered = useMemo(() => {
     let result = products.filter((p) => {
@@ -104,6 +107,39 @@ export default function CategoryClient({ products, cat }) {
             <ProductCardLink key={p.id} product={p} />
           ))}
         </div>
+      )}
+
+      {/* 選び方ガイド本文（薄いコンテンツ対策・SEO用） */}
+      {guide && (
+        <section className="bg-white rounded-[2rem] border border-[#F4EFEB] p-6 mb-10">
+          <h2 className="text-base font-black text-[#5A4C4C] mb-3">{guide.heading}</h2>
+          <p className="text-xs text-[#8E8282] font-bold leading-relaxed mb-5">{guide.intro}</p>
+
+          {guide.types?.length > 0 && (
+            <div className="space-y-3 mb-6">
+              {guide.types.map((t) => (
+                <div key={t.name}>
+                  <p className="text-xs font-black text-[#7B8E76] mb-1">{t.name}</p>
+                  <p className="text-xs text-[#8E8282] leading-relaxed">{t.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {guide.checklist?.length > 0 && (
+            <div>
+              <p className="text-xs font-black text-[#5A4C4C] mb-2">忖度なしチェックポイント</p>
+              <ul className="space-y-1.5">
+                {guide.checklist.map((item, i) => (
+                  <li key={i} className="text-xs text-[#8E8282] leading-relaxed flex gap-1.5">
+                    <span className="text-[#7B8E76] font-black">{i + 1}.</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
       )}
     </>
   );
