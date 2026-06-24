@@ -21,7 +21,7 @@ export async function GET() {
 
   const { data: babies } = await supabase
     .from('baby_profiles')
-    .select('user_id, name, birth_year, birth_month, last_milestone_sent_tag');
+    .select('id, user_id, name, birth_year, birth_month, last_milestone_sent_tag');
 
   if (!babies || babies.length === 0) {
     return Response.json({ ok: true, sent: 0 }, { status: 200 });
@@ -53,7 +53,7 @@ export async function GET() {
         body: `${milestone.label}にぴったりのギフトをチェックしませんか？`,
         icon: '/favicon.png',
         url: 'https://honestbaby-care.com/?tab=gift',
-        tag: `baby-milestone-${baby.user_id}-${milestone.key}`,
+        tag: `baby-milestone-${baby.id}-${milestone.key}`,
       });
 
       if (result.ok) {
@@ -63,10 +63,12 @@ export async function GET() {
       }
     }
 
+    // user_id ではなく id（ベビー単位）で更新。兄弟・双子が同じ user_id を共有しても
+    // それぞれ独立してマイルストーン送信済みを管理できるようにする。
     await supabase
       .from('baby_profiles')
       .update({ last_milestone_sent_tag: [...sentTags, milestone.key].join(',') })
-      .eq('user_id', baby.user_id);
+      .eq('id', baby.id);
   }
 
   for (const endpoint of expired) {
