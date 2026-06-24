@@ -32,6 +32,29 @@ export const CATEGORY_TREE = [
 
 export const CATEGORIES = CATEGORY_TREE.map((c) => c.name);
 
+// カテゴリ別 月齢→サブカテゴリ提案（おむつのサイズ、ベビーカー・車用品のタイプ切り替えなど）
+// sub: 設定するサブカテゴリ（nullなら変更しない）/ subsub: 設定するサブサブカテゴリ（nullなら変更しない）
+export const CATEGORY_AGE_SUGGESTIONS = {
+  'おむつ': [
+    { maxM: 1,   sub: 'テープタイプ', subsub: '新生児', label: '新生児サイズ' },
+    { maxM: 5,   sub: 'テープタイプ', subsub: 'S',      label: 'Sサイズ' },
+    { maxM: 13,  sub: null,           subsub: 'M',      label: 'Mサイズ' },
+    { maxM: 25,  sub: null,           subsub: 'L',      label: 'Lサイズ' },
+    { maxM: 999, sub: null,           subsub: 'BIG',    label: 'BIGサイズ' },
+  ],
+  'ベビーカー': [
+    { maxM: 7,   sub: 'A型', subsub: null, label: 'A型' },
+    { maxM: 999, sub: 'B型', subsub: null, label: 'B型' },
+  ],
+  '車用品': [
+    { maxM: 12,  sub: '新生児用', subsub: null, label: '新生児用チャイルドシート' },
+    { maxM: 999, sub: '1歳以上', subsub: null, label: '1歳以上向けチャイルドシート' },
+  ],
+};
+
+// 後方互換: 既存コードからの参照用（おむつ専用の旧名称）
+export const DIAPER_SIZE_BY_AGE = CATEGORY_AGE_SUGGESTIONS['おむつ'];
+
 // カテゴリごとの SEO メタ情報（タイトル・説明）
 export const CAT_META = {
   'おむつ':       { title: 'おむつ比較・おすすめランキング | HonestBaby', desc: 'テープ・パンツ・布おむつをパパママの口コミと価格で徹底比較。' },

@@ -1,6 +1,7 @@
 'use client';
-import { useState, useMemo } from 'react';
-import { CATEGORY_TREE, getLowestPrice } from '../lib/products';
+import { useState, useEffect, useMemo } from 'react';
+import { CATEGORY_TREE, CATEGORY_AGE_SUGGESTIONS, getLowestPrice } from '../lib/products';
+import { CATEGORY_GUIDES } from '../lib/categoryGuides';
 import ProductCardLink from './ProductCardLink';
 
 // subs は string | { name, subsubs? } の混在
@@ -11,6 +12,26 @@ export default function CategoryClient({ products, cat }) {
   const [subSubCat, setSubSubCat] = useState('すべて');
   const [sortOrder, setSortOrder] = useState('standard');
 
+  // サーバーレンダリング対象のためlocalStorageは初期値に使えず、useEffectで読み込む
+  const [babyInfo, setBabyInfo] = useState(null);
+  useEffect(() => {
+    try { setBabyInfo(JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null')); } catch { setBabyInfo(null); }
+  }, []);
+  const babyAgeMonths = useMemo(() => {
+    if (!babyInfo) return null;
+    const now = new Date();
+    return (now.getFullYear() - babyInfo.birthYear) * 12 + (now.getMonth() + 1 - babyInfo.birthMonth);
+  }, [babyInfo]);
+  const babyAgeLabel = babyAgeMonths != null
+    ? babyAgeMonths < 12
+      ? `${babyAgeMonths}ヶ月`
+      : `${Math.floor(babyAgeMonths / 12)}歳${babyAgeMonths % 12 ? `${babyAgeMonths % 12}ヶ月` : ''}`
+    : null;
+  const ageSuggestions = CATEGORY_AGE_SUGGESTIONS[cat];
+  const ageSuggestionEntry = ageSuggestions && babyAgeMonths != null
+    ? ageSuggestions.find((e) => babyAgeMonths < e.maxM)
+    : null;
+
   const catEntry = CATEGORY_TREE.find((c) => c.name === cat);
   const subs = catEntry?.subs || [];
   const subNames = subs.map(getSubName);
@@ -18,10 +39,13 @@ export default function CategoryClient({ products, cat }) {
   const currentSubEntry = subs.find((s) => getSubName(s) === subCat);
   const subsubs = currentSubEntry?.subsubs || [];
 
+  const guide = CATEGORY_GUIDES[cat];
+
   const filtered = useMemo(() => {
     let result = products.filter((p) => {
       const matchSub = subCat === 'すべて' || p.subCategory === subCat;
-      const matchSubSub = subSubCat === 'すべて' || p.subSubCategory === subSubCat;
+      // sub_sub_category（サイズ/月齢）は未保存の商品が多いため、未保存なら除外せず通す
+      const matchSubSub = subSubCat === 'すべて' || !p.subSubCategory || p.subSubCategory === subSubCat;
       return matchSub && matchSubSub;
     });
     if (sortOrder === 'popular')
@@ -35,6 +59,25 @@ export default function CategoryClient({ products, cat }) {
 
   return (
     <>
+      {/* カテゴリ別：月齢提案バナー（おむつのサイズ、ベビーカー・車用品のタイプなど） */}
+      {ageSuggestionEntry && (
+        <div className="flex items-center justify-between bg-[#FFF5F5] border border-[#FFEBEB] rounded-2xl px-4 py-3 mb-4">
+          <p className="text-xs font-bold text-[#5A4C4C] leading-snug">
+            {babyInfo.name || 'お子さま'}（{babyAgeLabel}）には<br />
+            <span className="text-[#F2ABAC] font-black">{ageSuggestionEntry.label}</span>がおすすめです
+          </p>
+          <button
+            onClick={() => {
+              if (ageSuggestionEntry.sub) setSubCat(ageSuggestionEntry.sub);
+              setSubSubCat(ageSuggestionEntry.subsub || 'すべて');
+            }}
+            className="bg-[#F2ABAC] text-white text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform whitespace-nowrap ml-3"
+          >
+            {ageSuggestionEntry.label}を見る
+          </button>
+        </div>
+      )}
+
       {/* サブカテゴリタブ */}
       {subNames.length > 0 && (
         <div className="mb-3">
@@ -104,6 +147,39 @@ export default function CategoryClient({ products, cat }) {
             <ProductCardLink key={p.id} product={p} />
           ))}
         </div>
+      )}
+
+      {/* 選び方ガイド本文（薄いコンテンツ対策・SEO用） */}
+      {guide && (
+        <section className="bg-white rounded-[2rem] border border-[#F4EFEB] p-6 mb-10">
+          <h2 className="text-base font-black text-[#5A4C4C] mb-3">{guide.heading}</h2>
+          <p className="text-xs text-[#8E8282] font-bold leading-relaxed mb-5">{guide.intro}</p>
+
+          {guide.types?.length > 0 && (
+            <div className="space-y-3 mb-6">
+              {guide.types.map((t) => (
+                <div key={t.name}>
+                  <p className="text-xs font-black text-[#7B8E76] mb-1">{t.name}</p>
+                  <p className="text-xs text-[#8E8282] leading-relaxed">{t.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {guide.checklist?.length > 0 && (
+            <div>
+              <p className="text-xs font-black text-[#5A4C4C] mb-2">忖度なしチェックポイント</p>
+              <ul className="space-y-1.5">
+                {guide.checklist.map((item, i) => (
+                  <li key={i} className="text-xs text-[#8E8282] leading-relaxed flex gap-1.5">
+                    <span className="text-[#7B8E76] font-black">{i + 1}.</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
       )}
     </>
   );

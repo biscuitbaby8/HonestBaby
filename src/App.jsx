@@ -12,7 +12,7 @@ import {
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
-import { CATEGORY_TREE, CATEGORIES } from './lib/products';
+import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -55,14 +55,20 @@ const AGE_CATEGORY_MAP = [
   { minM: 24,  maxM: 999, label: '2歳〜',          cats: ['ウェア', 'トイレ用品', '車用品', 'おもちゃ'] },
 ];
 
-// 月齢→おむつサイズのマッピング（体重個人差あり、目安として利用）
-const DIAPER_SIZE_BY_AGE = [
-  { maxM: 1,   size: '新生児', sub: 'テープタイプ', label: '新生児サイズ' },
-  { maxM: 5,   size: 'S',      sub: 'テープタイプ', label: 'Sサイズ' },
-  { maxM: 13,  size: 'M',      sub: null,           label: 'Mサイズ' },
-  { maxM: 25,  size: 'L',      sub: null,           label: 'Lサイズ' },
-  { maxM: 999, size: 'BIG',    sub: null,           label: 'BIGサイズ' },
+// 誕生日・記念日マイルストーン（生年月のみ保存のため月単位の近似）。sceneはギフトタブのシーンフィルタと対応。
+const BIRTHDAY_MILESTONES = [
+  { months: 6,  label: 'ハーフバースデー', scene: 'ハーフバースデー' },
+  { months: 12, label: '1歳のお誕生日',   scene: '1歳のお祝い' },
+  { months: 24, label: '2歳のお誕生日',   scene: 'すべて' },
+  { months: 36, label: '3歳のお誕生日',   scene: 'すべて' },
 ];
+
+// 複数ベビー（兄弟・双子）対応：baby_profiles.id 形式の判定とローカル生成ID
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const generateId = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 const LEGAL_PAGES = {
   terms: {
@@ -605,50 +611,101 @@ const App = () => {
     } catch { }
   };
 
-  // --- 赤ちゃん情報: DBとのsync ---
+  // --- 赤ちゃん情報: DBとのsync（複数ベビー対応） ---
+  // この関数は mount 時に一度だけ登録される useEffect から呼ばれるため、
+  // React state（babies等）ではなく localStorage を直接読んでstaleクロージャを回避する。
   const syncBabyProfileWithDB = async (userId) => {
     try {
-      const { data: dbProfile } = await supabase
+      const { data: dbProfiles } = await supabase
         .from('baby_profiles')
         .select('*')
         .eq('user_id', userId)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
-      if (dbProfile) {
+      if (dbProfiles && dbProfiles.length > 0) {
         // DBにあれば localStorage を上書き
-        setBabyInfo({
-          name: dbProfile.name || '',
-          birthYear: dbProfile.birth_year,
-          birthMonth: dbProfile.birth_month,
-          gender: dbProfile.gender || '',
-        });
-      } else {
-        // DBに無い & localStorageにあれば DB へ push
-        const local = JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null');
-        if (local && local.birthYear) {
-          await supabase.from('baby_profiles').upsert({
-            user_id: userId,
-            name: local.name || null,
-            birth_year: local.birthYear,
-            birth_month: local.birthMonth,
-            gender: local.gender || null,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id' });
+        const mapped = dbProfiles.map((p) => ({
+          id: p.id,
+          name: p.name || '',
+          birthYear: p.birth_year,
+          birthMonth: p.birth_month,
+          gender: p.gender || '',
+        }));
+        setBabies(mapped);
+        const primary = dbProfiles.find((p) => p.is_primary) || dbProfiles[0];
+        setActiveBabyId(primary.id);
+        return;
+      }
+
+      // DBに無い & localStorageにあれば DB へ push（初回ログイン時の移行）
+      let localBabies = [];
+      try {
+        const stored = JSON.parse(localStorage.getItem('honestBabyBabies') || 'null');
+        localBabies = Array.isArray(stored) ? stored : [];
+        if (localBabies.length === 0) {
+          const legacy = JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null');
+          if (legacy && legacy.birthYear) localBabies = [{ id: generateId(), ...legacy }];
         }
+      } catch { }
+      if (localBabies.length === 0) return;
+
+      const activeId = localStorage.getItem('honestBabyActiveBabyId');
+      const idMap = {};
+      for (const baby of localBabies) {
+        const payload = {
+          user_id: userId,
+          name: baby.name || null,
+          birth_year: baby.birthYear,
+          birth_month: baby.birthMonth,
+          gender: baby.gender || null,
+          is_primary: localBabies.length === 1 || baby.id === activeId,
+          updated_at: new Date().toISOString(),
+        };
+        if (UUID_RE.test(baby.id)) payload.id = baby.id;
+        const { data: saved } = await supabase
+          .from('baby_profiles')
+          .upsert(payload, { onConflict: 'id' })
+          .select('id')
+          .maybeSingle();
+        if (saved && saved.id !== baby.id) idMap[baby.id] = saved.id;
+      }
+      if (Object.keys(idMap).length > 0) {
+        setBabies(localBabies.map((b) => (idMap[b.id] ? { ...b, id: idMap[b.id] } : b)));
+        if (idMap[activeId]) setActiveBabyId(idMap[activeId]);
+      } else {
+        setBabies(localBabies);
       }
     } catch { }
   };
 
-  const saveBabyProfileToDB = async (userId, info) => {
+  const saveBabyProfileToDB = async (userId, baby) => {
     try {
-      await supabase.from('baby_profiles').upsert({
+      const payload = {
         user_id: userId,
-        name: info.name || null,
-        birth_year: info.birthYear,
-        birth_month: info.birthMonth,
-        gender: info.gender || null,
+        name: baby.name || null,
+        birth_year: baby.birthYear,
+        birth_month: baby.birthMonth,
+        gender: baby.gender || null,
+        is_primary: baby.id === activeBabyId,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' });
+      };
+      if (UUID_RE.test(baby.id)) payload.id = baby.id;
+      const { data: saved } = await supabase
+        .from('baby_profiles')
+        .upsert(payload, { onConflict: 'id' })
+        .select('id')
+        .maybeSingle();
+      if (saved && saved.id !== baby.id) {
+        setBabies((prev) => prev.map((b) => (b.id === baby.id ? { ...b, id: saved.id } : b)));
+        setActiveBabyId((prev) => (prev === baby.id ? saved.id : prev));
+      }
+    } catch { }
+  };
+
+  const deleteBabyProfileFromDB = async (userId, babyId) => {
+    try {
+      if (!UUID_RE.test(babyId)) return; // ローカルのみでDB未保存のベビー
+      await supabase.from('baby_profiles').delete().eq('id', babyId).eq('user_id', userId);
     } catch { }
   };
 
@@ -731,10 +788,30 @@ const App = () => {
   const [isGiftLoading, setIsGiftLoading] = useState(false);
 
 
-  // --- マイページ States（localStorage連動）---
-  const [babyInfo, setBabyInfo] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null'); } catch { return null; }
+  // --- マイページ States（localStorage連動・複数ベビー対応）---
+  // babies: 兄弟・双子など複数登録できるベビー情報の配列。
+  // 旧形式（単一オブジェクト honestBabyBabyInfo）が残っていれば配列へ自動移行する。
+  const [babies, setBabies] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('honestBabyBabies') || 'null');
+      if (Array.isArray(stored) && stored.length > 0) return stored;
+      const legacy = JSON.parse(localStorage.getItem('honestBabyBabyInfo') || 'null');
+      return legacy && legacy.birthYear ? [{ id: generateId(), ...legacy }] : [];
+    } catch { return []; }
   });
+  const [activeBabyId, setActiveBabyId] = useState(() => {
+    try { return localStorage.getItem('honestBabyActiveBabyId') || null; } catch { return null; }
+  });
+  // 選択中のベビーが存在しなければ先頭を自動選択（削除時・初回移行時のフォールバック）
+  useEffect(() => {
+    if (babies.length > 0 && !babies.some((b) => b.id === activeBabyId)) {
+      setActiveBabyId(babies[0].id);
+    }
+  }, [babies, activeBabyId]);
+  const babyInfo = useMemo(() => {
+    if (babies.length === 0) return null;
+    return babies.find((b) => b.id === activeBabyId) || babies[0];
+  }, [babies, activeBabyId]);
 
   // 月齢・年齢計算（全画面・AI から参照できるようトップレベルで計算）
   const _now = new Date();
@@ -757,6 +834,8 @@ const App = () => {
     try { return JSON.parse(localStorage.getItem('honestBabySavedSearches') || '[]'); } catch { return []; }
   });
   useEffect(() => { try { localStorage.setItem('honestBabyBabyInfo', JSON.stringify(babyInfo)); } catch { } }, [babyInfo]);
+  useEffect(() => { try { localStorage.setItem('honestBabyBabies', JSON.stringify(babies)); } catch { } }, [babies]);
+  useEffect(() => { try { if (activeBabyId) localStorage.setItem('honestBabyActiveBabyId', activeBabyId); } catch { } }, [activeBabyId]);
   useEffect(() => { try { localStorage.setItem('honestBabyRecentlyViewed', JSON.stringify(recentlyViewed)); } catch { } }, [recentlyViewed]);
   useEffect(() => { try { localStorage.setItem('honestBabyPriceAlerts', JSON.stringify(priceAlerts)); } catch { } }, [priceAlerts]);
   useEffect(() => { try { localStorage.setItem('honestBabySavedSearches', JSON.stringify(savedSearches)); } catch { } }, [savedSearches]);
@@ -770,7 +849,7 @@ const App = () => {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
-  const [babyForm, setBabyForm] = useState({ name: '', birthYear: new Date().getFullYear(), birthMonth: 1, gender: '' });
+  const [babyForm, setBabyForm] = useState({ id: null, name: '', birthYear: new Date().getFullYear(), birthMonth: 1, gender: '' });
   const [alertTargetPrice, setAlertTargetPrice] = useState('');
   const [saveSearchLabel, setSaveSearchLabel] = useState('');
 
@@ -1029,7 +1108,7 @@ const App = () => {
       ? `${selectedProduct.name} の最安値・価格比較 | HonestBaby`
       : selectedCategory !== 'すべて'
         ? `${selectedCategory}のベビー用品 価格比較・口コミ | HonestBaby`
-        : 'HonestBaby | 忖度なしのベビー用品比較・最安値検索';
+        : 'HonestBaby - 子育てグッズの忖度なし比較・レビュー';
     if (typeof document !== 'undefined') document.title = title;
   }, [selectedProduct, selectedCategory]);
 
@@ -1811,7 +1890,12 @@ const App = () => {
       let formatted;
 
       try {
-        const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
+        // マイベビー情報をコンテキストとして注入（月齢に合った商品の厳選・分析に活用）
+        const babyContext = babyInfo && babyAgeLabel
+          ? `【お子さま情報】${babyInfo.name ? `名前: ${babyInfo.name} / ` : ''}月齢: ${babyAgeLabel}${babyInfo.gender ? ` / 性別: ${babyInfo.gender}` : ''}\nこの月齢・状況に合った商品を優先し、AI分析にも月齢適合度を反映してください。\n\n`
+          : '';
+
+        const aiPrompt = `${babyContext}あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
 ルール：
 1. 重複（同じ商品の別店舗）は1つにまとめる。
 2. 「車輪だけ」「カバーだけ」などの付属品は除外し「本体」のみ残す。
@@ -1914,6 +1998,17 @@ const App = () => {
 
   const isFavorite = (id) => favorites.some(f => f.id === id);
   const favoriteSet = useMemo(() => new Set(favorites.map(f => f.id)), [favorites]);
+
+  // 口コミは「自分の子と同じくらいの月齢」のレビューを優先表示（月齢データがない口コミは元の順序のまま末尾へ）
+  const sortedHonestReviews = useMemo(() => {
+    const reviews = selectedProduct?.honestReviews || [];
+    if (babyAgeMonths == null) return reviews;
+    return [...reviews].sort((a, b) => {
+      const da = a.baby_age_months != null ? Math.abs(a.baby_age_months - babyAgeMonths) : Infinity;
+      const db = b.baby_age_months != null ? Math.abs(b.baby_age_months - babyAgeMonths) : Infinity;
+      return da - db;
+    });
+  }, [selectedProduct, babyAgeMonths]);
   const handleSendMessage = async () => {
     if (!userInput.trim()) return;
     const userText = userInput;
@@ -2447,9 +2542,10 @@ ${userText}
         .insert([{
           product_id: productId,
           rating: reviewForm.rating,
-          content: reviewForm.content,
+          comment: reviewForm.content,
           user_name: displayName,
           image_url: uploadedImageUrl,
+          baby_age_months: babyAgeMonths,
         }])
         .select();
 
@@ -2492,7 +2588,10 @@ ${userText}
     setSelectedProduct(product);
     // SPA内ではモーダル表示を維持しつつURLだけ更新（直リンク・共有用）。
     // /product/[id] への実遷移はSSRページ（Google・直アクセス向け）が担う。
-    if (typeof window !== 'undefined') {
+    // ただしremote-始まりのIDはDB未登録の一時商品（AIフォールバック検索結果）のため、
+    // SSRページが存在せず404になる。URL書き換え・共有リンクの対象から除外する。
+    const isPersisted = !String(product.id).startsWith('remote-');
+    if (isPersisted && typeof window !== 'undefined') {
       window.history.replaceState(null, '', `/product/${encodeURIComponent(product.id)}`);
     }
 
@@ -2812,6 +2911,31 @@ ${userText}
           );
         })()}
 
+        {/* ─── 誕生日・記念日バナー（ギフト提案） ─── */}
+        {babyInfo && babyAgeMonths != null && (() => {
+          const now_ = BIRTHDAY_MILESTONES.find(m => m.months === babyAgeMonths);
+          const soon = BIRTHDAY_MILESTONES.find(m => m.months === babyAgeMonths + 1);
+          const milestone = now_ || soon;
+          if (!milestone) return null;
+          return (
+            <button
+              onClick={() => { setGiftSceneFilter(milestone.scene); setActiveTab('gift'); }}
+              className="w-full bg-[#FFF0F5] rounded-[1.75rem] p-4 mb-6 flex items-center gap-3 shadow-sm active:scale-[0.98] transition-transform border border-[#FFD9E6]"
+            >
+              <div className="bg-white p-2 rounded-full shadow-sm flex-shrink-0">
+                <Gift className="w-4 h-4 text-[#F2ABAC]" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#F2ABAC] mb-0.5">Anniversary</p>
+                <p className="text-sm font-black text-[#5A4C4C] leading-tight">
+                  {now_ ? `今月は${babyInfo.name || 'お子さま'}の${milestone.label}🎉` : `もうすぐ${milestone.label}。ギフトを探しませんか？`}
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-[#F2ABAC] flex-shrink-0" />
+            </button>
+          );
+        })()}
+
         <div className="relative">
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5 -mx-4 px-4 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
             {CATEGORY_TREE.map(cat => (
@@ -2894,7 +3018,7 @@ ${userText}
               <button
                 onClick={() => {
                   if (entry.sub) setSelectedSubCategory(entry.sub);
-                  setSelectedSubSubCategory(entry.size);
+                  if (entry.subsub) setSelectedSubSubCategory(entry.subsub);
                 }}
                 className="bg-[#F2ABAC] text-white text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform whitespace-nowrap ml-3"
               >
@@ -3149,7 +3273,7 @@ ${userText}
                 : babyInfo ? <Baby className="w-8 h-8" /> : <User className="w-8 h-8" />
               }
             </div>
-            <div className="relative z-10">
+            <div className="relative z-10 flex-1">
               <h3 className="text-xl font-black text-[#5A4C4C] leading-tight">
                 {user?.user_metadata?.full_name || (babyInfo?.name ? `${babyInfo.name}のママ・パパ` : 'ゲスト様')}
               </h3>
@@ -3162,12 +3286,24 @@ ${userText}
                 )}
                 <button onClick={() => {
                   const today = new Date();
-                  setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
+                  setBabyForm(babyInfo ? { ...babyInfo } : { id: null, name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
                   setShowBabyModal(true);
                 }} className="text-[10px] text-[#A5A19E] flex items-center gap-0.5 font-bold hover:text-[#5A4C4C] transition-colors">
                   {babyInfo ? '編集' : 'プロフィール登録'} <Edit3 className="w-3 h-3" />
                 </button>
               </div>
+              {babies.length > 1 && (
+                <div className="flex gap-1.5 mt-2.5 overflow-x-auto no-scrollbar">
+                  {babies.map((b, i) => (
+                    <button key={b.id} onClick={() => setActiveBabyId(b.id)}
+                      className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors ${
+                        b.id === babyInfo?.id ? 'bg-[#5A4C4C] text-white' : 'bg-[#F9F6F3] text-[#A5A19E]'
+                      }`}>
+                      {b.name || `お子さま${i + 1}`}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -3182,14 +3318,14 @@ ${userText}
           </div>
           <div onClick={() => {
             const today = new Date();
-            setBabyForm(babyInfo ? { ...babyInfo } : { name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
+            setBabyForm(babyInfo ? { ...babyInfo } : { id: null, name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
             setShowBabyModal(true);
           }} className="bg-[#FFF5F5] border border-[#FFEBEB] p-5 rounded-[2rem] shadow-sm flex items-center justify-between active:scale-95 transition-transform cursor-pointer relative overflow-hidden group">
             <div className="absolute left-0 top-0 bottom-0 w-2 bg-[#F2ABAC] rounded-l-[2rem]"></div>
             <div className="pl-2">
               {babyInfo ? (
                 <>
-                  <p className="text-[10px] font-bold text-[#8E8282] mb-1">登録済み</p>
+                  <p className="text-[10px] font-bold text-[#8E8282] mb-1">登録済み{babies.length > 1 ? `（${babies.length}人）` : ''}</p>
                   <p className="text-sm font-black text-[#5A4C4C]">
                     {babyInfo.name || 'お子さん'} · {babyAgeLabel} · {babyInfo.gender || '性別未設定'}
                   </p>
@@ -3205,6 +3341,15 @@ ${userText}
               <ChevronRight className="w-5 h-5" />
             </div>
           </div>
+          {babyInfo && (
+            <button onClick={() => {
+              const today = new Date();
+              setBabyForm({ id: null, name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
+              setShowBabyModal(true);
+            }} className="mt-2 text-[11px] font-black text-[#7B8E76] flex items-center gap-1 px-1">
+              ＋ 兄弟・双子を追加登録する
+            </button>
+          )}
         </div>
 
         {/* 最近見た商品 */}
@@ -3838,6 +3983,28 @@ ${userText}
               </div>
             </div>
 
+            {/* ─── マイベビーの月齢適合コメント（ルールベース、AIではなく即時表示） ─── */}
+            {(() => {
+              if (!babyInfo || babyAgeMonths == null || !selectedProduct.subCategory) return null;
+              const suggestions = CATEGORY_AGE_SUGGESTIONS[selectedProduct.category];
+              if (!suggestions) return null;
+              const entry = suggestions.find(e => babyAgeMonths < e.maxM);
+              if (!entry || !entry.sub) return null;
+              const fits = selectedProduct.subCategory === entry.sub;
+              return (
+                <div className={`flex items-center gap-2.5 rounded-2xl px-4 py-3 mb-6 ${fits ? 'bg-[#F0F4EF] border border-[#D4DDD2]' : 'bg-[#FFF9E6] border border-[#F4E8B8]'}`}>
+                  <span className={`text-base font-black flex-shrink-0 ${fits ? 'text-[#7B8E76]' : 'text-[#D4AF37]'}`}>{fits ? '✓' : '△'}</span>
+                  <p className="text-xs font-bold text-[#5A4C4C] leading-snug">
+                    {fits
+                      ? `${babyInfo.name || 'お子さま'}（${babyAgeLabel}）にぴったりのタイプです`
+                      : `${babyInfo.name || 'お子さま'}（${babyAgeLabel}）には「${entry.sub}」タイプが一般的です`}
+                  </p>
+                </div>
+              );
+            })()}
+
+            {/* remote-始まりのID（DB未登録の一時商品）は共有先URLが404になるため、シェアボタンを出さない */}
+            {!String(selectedProduct.id).startsWith('remote-') && (
             <div className="flex gap-3 mb-8 px-1">
               <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(`https://honestbaby-care.com/product/${selectedProduct.id}`)}`}
                  target="_blank" rel="noopener noreferrer"
@@ -3850,6 +4017,7 @@ ${userText}
                 X でシェア
               </a>
             </div>
+            )}
 
             {selectedProduct.description && (
               <section className="mb-10 bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
@@ -4061,7 +4229,10 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           )}
                         </div>
                         <p className="text-[10px] text-[#A5A19E] mt-2 font-bold">
-                          {shop._isRental ? 'レンタル料金（新品購入ではありません）'
+                          {shop._isRental
+                            ? ((shop.sellers || []).filter(sl => sl.period).length > 1
+                                ? 'レンタル料金（期間により異なります・タップで詳細）'
+                                : 'レンタル料金（新品購入ではありません）')
                             : shop.lowestPrice > 0 && shop._sellerLabel ? `最安ショップ: ${shop._sellerLabel}`
                             : shop.lowestPrice > 0 ? `出品者: ${Math.max(1, (shop.sellers || []).length)}店舗`
                             : "最新の価格・在庫をチェック"}
@@ -4093,10 +4264,19 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                             return (
                               <div key={sIdx} className="bg-white p-5 rounded-[1.5rem] flex items-center justify-between shadow-sm">
                                 <div className="flex-1 pr-4">
-                                  {roleLabel && (
-                                    <span className={`inline-block text-white text-[9px] font-black px-2 py-0.5 rounded mb-1.5 ${roleLabel.bg}`}>
-                                      {roleLabel.text}
-                                    </span>
+                                  {(seller.period || roleLabel) && (
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                      {seller.period && (
+                                        <span className="inline-block text-white text-[9px] font-black px-2 py-0.5 rounded bg-[#7BA7CC]">
+                                          {seller.period}
+                                        </span>
+                                      )}
+                                      {roleLabel && (
+                                        <span className={`inline-block text-white text-[9px] font-black px-2 py-0.5 rounded ${roleLabel.bg}`}>
+                                          {roleLabel.text}
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                   <p className="text-xs font-black text-[#5A4C4C] line-clamp-1">{seller.name}</p>
                                   <div className="flex flex-wrap gap-2 mt-2 text-[9px] font-bold">
@@ -4149,8 +4329,8 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   </div>
 
                   <div className="space-y-4">
-                    {selectedProduct.honestReviews && selectedProduct.honestReviews.length > 0 ? (
-                      selectedProduct.honestReviews.map(review => (
+                    {sortedHonestReviews.length > 0 ? (
+                      sortedHonestReviews.map(review => (
                         review.image_url ? (
                           // Instagram風: 画像中心レイアウト
                           <div key={review.id} className="bg-white border border-[#F4EFEB] rounded-[2rem] overflow-hidden shadow-sm">
@@ -4172,7 +4352,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                                 <Heart className="w-5 h-5 fill-current" />
                                 <span className="text-xs font-black text-[#5A4C4C]">使ってよかった</span>
                               </div>
-                              <p className="text-sm text-[#5A4C4C] leading-relaxed font-medium">{review.content}</p>
+                              <p className="text-sm text-[#5A4C4C] leading-relaxed font-medium">{review.comment}</p>
                             </div>
                           </div>
                         ) : (
@@ -4190,7 +4370,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                                 {[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
                               </div>
                             </div>
-                            <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.content}"</p>
+                            <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.comment}"</p>
                           </div>
                         )
                       ))
@@ -4589,6 +4769,30 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><Baby className="w-5 h-5 text-[#F2ABAC]" /> Myベビー情報</h3>
               <button onClick={() => setShowBabyModal(false)} className="p-2 rounded-full bg-[#F9F6F3] text-[#A5A19E]"><X className="w-5 h-5" /></button>
             </div>
+
+            {/* 兄弟・双子の切替＋追加（複数登録時のみ表示） */}
+            {babies.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto no-scrollbar mb-5 pb-1">
+                {babies.map((b, i) => (
+                  <button key={b.id} onClick={() => setBabyForm({ ...b })}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-colors ${
+                      babyForm.id === b.id ? 'bg-[#5A4C4C] text-white' : 'bg-[#F9F6F3] text-[#A5A19E]'
+                    }`}>
+                    {b.name || `お子さま${i + 1}`}
+                  </button>
+                ))}
+                <button onClick={() => {
+                  const today = new Date();
+                  setBabyForm({ id: null, name: '', birthYear: today.getFullYear(), birthMonth: today.getMonth() + 1, gender: '' });
+                }}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap border border-dashed ${
+                    !babyForm.id ? 'border-[#F2ABAC] text-[#F2ABAC]' : 'border-[#E5DFDA] text-[#A5A19E]'
+                  }`}>
+                  ＋ 追加
+                </button>
+              </div>
+            )}
+
             <div className="space-y-5">
               <div>
                 <label className="text-xs font-black text-[#5A4C4C] mb-2 block">赤ちゃんのお名前（任意）</label>
@@ -4621,14 +4825,28 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                 </div>
               </div>
               <button onClick={() => {
-                const info = { ...babyForm };
-                setBabyInfo(info);
+                const id = babyForm.id || generateId();
+                const info = { ...babyForm, id };
+                setBabies(prev => prev.some(b => b.id === id) ? prev.map(b => b.id === id ? info : b) : [...prev, info]);
+                setActiveBabyId(id);
                 if (user) saveBabyProfileToDB(user.id, info);
                 setShowBabyModal(false);
               }}
                 className="w-full py-4 bg-[#5A4C4C] text-white rounded-full font-black text-sm active:scale-95 transition-transform mt-2">
                 保存する
               </button>
+              {babyForm.id && (
+                <button onClick={() => {
+                  const id = babyForm.id;
+                  setBabies(prev => prev.filter(b => b.id !== id));
+                  setActiveBabyId(prev => prev === id ? null : prev);
+                  if (user) deleteBabyProfileFromDB(user.id, id);
+                  setShowBabyModal(false);
+                }}
+                  className="w-full py-1 text-[#F2ABAC] text-xs font-black">
+                  このベビー情報を削除する
+                </button>
+              )}
             </div>
           </div>
         </div>

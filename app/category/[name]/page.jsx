@@ -109,9 +109,11 @@ export default async function CategoryPage({ params }) {
           ))}
         </div>
 
-        {/* タイトル・説明 */}
+        {/* タイトル・説明（H1は「検索結果」ではなく内容のある見出しにする） */}
         <h1 className="text-xl font-black mb-1 mt-4">
-          {cat === 'すべて' ? 'おすすめピックアップ' : `${cat}の検索結果`}
+          {cat === 'すべて'
+            ? 'おすすめピックアップ'
+            : (meta?.title || `${cat}のベビー用品 価格比較・口コミ`).replace(/\s*\|\s*HonestBaby$/, '')}
         </h1>
         <p className="text-xs text-[#8E8282] font-bold mb-4 leading-relaxed">
           {meta?.desc || `${cat}のベビー用品を楽天・Yahooの最安値と口コミで比較。`}

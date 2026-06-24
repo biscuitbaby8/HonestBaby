@@ -14,7 +14,8 @@
     { "path": "/api/cron/sync-products?manual=1&batch=12", "schedule": "30 16 * * *" },
     { "path": "/api/cron/sync-products?manual=1&batch=13", "schedule": "0 18 * * *" },
     { "path": "/api/cron/sync-products?manual=1&batch=14", "schedule": "30 19 * * *" },
-    { "path": "/api/cron/sync-products?manual=1&batch=15", "schedule": "0 21 * * *" }
+    { "path": "/api/cron/sync-products?manual=1&batch=15", "schedule": "0 21 * * *" },
+    { "path": "/api/cron/baby-milestone-push", "schedule": "0 23 * * *" }
   ],
   "redirects": [
     {
