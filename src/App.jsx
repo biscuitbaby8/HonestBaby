@@ -12,7 +12,7 @@ import {
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
-import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE } from './lib/products';
+import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -1810,7 +1810,12 @@ const App = () => {
       let formatted;
 
       try {
-        const aiPrompt = `あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
+        // マイベビー情報をコンテキストとして注入（月齢に合った商品の厳選・分析に活用）
+        const babyContext = babyInfo && babyAgeLabel
+          ? `【お子さま情報】${babyInfo.name ? `名前: ${babyInfo.name} / ` : ''}月齢: ${babyAgeLabel}${babyInfo.gender ? ` / 性別: ${babyInfo.gender}` : ''}\nこの月齢・状況に合った商品を優先し、AI分析にも月齢適合度を反映してください。\n\n`
+          : '';
+
+        const aiPrompt = `${babyContext}あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
 ルール：
 1. 重複（同じ商品の別店舗）は1つにまとめる。
 2. 「車輪だけ」「カバーだけ」などの付属品は除外し「本体」のみ残す。
@@ -3864,6 +3869,26 @@ ${userText}
                 <p className="text-sm font-black text-[#7B8E76]">{(selectedProduct.shops || []).length}店</p>
               </div>
             </div>
+
+            {/* ─── マイベビーの月齢適合コメント（ルールベース、AIではなく即時表示） ─── */}
+            {(() => {
+              if (!babyInfo || babyAgeMonths == null || !selectedProduct.subCategory) return null;
+              const suggestions = CATEGORY_AGE_SUGGESTIONS[selectedProduct.category];
+              if (!suggestions) return null;
+              const entry = suggestions.find(e => babyAgeMonths < e.maxM);
+              if (!entry || !entry.sub) return null;
+              const fits = selectedProduct.subCategory === entry.sub;
+              return (
+                <div className={`flex items-center gap-2.5 rounded-2xl px-4 py-3 mb-6 ${fits ? 'bg-[#F0F4EF] border border-[#D4DDD2]' : 'bg-[#FFF9E6] border border-[#F4E8B8]'}`}>
+                  <span className={`text-base font-black flex-shrink-0 ${fits ? 'text-[#7B8E76]' : 'text-[#D4AF37]'}`}>{fits ? '✓' : '△'}</span>
+                  <p className="text-xs font-bold text-[#5A4C4C] leading-snug">
+                    {fits
+                      ? `${babyInfo.name || 'お子さま'}（${babyAgeLabel}）にぴったりのタイプです`
+                      : `${babyInfo.name || 'お子さま'}（${babyAgeLabel}）には「${entry.sub}」タイプが一般的です`}
+                  </p>
+                </div>
+              );
+            })()}
 
             {/* remote-始まりのID（DB未登録の一時商品）は共有先URLが404になるため、シェアボタンを出さない */}
             {!String(selectedProduct.id).startsWith('remote-') && (
