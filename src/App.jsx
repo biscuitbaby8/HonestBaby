@@ -1918,6 +1918,17 @@ const App = () => {
 
   const isFavorite = (id) => favorites.some(f => f.id === id);
   const favoriteSet = useMemo(() => new Set(favorites.map(f => f.id)), [favorites]);
+
+  // 口コミは「自分の子と同じくらいの月齢」のレビューを優先表示（月齢データがない口コミは元の順序のまま末尾へ）
+  const sortedHonestReviews = useMemo(() => {
+    const reviews = selectedProduct?.honestReviews || [];
+    if (babyAgeMonths == null) return reviews;
+    return [...reviews].sort((a, b) => {
+      const da = a.baby_age_months != null ? Math.abs(a.baby_age_months - babyAgeMonths) : Infinity;
+      const db = b.baby_age_months != null ? Math.abs(b.baby_age_months - babyAgeMonths) : Infinity;
+      return da - db;
+    });
+  }, [selectedProduct, babyAgeMonths]);
   const handleSendMessage = async () => {
     if (!userInput.trim()) return;
     const userText = userInput;
@@ -2451,9 +2462,10 @@ ${userText}
         .insert([{
           product_id: productId,
           rating: reviewForm.rating,
-          content: reviewForm.content,
+          comment: reviewForm.content,
           user_name: displayName,
           image_url: uploadedImageUrl,
+          baby_age_months: babyAgeMonths,
         }])
         .select();
 
@@ -4216,8 +4228,8 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   </div>
 
                   <div className="space-y-4">
-                    {selectedProduct.honestReviews && selectedProduct.honestReviews.length > 0 ? (
-                      selectedProduct.honestReviews.map(review => (
+                    {sortedHonestReviews.length > 0 ? (
+                      sortedHonestReviews.map(review => (
                         review.image_url ? (
                           // Instagram風: 画像中心レイアウト
                           <div key={review.id} className="bg-white border border-[#F4EFEB] rounded-[2rem] overflow-hidden shadow-sm">
@@ -4239,7 +4251,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                                 <Heart className="w-5 h-5 fill-current" />
                                 <span className="text-xs font-black text-[#5A4C4C]">使ってよかった</span>
                               </div>
-                              <p className="text-sm text-[#5A4C4C] leading-relaxed font-medium">{review.content}</p>
+                              <p className="text-sm text-[#5A4C4C] leading-relaxed font-medium">{review.comment}</p>
                             </div>
                           </div>
                         ) : (
@@ -4257,7 +4269,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                                 {[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
                               </div>
                             </div>
-                            <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.content}"</p>
+                            <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.comment}"</p>
                           </div>
                         )
                       ))

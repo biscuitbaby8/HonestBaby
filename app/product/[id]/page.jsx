@@ -242,7 +242,7 @@ export default async function ProductPage({ params }) {
                     <span className="text-xs font-black text-[#5A4C4C]">{r.user_name || 'ユーザー'}</span>
                     {r.rating && <span className="text-[#D4AF37] text-xs font-black">★ {r.rating}</span>}
                   </div>
-                  <p className="text-xs text-[#8E8282] leading-relaxed">{r.content}</p>
+                  <p className="text-xs text-[#8E8282] leading-relaxed">{r.comment}</p>
                 </div>
               ))}
             </div>
