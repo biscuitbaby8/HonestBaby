@@ -1229,6 +1229,38 @@ const App = () => {
     } catch { }
   }, []);
 
+  // 管理者パスワードを取得（セッション中はキャッシュ）
+  const getAdminPassword = () => {
+    try {
+      const cached = sessionStorage.getItem('honestBabyAdminPassword');
+      if (cached) return cached;
+    } catch { }
+    const input = typeof window !== 'undefined' ? window.prompt('管理者パスワードを入力してください') : null;
+    if (input) {
+      try { sessionStorage.setItem('honestBabyAdminPassword', input); } catch { }
+    }
+    return input;
+  };
+
+  // 商品の表示/非表示をサーバーサイドAPI（パスワード保護）経由で切り替える
+  const adminProductsCall = async (action, params = {}) => {
+    const password = getAdminPassword();
+    if (!password) throw new Error('パスワードが必要です');
+    const res = await fetch('/api/admin-products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, password, ...params }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (res.status === 401) {
+        try { sessionStorage.removeItem('honestBabyAdminPassword'); } catch { }
+      }
+      throw new Error(data.error || 'エラー');
+    }
+    return data;
+  };
+
   // 商品を非表示にする（管理者モード専用）
   const blockProduct = async (product) => {
     const code = String(product.id).replace(/^(ranking|product)-/, '');
@@ -1255,11 +1287,11 @@ const App = () => {
 
     // DB: is_blocked フラグを立てる
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(product.id));
-    const updateById = supabase.from('products').update({ is_blocked: true }).eq('id', product.id);
-    const updateByCode = supabase.from('products').update({ is_blocked: true }).eq('rakuten_item_code', code);
-    const [r1, r2] = await Promise.all([isUuid ? updateById : Promise.resolve({}), updateByCode]);
-    if (r1.error) console.error('Block by id failed:', r1.error.message);
-    if (r2.error) console.error('Block by code failed:', r2.error.message);
+    try {
+      await adminProductsCall('block', { id: isUuid ? product.id : undefined, rakuten_item_code: code });
+    } catch (e) {
+      console.error('Block failed:', e.message);
+    }
   };
 
   // 誤って削除した商品を復元する
@@ -1277,9 +1309,11 @@ const App = () => {
     });
     setDbProducts(prev => [...prev, product].sort((a, b) => (a.popularity_rank || 9999) - (b.popularity_rank || 9999)));
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(product.id));
-    const restoreById = supabase.from('products').update({ is_blocked: false }).eq('id', product.id);
-    const restoreByCode = supabase.from('products').update({ is_blocked: false }).eq('rakuten_item_code', code);
-    await Promise.all([isUuid ? restoreById : Promise.resolve({}), restoreByCode]);
+    try {
+      await adminProductsCall('unblock', { id: isUuid ? product.id : undefined, rakuten_item_code: code });
+    } catch (e) {
+      console.error('Unblock failed:', e.message);
+    }
   };
 
   // ブロック済み商品一覧を取得（管理者モード専用）
@@ -1296,7 +1330,12 @@ const App = () => {
 
   // ブロック済み商品を個別に復元
   const restoreBlockedProduct = async (p) => {
-    await supabase.from('products').update({ is_blocked: false }).eq('id', p.id);
+    try {
+      await adminProductsCall('unblock', { id: p.id, rakuten_item_code: p.rakuten_item_code });
+    } catch (e) {
+      console.error('Restore failed:', e.message);
+      return;
+    }
     setBlockedProducts(prev => prev.filter(b => b.id !== p.id));
     // ローカルのブロックリストからも除去
     const code = p.rakuten_item_code || p.id;
