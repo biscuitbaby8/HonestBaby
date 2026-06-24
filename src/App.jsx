@@ -2888,7 +2888,7 @@ ${userText}
               <button
                 onClick={() => {
                   if (entry.sub) setSelectedSubCategory(entry.sub);
-                  setSelectedSubSubCategory(entry.size);
+                  if (entry.subsub) setSelectedSubSubCategory(entry.subsub);
                 }}
                 className="bg-[#F2ABAC] text-white text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform whitespace-nowrap ml-3"
               >
