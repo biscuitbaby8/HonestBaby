@@ -55,6 +55,14 @@ const AGE_CATEGORY_MAP = [
   { minM: 24,  maxM: 999, label: '2歳〜',          cats: ['ウェア', 'トイレ用品', '車用品', 'おもちゃ'] },
 ];
 
+// 誕生日・記念日マイルストーン（生年月のみ保存のため月単位の近似）。sceneはギフトタブのシーンフィルタと対応。
+const BIRTHDAY_MILESTONES = [
+  { months: 6,  label: 'ハーフバースデー', scene: 'ハーフバースデー' },
+  { months: 12, label: '1歳のお誕生日',   scene: '1歳のお祝い' },
+  { months: 24, label: '2歳のお誕生日',   scene: 'すべて' },
+  { months: 36, label: '3歳のお誕生日',   scene: 'すべて' },
+];
+
 const LEGAL_PAGES = {
   terms: {
     title: "利用規約",
@@ -2803,6 +2811,31 @@ ${userText}
                 ))}
               </div>
             </div>
+          );
+        })()}
+
+        {/* ─── 誕生日・記念日バナー（ギフト提案） ─── */}
+        {babyInfo && babyAgeMonths != null && (() => {
+          const now_ = BIRTHDAY_MILESTONES.find(m => m.months === babyAgeMonths);
+          const soon = BIRTHDAY_MILESTONES.find(m => m.months === babyAgeMonths + 1);
+          const milestone = now_ || soon;
+          if (!milestone) return null;
+          return (
+            <button
+              onClick={() => { setGiftSceneFilter(milestone.scene); setActiveTab('gift'); }}
+              className="w-full bg-[#FFF0F5] rounded-[1.75rem] p-4 mb-6 flex items-center gap-3 shadow-sm active:scale-[0.98] transition-transform border border-[#FFD9E6]"
+            >
+              <div className="bg-white p-2 rounded-full shadow-sm flex-shrink-0">
+                <Gift className="w-4 h-4 text-[#F2ABAC]" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#F2ABAC] mb-0.5">Anniversary</p>
+                <p className="text-sm font-black text-[#5A4C4C] leading-tight">
+                  {now_ ? `今月は${babyInfo.name || 'お子さま'}の${milestone.label}🎉` : `もうすぐ${milestone.label}。ギフトを探しませんか？`}
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-[#F2ABAC] flex-shrink-0" />
+            </button>
           );
         })()}
 
