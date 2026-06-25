@@ -48,6 +48,15 @@ button, a, [role="button"] {
   touch-action: manipulation;
 }
 
+/* iOS Safariはinput/textareaのフォントサイズが16px未満だとフォーカス時に
+   画面を自動拡大する。text-sm(14px)等を使う箇所が多いため、入力欄全体に
+   16px以上を強制してこの「画面が拡大される」不具合を防ぐ。 */
+@media screen and (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
 /* スクロールバー非表示 */
 @utility scrollbar-hide {
   -ms-overflow-style: none;
