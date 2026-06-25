@@ -1,22 +1,12 @@
 import { checkRateLimit } from '@/lib/rateLimit';
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
-export async function OPTIONS() {
-  return new Response(null, { status: 200, headers: CORS });
-}
-
 export async function POST(request) {
-  const limited = checkRateLimit(request, { limit: 10, windowMs: 60 * 1000, prefix: 'gemini', headers: CORS });
+  const limited = checkRateLimit(request, { limit: 10, windowMs: 60 * 1000, prefix: 'gemini' });
   if (limited) return limited;
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return Response.json({ text: '', error: 'Groq API key not configured on server' }, { status: 200, headers: CORS });
+    return Response.json({ text: '', error: 'Groq API key not configured on server' }, { status: 200 });
   }
 
   let body = {};
@@ -27,7 +17,7 @@ export async function POST(request) {
   }
   const { prompt } = body;
   if (!prompt) {
-    return Response.json({ error: 'Missing prompt' }, { status: 400, headers: CORS });
+    return Response.json({ error: 'Missing prompt' }, { status: 400 });
   }
 
   try {
@@ -46,12 +36,12 @@ export async function POST(request) {
 
     if (!response.ok) {
       const errMsg = data?.error?.message || JSON.stringify(data);
-      return Response.json({ text: '', error: errMsg }, { status: 200, headers: CORS });
+      return Response.json({ text: '', error: errMsg }, { status: 200 });
     }
 
     const text = data.choices?.[0]?.message?.content || '';
-    return Response.json({ text }, { status: 200, headers: CORS });
+    return Response.json({ text }, { status: 200 });
   } catch (error) {
-    return Response.json({ text: '', error: error.message }, { status: 200, headers: CORS });
+    return Response.json({ text: '', error: error.message }, { status: 200 });
   }
 }
