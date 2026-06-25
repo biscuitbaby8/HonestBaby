@@ -326,6 +326,15 @@ function upgradeYahooImage(url) {
   return url.replace(/\/i\/j\//, '/i/g/');
 }
 
+// Yahoo APIの image.medium は 146×146px しかなく、一覧カードのretina表示で粗く
+// 見える。一方 exImage.url はAPIが返す大きい表示用画像（最大600px相当）なので、
+// 存在すればこちらを優先する。サイズコードを推測する方式（過去に /i/j/・/i/k/ で
+// 画像欠落を起こした）と違い、exImage.url はAPIが実際に返すURLのため安全。
+// exImage が無い古い/特殊な商品のみ image.medium にフォールバックする。
+function pickYahooImage(item) {
+  return upgradeYahooImage(item.exImage?.url || item.image?.medium || '');
+}
+
 // 先頭ノイズトークンセット（スペース区切りで完全一致するもののみ除去）
 const LEADING_NOISE_SET = new Set([
   'おもちゃ', '知育玩具', '知育', '玩具', '木のおもちゃ', '積み木',
@@ -656,7 +665,7 @@ function normalizeYahooItem(item, category) {
     category,
     sub_category: subCategory,
     brand,
-    image_url: upgradeYahooImage(item.image?.large || item.image?.medium || ''),
+    image_url: pickYahooImage(item),
     rating: parseFloat(item.review?.rate) || 0,
     reviews_count: parseInt(item.review?.count) || 0,
     rakuten_item_code: `yahoo-${item.code}`,
