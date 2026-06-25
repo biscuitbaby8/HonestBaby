@@ -1,4 +1,5 @@
 import { supabaseServer as supabase } from '@/src/lib/supabaseServer';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 function auth(password) {
   const expected = process.env.ADMIN_PASSWORD;
@@ -7,6 +8,9 @@ function auth(password) {
 }
 
 export async function POST(request) {
+  const limited = checkRateLimit(request, { limit: 10, windowMs: 5 * 60 * 1000, prefix: 'admin-products' });
+  if (limited) return limited;
+
   let body = {};
   try {
     body = await request.json();

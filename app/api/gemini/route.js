@@ -1,3 +1,5 @@
+import { checkRateLimit } from '@/lib/rateLimit';
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -9,6 +11,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(request) {
+  const limited = checkRateLimit(request, { limit: 10, windowMs: 60 * 1000, prefix: 'gemini', headers: CORS });
+  if (limited) return limited;
+
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return Response.json({ text: '', error: 'Groq API key not configured on server' }, { status: 200, headers: CORS });

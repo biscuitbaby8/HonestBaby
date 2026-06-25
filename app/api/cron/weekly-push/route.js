@@ -7,7 +7,13 @@ const supabase = createClient(
 );
 
 // 今週の人気ランキング上位3件を取得してPush通知を全購読者に送る
-export async function GET() {
+export async function GET(request) {
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = request.headers.get('authorization');
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   if (!isPushConfigured()) {
     return Response.json({ ok: false, reason: 'VAPID keys not configured' }, { status: 200 });
   }

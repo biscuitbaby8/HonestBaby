@@ -14,7 +14,13 @@ const MILESTONES = [
   { key: '3y',   months: 36, label: '3歳のお誕生日' },
 ];
 
-export async function GET() {
+export async function GET(request) {
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = request.headers.get('authorization');
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   if (!isPushConfigured()) {
     return Response.json({ ok: false, reason: 'VAPID keys not configured' }, { status: 200 });
   }

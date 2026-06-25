@@ -1,4 +1,5 @@
 import { request as httpsRequest } from 'node:https';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // /api/rakuten と同様、新・楽天APIはReferer/Originが一致しないと403になる。
 // fetch()はこれらを禁止ヘッダーとして送信しないため node:https を使う。
@@ -40,6 +41,9 @@ export async function GET(request) {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
   };
+
+  const limited = checkRateLimit(request, { limit: 30, windowMs: 60 * 1000, prefix: 'rakuten-product', headers });
+  if (limited) return limited;
 
   if (!appId) {
     return Response.json({ error: 'Missing RAKUTEN_APP_ID' }, { status: 500, headers });

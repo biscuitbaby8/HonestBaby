@@ -1,4 +1,5 @@
 import amazonPaapi from 'amazon-paapi';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // Amazon PA-API v5 ラッパー
 // 環境変数: AMAZON_ACCESS_KEY / AMAZON_SECRET_KEY / AMAZON_PARTNER_TAG
@@ -46,6 +47,9 @@ export async function GET(request) {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
   };
+
+  const limited = checkRateLimit(request, { limit: 30, windowMs: 60 * 1000, prefix: 'amazon', headers });
+  if (limited) return limited;
 
   if (!isConfigured()) {
     return Response.json(

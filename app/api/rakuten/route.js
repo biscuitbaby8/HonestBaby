@@ -1,4 +1,5 @@
 import { request as httpsRequest } from 'node:https';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // 新・楽天API(openapi.rakuten.co.jp)は Referer と Origin の両方が
 // アプリ登録時の「許可するWebサイト」と一致しないと
@@ -44,6 +45,9 @@ export async function GET(request) {
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Cache-Control': 's-maxage=120, stale-while-revalidate=300',
   };
+
+  const limited = checkRateLimit(request, { limit: 30, windowMs: 60 * 1000, prefix: 'rakuten', headers });
+  if (limited) return limited;
 
   if (!appId) {
     return Response.json(

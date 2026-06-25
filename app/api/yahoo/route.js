@@ -1,3 +1,5 @@
+import { checkRateLimit } from '@/lib/rateLimit';
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
@@ -11,6 +13,9 @@ export async function GET(request) {
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Cache-Control': 's-maxage=120, stale-while-revalidate=300',
   };
+
+  const limited = checkRateLimit(request, { limit: 30, windowMs: 60 * 1000, prefix: 'yahoo', headers });
+  if (limited) return limited;
 
   if (!clientId) {
     return Response.json({ error: 'Missing Yahoo Client ID (YAHOO_CLIENT_ID)' }, { status: 500, headers });

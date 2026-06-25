@@ -1409,15 +1409,13 @@ async function backfillSubCategories(log) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
 
-  // Cron認証（Vercel Cronは CRON_SECRET ヘッダーを送信する）
+  // Cron認証: CRON_SECRET設定時、Vercel CronはAuthorizationヘッダーを自動付与する。
+  // 旧?manual=1は誰でも叩けてしまう穴だったため廃止し、認証必須にする。
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get('authorization');
+  const isCronAuth = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
 
-  // 手動実行（?manual=1）またはCron認証
-  const isManual = searchParams.get('manual') === '1';
-  const isCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`;
-
-  if (!isManual && !isCronAuth) {
+  if (!isCronAuth) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
