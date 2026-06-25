@@ -423,9 +423,10 @@ const getHighResImage = (url) => {
     if (url.indexOf('rakuten.co.jp') !== -1) {
       return url.split('?_ex=')[0] + '?_ex=1000x1000';
     }
-    // Yahoo yimg.jp: /i/n/ /i/g/ /i/s/ → /i/j/ (標準サイズ。/i/g/はショップ依存で低画質の場合あり)
+    // Yahoo yimg.jp: /i/j/ は存在しないショップが多く画像が表示されないため、
+    // 確実に表示できる native medium (/i/g/) を使う（その他のサイズコードは温存）。
     if (url.indexOf('yimg.jp') !== -1) {
-      return url.replace(/\/i\/[ngs]\//, '/i/j/');
+      return url.replace(/\/i\/j\//, '/i/g/');
     }
     return url;
   } catch (e) {

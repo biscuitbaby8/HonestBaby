@@ -82,7 +82,9 @@ export const getHighResImage = (url) => {
       return url.split('?_ex=')[0] + '?_ex=1000x1000';
     }
     if (url.indexOf('yimg.jp') !== -1) {
-      return url.replace(/\/i\/[ngs]\//, '/i/j/');
+      // /i/j/ は存在しないショップが多く画像欠落の原因になるため、確実に表示できる
+      // native medium（/i/g/）を使う（APIが返す元のサイズコードはそのまま温存）。
+      return url.replace(/\/i\/j\//, '/i/g/');
     }
     return url;
   } catch {
