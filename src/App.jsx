@@ -153,6 +153,24 @@ const CATEGORY_NG = {
   "ウェア": ["大人用", "レディース", "メンズ", "ペット", "犬服", "猫服", "犬用"],
 };
 
+// AIチャット・市場網羅検索 共用: ユーザー文章 → 楽天ジャンルID／カテゴリ／サブカテゴリの判定表
+// 漢字・かな表記のゆらぎ（おしりふき／お尻拭き等）を吸収するため、CATEGORY_TREEの
+// サブカテゴリ名の単純一致だけでは不十分な語をここで個別にキーワード網羅する。
+const categoryGenreMap = [
+  { keywords: ['ベビーカー', 'バギー', 'ストローラー'], genreId: '200833', category: 'ベビーカー' },
+  { keywords: ['抱っこ紐', '抱っこひも', 'だっこ', 'スリング'], genreId: '412209', category: '抱っこ紐' },
+  // おしりふきは「おむつ」ジャンルに必ずしも属さないため単独判定＋ジャンル指定なしで検索する
+  { keywords: ['おしりふき', 'おしり拭き', 'お尻拭き', '尻拭き', 'お尻ふき', 'お尻ナップ'], genreId: '205197', category: 'おむつ', subCategory: 'おしりふき', skipGenre: true },
+  { keywords: ['おむつ', 'オムツ', 'パンツ型', 'テープ型'], genreId: '205197', category: 'おむつ' },
+  { keywords: ['ミルク', '粉ミルク', '授乳', '哺乳瓶', '搾乳'], genreId: '205208', category: 'ミルク・授乳' },
+  { keywords: ['ベッド', '寝具', 'ねんね', 'スリーパー'], genreId: '200822', category: '寝具・ベッド' },
+  { keywords: ['おもちゃ', 'ガラガラ', '知育', 'プレイマット', 'ぬいぐるみ'], genreId: '201591', category: 'おもちゃ' },
+  { keywords: ['チャイルドシート', 'カーシート', 'ジュニアシート'], genreId: '566088', category: '車用品' },
+  { keywords: ['離乳食', '食器', 'スプーン', 'マグ', 'ベビーフード'], genreId: '213980', category: '離乳食・食器' },
+  { keywords: ['お風呂', 'バス', 'ベビーバス', '沐浴'], genreId: '200815', category: 'お風呂用品' },
+  { keywords: ['ゲート', 'ガード', 'ベビーモニター', '安全'], genreId: '200841', category: '安全グッズ' },
+];
+
 // おむつサイズマッピング（検索精度向上用）
 const DIAPER_SIZE_MAP = {
   '新生児': '新生児', 'S': 'Sサイズ', 'M': 'Mサイズ',
@@ -2046,25 +2064,32 @@ const App = () => {
       // 既存の検索結果があればそれを使う、なければユーザーの質問で検索する
       let contextProducts = searchResults.length > 0 ? searchResults : [];
 
+      // ユーザー文章からカテゴリ／サブカテゴリを判定する。まずcategoryGenreMap（漢字・かな
+      // 表記ゆらぎを網羅した手動キーワード表）を試し、ヒットしなければCATEGORY_TREE全体
+      // （カテゴリ名・サブカテゴリ名の単純一致）にフォールバックする。
+      const matched = categoryGenreMap.find(m => m.keywords.some(k => userText.includes(k)));
+      const matchedTreeCat = !matched && CATEGORY_TREE.find(cat =>
+        cat.name !== "すべて" && (
+          userText.includes(cat.name) ||
+          (cat.keyword && userText.includes(cat.keyword)) ||
+          cat.subs?.some(s => userText.includes(typeof s === 'string' ? s : s.name))
+        )
+      );
+
       if (contextProducts.length === 0) {
         // まず自社キュレーションDB（dbProducts、起動時にロード済みで追加通信不要）を
         // カテゴリ／サブカテゴリ判定で検索する。ライブ楽天検索はユーザーの自然文を
         // そのままキーワードにするため失敗しやすく、ヒットしないと「商品データなし」の
         // 汎用回答に落ちてしまう。dbProductsは画像・評価も整備済みで信頼性が高いため、
         // ここでヒットすればライブ検索は行わない。
-        const matchedTreeCat = CATEGORY_TREE.find(cat =>
-          cat.name !== "すべて" && (
-            userText.includes(cat.name) ||
-            (cat.keyword && userText.includes(cat.keyword)) ||
-            cat.subs?.some(s => userText.includes(typeof s === 'string' ? s : s.name))
-          )
-        );
-
-        if (matchedTreeCat) {
-          const catName = matchedTreeCat.name;
+        let catName = matched?.category || matchedTreeCat?.name || null;
+        let subName = matched?.subCategory || null;
+        if (!subName && matchedTreeCat) {
           const subNode = matchedTreeCat.subs?.find(s => userText.includes(typeof s === 'string' ? s : s.name));
-          const subName = subNode ? (typeof subNode === 'string' ? subNode : subNode.name) : null;
+          subName = subNode ? (typeof subNode === 'string' ? subNode : subNode.name) : null;
+        }
 
+        if (catName) {
           let dbFiltered = dbProducts.filter(p =>
             p.category === catName || (catName === 'おむつ' && p.category === 'ゴミ箱・袋')
           );
@@ -2092,22 +2117,6 @@ const App = () => {
 
       if (contextProducts.length === 0) {
         try {
-          const categoryGenreMap = [
-            { keywords: ['ベビーカー', 'バギー', 'ストローラー'], genreId: '200833', category: 'ベビーカー' },
-            { keywords: ['抱っこ紐', '抱っこひも', 'だっこ', 'スリング'], genreId: '412209', category: '抱っこ紐' },
-            // おしりふきは「おむつ」ジャンルに必ずしも属さないため単独判定＋ジャンル指定なしで検索する
-            { keywords: ['おしりふき', 'おしり拭き', 'お尻拭き', '尻拭き', 'お尻ふき', 'お尻ナップ'], genreId: '205197', category: 'おむつ', skipGenre: true },
-            { keywords: ['おむつ', 'オムツ', 'パンツ型', 'テープ型'], genreId: '205197', category: 'おむつ' },
-            { keywords: ['ミルク', '粉ミルク', '授乳', '哺乳瓶', '搾乳'], genreId: '205208' },
-            { keywords: ['ベッド', '寝具', 'ねんね', 'スリーパー'], genreId: '200822', category: '寝具・ベッド' },
-            { keywords: ['おもちゃ', 'ガラガラ', '知育', 'プレイマット', 'ぬいぐるみ'], genreId: '201591', category: 'おもちゃ' },
-            { keywords: ['チャイルドシート', 'カーシート', 'ジュニアシート'], genreId: '566088', category: '車用品' },
-            { keywords: ['離乳食', '食器', 'スプーン', 'マグ', 'ベビーフード'], genreId: '213980' },
-            { keywords: ['お風呂', 'バス', 'ベビーバス', '沐浴'], genreId: '200815' },
-            { keywords: ['ゲート', 'ガード', 'ベビーモニター', '安全'], genreId: '200841', category: '安全グッズ' },
-          ];
-          const matched = categoryGenreMap.find(m => m.keywords.some(k => userText.includes(k)));
-
           // 人気ランキング（ジャンル内の売れ筋）だけでは「厚手のおしり拭き」のような
           // 具体的な要望に応えられず無関係な商品が混ざるため、まずユーザーの文章その
           // ものでキーワード実検索（mode=batch）を行い、ヒットしない場合のみ
