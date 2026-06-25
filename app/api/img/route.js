@@ -16,14 +16,19 @@
 
 export const runtime = 'nodejs';
 
-// SSRF防止: 取得を許可するホスト（楽天サムネイル / Yahoo商品画像）のみ。
-const ALLOWED_HOST_RE = [/(^|\.)yimg\.jp$/i, /(^|\.)rakuten\.co\.jp$/i];
-
+// SSRF防止: 取得を許可するホストのみ。
+//  - 楽天サムネイル / Yahoo商品画像（商品画像）
+//  - Googleのfaviconサービス（ショップロゴ。/s2/favicons パスのみに限定して
+//    任意URLのオープンプロキシ化を防ぐ）
 function isAllowed(rawUrl) {
   try {
     const u = new URL(rawUrl);
     if (u.protocol !== 'https:') return false;
-    return ALLOWED_HOST_RE.some((re) => re.test(u.hostname));
+    const h = u.hostname;
+    if (/(^|\.)yimg\.jp$/i.test(h)) return true;
+    if (/(^|\.)rakuten\.co\.jp$/i.test(h)) return true;
+    if (/(^|\.)google\.com$/i.test(h) && u.pathname.startsWith('/s2/favicons')) return true;
+    return false;
   } catch {
     return false;
   }
@@ -77,8 +82,10 @@ async function fetchImage(url) {
     const ct = res.headers.get('content-type') || '';
     if (!ct.startsWith('image/')) return null;
     const buf = Buffer.from(await res.arrayBuffer());
-    // Yahoo等が「画像なし」を200+小さなダミー画像で返すケース(ソフト404)を弾く。
-    if (buf.byteLength < 1000) return null;
+    // Yahooは「画像なし」を200+小さなダミー画像で返す(ソフト404)ため1000B未満を弾く。
+    // ショップロゴ(favicon)は元々小さいので閾値を下げ、誤って弾かないようにする。
+    const minBytes = /yimg\.jp/i.test(url) ? 1000 : 64;
+    if (buf.byteLength < minBytes) return null;
     return { buf, contentType: ct };
   } catch {
     return null;

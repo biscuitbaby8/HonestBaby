@@ -4348,8 +4348,10 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                               const domainBySource = { rakuten: 'rakuten.co.jp', yahoo: 'shopping.yahoo.co.jp', amazon: 'amazon.co.jp' };
                               const sp = SPECIALTY_SHOPS.find(s => s.source === (shop.source || ''));
                               const domain = domainBySource[shop.source] || sp?.domain;
+                              // 端末のコンテンツブロッカーが外部画像を遮断するため、
+                              // ロゴも同一オリジンの画像プロキシ(/api/img)経由で配信する。
                               return domain
-                                ? <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} alt="" className="w-3.5 h-3.5" loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
+                                ? <img src={`/api/img?url=${encodeURIComponent(`https://www.google.com/s2/favicons?domain=${domain}&sz=64`)}`} alt="" className="w-3.5 h-3.5" loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
                                 : <Store className="w-3.5 h-3.5 text-[#A5A19E]" />;
                             })()}
                           </div>
