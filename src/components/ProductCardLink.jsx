@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getCardImage, getLowestPrice } from '../lib/products';
+import { getProxiedImage, getLowestPrice } from '../lib/products';
 
 // サーバーコンポーネント: 商品カードを /product/[id] への <a> リンクとして描画。
 // Google がクロールできる実HTMLのリンク・商品情報を提供する。
@@ -12,7 +12,7 @@ export default function ProductCardLink({ product }) {
     >
       <div className="relative aspect-square bg-[#F9F6F3] p-4">
         <img
-          src={getCardImage(product.image)}
+          src={getProxiedImage(product.image, 'card')}
           className="w-full h-full object-cover rounded-[1.5rem]"
           alt={product.name}
           loading="lazy"

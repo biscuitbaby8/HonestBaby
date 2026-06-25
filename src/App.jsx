@@ -12,7 +12,7 @@ import {
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
-import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS } from './lib/products';
+import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -3457,7 +3457,7 @@ ${userText}
                 <div key={p.id} onClick={() => { const full = [...remoteProducts, ...dbProducts].find(r => r.id === p.id) || p; openProduct(full); }}
                   className="flex-shrink-0 w-28 cursor-pointer active:scale-95 transition-transform">
                   <div className="w-28 h-28 rounded-[1.5rem] overflow-hidden bg-[#F9F6F3] mb-2">
-                    {p.image ? <img src={getHighResImage(p.image)} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#A5A19E]"><Package className="w-8 h-8" /></div>}
+                    {p.image ? <img src={getProxiedImage(p.image, 'card')} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#A5A19E]"><Package className="w-8 h-8" /></div>}
                   </div>
                   <p className="text-[10px] font-bold text-[#5A4C4C] leading-tight line-clamp-2">{p.name}</p>
                   {p.price && <p className="text-[10px] text-[#F2ABAC] font-black mt-0.5">¥{p.price.toLocaleString()}</p>}
@@ -3727,7 +3727,7 @@ ${userText}
                     <div key={p.id} className="bg-white rounded-[2rem] border border-[#F4EFEB] shadow-sm overflow-hidden flex gap-4 p-4 active:scale-[0.98] transition-transform cursor-pointer"
                       onClick={() => openProduct(p)}>
                       <div className="w-20 h-20 rounded-[1.25rem] overflow-hidden bg-[#F9F6F3] flex-shrink-0">
-                        {p.image ? <img src={getHighResImage(p.image)} alt={p.name} className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-[#A5A19E] m-auto mt-6" />}
+                        {p.image ? <img src={getProxiedImage(p.image, 'card')} alt={p.name} className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-[#A5A19E] m-auto mt-6" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-black text-[#5A4C4C] leading-tight line-clamp-2 mb-1">{p.name}</p>
@@ -3794,7 +3794,7 @@ ${userText}
                     <div className="mt-2 space-y-2 w-[85%]">
                       {msg.products.map(p => (
                         <button key={p.id} onClick={() => setSelectedProduct(p)} className="w-full flex items-center gap-3 bg-white rounded-2xl p-3 text-left border border-[#F4EFEB] shadow-sm active:scale-[0.98] transition-transform">
-                          <img src={getHighResImage(p.image)} onError={e => { e.target.src = "https://placehold.jp/24/7b8e76/ffffff/80x80.png?text=Baby"; }} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" alt={p.name} />
+                          <img src={getProxiedImage(p.image, 'card')} onError={e => { if (e.target.dataset.fb !== '1' && p.image) { e.target.dataset.fb = '1'; e.target.src = p.image; return; } e.target.src = "https://placehold.jp/24/7b8e76/ffffff/80x80.png?text=Baby"; }} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" alt={p.name} />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-black text-[#5A4C4C] line-clamp-2 leading-snug">{p.name}</p>
                             <p className="text-xs text-[#7B8E76] font-bold mt-1">¥{(p.shops?.[0]?.lowest_price ?? p.price)?.toLocaleString()}</p>
@@ -4037,7 +4037,7 @@ ${userText}
           </div>
           <div className="flex-1 overflow-y-auto px-6 pb-32 lg:pb-8">
             <div className="bg-[#F9F6F3] rounded-[3rem] p-6 my-6">
-              <img src={getHighResImage(selectedProduct.image)} onError={(e) => { e.target.onerror = null; e.target.src = selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
+              <img src={getProxiedImage(selectedProduct.image, 'hero')} onError={(e) => { if (e.target.dataset.fb !== '1' && selectedProduct.image) { e.target.dataset.fb = '1'; e.target.src = selectedProduct.image; return; } e.target.onerror = null; e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }} className="w-full aspect-square object-cover rounded-[2rem] shadow-sm" alt={selectedProduct.name} />
             </div>
 
             <div className="flex justify-between items-start mb-8 px-1">
@@ -4489,7 +4489,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
             </div>
 
             <div className="flex items-center gap-3 mb-6 bg-[#F9F6F3] p-3 rounded-[1.5rem]">
-              <img src={getHighResImage(selectedProduct.image) || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby"} onError={(e) => { e.target.onerror = null; e.target.src = selectedProduct.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
+              <img src={getProxiedImage(selectedProduct.image, 'card')} onError={(e) => { if (e.target.dataset.fb !== '1' && selectedProduct.image) { e.target.dataset.fb = '1'; e.target.src = selectedProduct.image; return; } e.target.onerror = null; e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby"; }} className="w-12 h-12 object-cover rounded-xl" alt="product" />
               <p className="text-xs font-black text-[#5A4C4C] line-clamp-1 flex-1">{selectedProduct.name}</p>
             </div>
 

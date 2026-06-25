@@ -6,6 +6,7 @@ import {
   CAT_META,
   formatDbProduct,
   getLowestPrice,
+  getProxiedImage,
 } from '@/src/lib/products';
 
 const SITE_URL = 'https://honestbaby-care.com';
@@ -85,7 +86,7 @@ export default async function Page() {
                         <div className="aspect-square bg-[#F9F6F3] p-3">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={p.image}
+                            src={getProxiedImage(p.image, 'card')}
                             alt={p.name}
                             loading="lazy"
                             className="w-full h-full object-contain"

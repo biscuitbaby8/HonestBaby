@@ -1,6 +1,6 @@
 'use client';
 import { Heart, Star, Award, ShieldCheck } from 'lucide-react';
-import { getCardImage, getLowestPrice } from '../lib/products';
+import { getProxiedImage, getLowestPrice } from '../lib/products';
 
 const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock }) => (
   <div
@@ -12,10 +12,16 @@ const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favo
   >
     <div className="relative aspect-square bg-[#F9F6F3] p-4">
       <img
-        src={getCardImage(product.image)}
+        src={getProxiedImage(product.image, 'card')}
         onError={(e) => {
+          // プロキシ失敗時は元の外部URLを直接 → それも失敗ならプレースホルダ。
+          if (e.target.dataset.fb !== '1' && product.image) {
+            e.target.dataset.fb = '1';
+            e.target.src = product.image;
+            return;
+          }
           e.target.onerror = null;
-          e.target.src = product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby";
+          e.target.src = "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby";
         }}
         className="w-full h-full object-cover rounded-[1.5rem]"
         alt={product.name}

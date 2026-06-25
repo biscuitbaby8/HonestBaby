@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
-import { formatDbProduct, getLowestPrice, CAT_META } from '@/src/lib/products';
+import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage } from '@/src/lib/products';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
@@ -169,7 +169,7 @@ export default async function ProductPage({ params }) {
 
         <div className="bg-white rounded-[2rem] border border-[#F4EFEB] overflow-hidden shadow-sm">
           <div className="aspect-square bg-[#F9F6F3] p-6">
-            <img src={product.image} alt={product.name} className="w-full h-full object-contain rounded-[1.5rem]" />
+            <img src={getProxiedImage(product.image, 'hero')} alt={product.name} className="w-full h-full object-contain rounded-[1.5rem]" />
           </div>
           <div className="p-6">
             {product.category && (

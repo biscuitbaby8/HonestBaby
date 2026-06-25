@@ -108,6 +108,25 @@ export const getCardImage = (url) => {
   }
 };
 
+// 商品画像を同一オリジンの画像プロキシ(/api/img)経由のURLに変換する。
+// 楽天・Yahooの画像はサーバー側で「高画質→存在確認→確実なURL」とフォールバック
+// してから配信するため、ホットリンク制限やサイズコードの当て推量による
+// 「一部表示されない／画質が荒い」問題を解消できる。
+// variant: 'card'（一覧サムネ）/ 'hero'（詳細表示、最大サイズ）。
+// プロキシ対象外（自前画像・プレースホルダ等）はそのまま返す。
+export const getProxiedImage = (url, variant = 'card') => {
+  if (!url) return 'https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby';
+  try {
+    if (/(^|\.)yimg\.jp|rakuten\.co\.jp/.test(new URL(url).hostname)) {
+      const v = variant === 'hero' ? 'hero' : 'card';
+      return `/api/img?v=${v}&url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  } catch {
+    return url;
+  }
+};
+
 // shops 配列から最安値を取得（表示用、official正規化なしの軽量版）
 export const getLowestPrice = (shops) => {
   if (!shops || shops.length === 0) return 0;
