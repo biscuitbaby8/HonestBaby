@@ -37,10 +37,7 @@ export async function GET(request) {
   const accessKey = process.env.RAKUTEN_ACCESS_KEY || process.env.VITE_RAKUTEN_ACCESS_KEY || '';
   const affiliateId = process.env.RAKUTEN_AFFILIATE_ID || process.env.VITE_RAKUTEN_AFFILIATE_ID || '';
 
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  };
+  const headers = {};
 
   const limited = checkRateLimit(request, { limit: 30, windowMs: 60 * 1000, prefix: 'rakuten-product', headers });
   if (limited) return limited;

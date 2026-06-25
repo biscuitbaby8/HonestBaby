@@ -30,19 +30,53 @@ function nodeHttpsGet(url) {
   });
 }
 
+function getCreds() {
+  return {
+    appId: process.env.RAKUTEN_APP_ID || process.env.VITE_RAKUTEN_APP_ID,
+    accessKey: process.env.RAKUTEN_ACCESS_KEY || process.env.VITE_RAKUTEN_ACCESS_KEY || '',
+    affiliateId: process.env.RAKUTEN_AFFILIATE_ID || process.env.VITE_RAKUTEN_AFFILIATE_ID || '',
+  };
+}
+
+// 市場網羅型ランキング取得エンジン用: 複数ソート×複数ページをサーバー側で
+// 並列取得しマージ（APIキーをクライアントに渡さないため）
+async function fetchBatchItems({ appId, accessKey, affiliateId, keyword, genreId, skipGenreId }) {
+  const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
+  const fetches = SORTS.flatMap(sort =>
+    [1, 2, 3].map(async (page) => {
+      const genreParam = (genreId && !skipGenreId) ? `&genreId=${genreId}` : '';
+      const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1${genreParam}&affiliateId=${affiliateId}`;
+      try {
+        const { statusCode, text } = await nodeHttpsGet(url);
+        if (statusCode !== 200) return [];
+        const data = JSON.parse(text);
+        return data.Items || [];
+      } catch {
+        return [];
+      }
+    })
+  );
+  const results = await Promise.all(fetches);
+  const seen = new Set();
+  return results.flat().filter((item) => {
+    const code = item?.Item?.itemCode;
+    if (!code) return true;
+    if (seen.has(code)) return false;
+    seen.add(code);
+    return true;
+  });
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
+  const mode = searchParams.get('mode');
   const query = searchParams.get('query');
   const noFilter = searchParams.get('noFilter');
   const shopCode = searchParams.get('shopCode');
 
-  const appId = process.env.RAKUTEN_APP_ID || process.env.VITE_RAKUTEN_APP_ID;
-  const affiliateId = process.env.RAKUTEN_AFFILIATE_ID || process.env.VITE_RAKUTEN_AFFILIATE_ID;
-  const accessKey = process.env.RAKUTEN_ACCESS_KEY || process.env.VITE_RAKUTEN_ACCESS_KEY;
+  const { appId, accessKey, affiliateId } = getCreds();
 
   const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Cache-Control': 's-maxage=120, stale-while-revalidate=300',
   };
 
@@ -54,6 +88,33 @@ export async function GET(request) {
       { error: 'Missing Rakuten App ID (RAKUTEN_APP_ID or VITE_RAKUTEN_APP_ID) in server environment variables' },
       { status: 500, headers }
     );
+  }
+
+  // ジャンル別ランキング（市場網羅エンジンの最終フォールバック・AIチャットの商品提案で使用）
+  if (mode === 'ranking') {
+    const genreId = searchParams.get('genreId') || '100533';
+    const url = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
+    try {
+      const { statusCode, text } = await nodeHttpsGet(url);
+      if (statusCode !== 200) return Response.json({ error: text }, { status: statusCode, headers });
+      const data = JSON.parse(text);
+      return Response.json({ Items: data.Items || [] }, { status: 200, headers });
+    } catch (error) {
+      return Response.json({ error: error.message }, { status: 500, headers });
+    }
+  }
+
+  // 複数ソート×複数ページの並列検索結果をマージ（市場網羅型ランキング取得エンジンで使用）
+  if (mode === 'batch') {
+    const keyword = searchParams.get('keyword') || '';
+    const genreId = searchParams.get('genreId') || '';
+    const skipGenreId = searchParams.get('skipGenreId') === '1';
+    try {
+      const items = await fetchBatchItems({ appId, accessKey, affiliateId, keyword, genreId, skipGenreId });
+      return Response.json({ Items: items }, { status: 200, headers });
+    } catch (error) {
+      return Response.json({ error: error.message }, { status: 500, headers });
+    }
   }
 
   // 一般検索: ベビー用品ジャンル(566382)に限定 + 価格フィルタ

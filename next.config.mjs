@@ -41,7 +41,7 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   // バンドルせず Node ランタイムで読み込む（独自のモジュール解決を持つパッケージ）
-  serverExternalPackages: ['amazon-paapi', 'web-push'],
+  serverExternalPackages: ['web-push'],
   images: {
     // 楽天・Yahoo・Amazon 等の外部商品画像を許可
     remotePatterns: [{ protocol: 'https', hostname: '**' }],

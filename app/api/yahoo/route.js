@@ -9,8 +9,6 @@ export async function GET(request) {
   const vcSid = process.env.VITE_VC_SID || process.env.NEXT_PUBLIC_VC_SID || '3768537';
 
   const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Cache-Control': 's-maxage=120, stale-while-revalidate=300',
   };
 

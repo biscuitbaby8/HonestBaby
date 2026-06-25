@@ -1644,13 +1644,9 @@ const App = () => {
       .filter(validateProduct);
 
     try {
-      const appId = process.env.NEXT_PUBLIC_RAKUTEN_APP_ID;
-      const accessKey = process.env.NEXT_PUBLIC_RAKUTEN_ACCESS_KEY || '';
-      const affiliateId = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || '';
-      if (!appId) throw new Error("NEXT_PUBLIC_RAKUTEN_APP_ID not set");
-
-      const rankingUrl = (genreId) => `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
-      const searchUrl = (keyword, page = 1, sort = '-reviewCount') => `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1&affiliateId=${affiliateId}`;
+      // 楽天APIキーはクライアントに渡さず、/api/rakuten (サーバー側プロキシ) を経由する
+      const rankingUrl = (genreId) => `/api/rakuten?mode=ranking&genreId=${genreId}`;
+      const batchUrl = (keyword, genreId, skipGenreId) => `/api/rakuten?mode=batch&keyword=${encodeURIComponent(keyword)}${genreId ? `&genreId=${genreId}` : ''}${skipGenreId ? '&skipGenreId=1' : ''}`;
 
       // メインカテゴリー表示はRanking API（genreId指定 → ジャンル外商品が構造的に混入しない）
       // サブカテゴリー選択時のみ Search API（genreId + サブキーワードで絞り込み）
@@ -1678,22 +1674,15 @@ const App = () => {
                 : subCat === '周辺グッズ'
                   ? (ACCESSORY_SEARCH_KEYWORDS[catName] || genre.keyword)
                   : [genre.keyword, subCat !== "すべて" ? subCat : "", normalizedSubSub !== "すべて" ? normalizedSubSub : ""].filter(Boolean).join(" ").trim();
-        // 複数ソート×3ページで並列取得（最大270件→重複排除後150〜200件）
-        const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
         const isWipes = catName === 'おむつ' && subCat === 'おしりふき';
         // ミルク(粉/液体)は食品ジャンルにあるためgenreIdを外して広範囲検索
         const skipGenreId = isWipes || (catName === 'ミルク・授乳' && subCat === 'ミルク');
-        const subFetches = SORTS.flatMap(sort =>
-          [1, 2, 3].map(p =>
-            fetch(`${searchUrl(subKeyword, p, sort)}${skipGenreId ? '' : '&genreId=' + genreId}`)
-              .then(r => r.ok ? r.json() : { Items: [] })
-              .catch(() => ({ Items: [] }))
-          )
-        );
-        const subResults = await Promise.all(subFetches);
-        if (!subResults[0]?.Items && !subResults[1]?.Items) throw new Error('Search API Error');
-        const combined = subResults.flatMap(d => d.Items || []);
-        rawItems = dedupeAndMergeShops(mapItems(combined, catName));
+        // 複数ソート×3ページの並列取得はサーバー側(mode=batch)で実行（最大270件→重複排除後150〜200件）
+        const subRes = await fetch(batchUrl(subKeyword, genreId, skipGenreId))
+          .then(r => r.ok ? r.json() : { Items: [] })
+          .catch(() => ({ Items: [] }));
+        if (!subRes?.Items) throw new Error('Search API Error');
+        rawItems = dedupeAndMergeShops(mapItems(subRes.Items || [], catName));
 
         // おむつサイズ指定時: 対象サイズが名前に含まれる商品のみに絞り込む
         if (catName === 'おむつ' && subSubCat && subSubCat !== 'すべて' && DIAPER_SIZE_MAP[subSubCat]) {
@@ -1740,19 +1729,13 @@ const App = () => {
           }
         } catch (_) { /* フォールバックへ */ }
 
-        // 通常商品検索APIを複数ソートで並列取得しマージ（市場網羅）
+        // 通常商品検索APIを複数ソートで並列取得しマージ（市場網羅、サーバー側 mode=batch で実行）
         if (genre.keyword) {
           try {
-            const SORTS = ['-reviewCount', 'standard', '-reviewAverage'];
-            const mainFetches = SORTS.flatMap(sort =>
-              [1, 2, 3].map(p =>
-                fetch(`${searchUrl(genre.keyword, p, sort)}&genreId=${genreId}`)
-                  .then(r => r.ok ? r.json() : { Items: [] })
-                  .catch(() => ({ Items: [] }))
-              )
-            );
-            const mainResults = await Promise.all(mainFetches);
-            const searchItems = dedupeAndMergeShops(mapItems(mainResults.flatMap(d => d.Items || []), catName));
+            const mainRes = await fetch(batchUrl(genre.keyword, genreId))
+              .then(r => r.ok ? r.json() : { Items: [] })
+              .catch(() => ({ Items: [] }));
+            const searchItems = dedupeAndMergeShops(mapItems(mainRes.Items || [], catName));
             if (searchItems.length > 0) {
               // 商品価格ナビ結果とマージして重複排除
               const merged = [...(rawItems || []), ...searchItems];
@@ -2076,12 +2059,8 @@ const App = () => {
           ];
           const matched = categoryGenreMap.find(m => m.keywords.some(k => userText.includes(k)));
           const genreId = matched?.genreId ?? '100533';
-          const appId = process.env.NEXT_PUBLIC_RAKUTEN_APP_ID;
-          const accessKey = process.env.NEXT_PUBLIC_RAKUTEN_ACCESS_KEY || '';
-          const affiliateId = process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || '';
-          if (!appId) throw new Error('NEXT_PUBLIC_RAKUTEN_APP_ID not set');
-          const rankingUrl = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
-          const res = await fetch(rankingUrl, { headers: { Referer: 'https://honestbaby-care.com' } });
+          // 楽天APIキーはクライアントに渡さず、/api/rakuten (サーバー側プロキシ) を経由する
+          const res = await fetch(`/api/rakuten?mode=ranking&genreId=${genreId}`);
           const resData = await res.json();
           const allItems = (resData.Items || []).map(i => i.Item).filter(Boolean);
           let filtered = filterAccessories(allItems, item => item.itemName || '');
