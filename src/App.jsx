@@ -4343,15 +4343,15 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       <div className="flex-1 pr-4">
                         <div className="flex items-center flex-wrap gap-2 mb-1.5">
                           <div className="w-5 h-5 rounded-md flex items-center justify-center overflow-hidden border border-[#F4EFEB] bg-white">
-                            {shop.source === 'rakuten' ? <img src="https://www.rakuten.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
-                             shop.source === 'yahoo' ? <img src="https://shopping.yahoo.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
-                             shop.source === 'amazon' ? <img src="https://www.amazon.co.jp/favicon.ico" className="w-3.5 h-3.5" /> :
-                             (() => {
-                               const sp = SPECIALTY_SHOPS.find(s => s.source === (shop.source || ''));
-                               return sp
-                                 ? <img src={`https://www.google.com/s2/favicons?domain=${sp.domain}&sz=32`} className="w-3.5 h-3.5" onError={e => { e.target.style.display='none'; }} />
-                                 : <Store className="w-3.5 h-3.5 text-[#A5A19E]" />;
-                             })()}
+                            {(() => {
+                              // 各モールのfavicon.icoは直リンクが不安定なため、Googleのfaviconサービスに統一。
+                              const domainBySource = { rakuten: 'rakuten.co.jp', yahoo: 'shopping.yahoo.co.jp', amazon: 'amazon.co.jp' };
+                              const sp = SPECIALTY_SHOPS.find(s => s.source === (shop.source || ''));
+                              const domain = domainBySource[shop.source] || sp?.domain;
+                              return domain
+                                ? <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} alt="" className="w-3.5 h-3.5" loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
+                                : <Store className="w-3.5 h-3.5 text-[#A5A19E]" />;
+                            })()}
                           </div>
                           <p className="text-base font-black text-[#5A4C4C]">{shop._displayName}</p>
                           {shop.type === 'official' && (
@@ -4376,9 +4376,16 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
-                        <span className="text-2xl font-black text-[#7B8E76]">
-                          {shop.lowestPrice > 0 ? `¥${shop.lowestPrice.toLocaleString()}` : '最安値をチェック'}
-                        </span>
+                        <div className="flex flex-col items-end leading-tight">
+                          <span className="text-2xl font-black text-[#7B8E76]">
+                            {shop.lowestPrice > 0 ? `¥${shop.lowestPrice.toLocaleString()}` : '最安値をチェック'}
+                          </span>
+                          {selectedProduct.unitCount > 0 && shop.lowestPrice > 0 && !shop._isRental && (
+                            <span className="text-[10px] font-black text-[#F2ABAC] mt-0.5">
+                              1{selectedProduct.unitName}あたり ¥{(shop.lowestPrice / selectedProduct.unitCount).toFixed(1)}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[#A5A19E] bg-white p-1 rounded-full shadow-sm">
                           {shop.sellers?.length > 0 ? (expandedMall === shop._displayName ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />) : <ExternalLink className="w-4 h-4 opacity-30" />}
                         </div>
