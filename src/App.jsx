@@ -456,6 +456,21 @@ const getAmazonUrl = (keyword) => {
   return `https://www.amazon.co.jp/s?k=${encodeURIComponent(keyword)}&tag=${AMAZON_TAG}`;
 };
 
+// 各SNSの公式ロゴ（simple-icons準拠の単一パス、currentColorで着色）。
+// lucide-reactにはブランドロゴが無いためインラインSVGで用意する。
+const SNS_LOGO_PATHS = {
+  line: 'M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596a.627.627 0 0 1-.194.033.62.62 0 0 1-.51-.265l-2.443-3.317v2.954a.63.63 0 0 1-.628.629.629.629 0 0 1-.626-.629V8.108c0-.27.173-.51.43-.595a.609.609 0 0 1 .195-.033c.198 0 .38.092.512.265l2.444 3.319V8.108a.63.63 0 0 1 .629-.63c.346 0 .628.285.628.63v4.771zm-5.741 0a.63.63 0 0 1-.631.629.63.63 0 0 1-.626-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917a.625.625 0 0 1-.625-.629V8.108c0-.345.281-.63.63-.63.346 0 .627.285.627.63v4.141h1.756c.349 0 .63.283.63.63 0 .344-.281.629-.63.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314',
+  x: 'M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z',
+  threads: 'M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.166 1.43 1.781 3.631 2.695 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.36-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.74-1.757-.5-.586-1.273-.883-2.298-.89h-.029c-.823 0-1.939.227-2.65 1.29L8.665 7.84c.951-1.419 2.495-2.199 4.352-2.199h.045c3.107.019 4.958 1.946 5.144 5.318.106.045.211.092.314.141 1.46.686 2.532 1.74 3.077 3.066.764 1.851.834 4.872-1.62 7.293-1.876 1.849-4.151 2.685-7.385 2.74h-.064zm1.831-9.357c-.328 0-.66.012-.994.037-1.346.097-2.222.74-2.18 1.601.043.886 1.02 1.299 1.96 1.25.864-.044 1.99-.382 2.18-2.628a8.97 8.97 0 0 0-.966-.064z',
+  facebook: 'M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z',
+};
+
+const SnsLogo = ({ name, className }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true" focusable="false">
+    <path d={SNS_LOGO_PATHS[name]} />
+  </svg>
+);
+
 
 const App = () => {
   const router = useRouter();
@@ -2721,7 +2736,12 @@ ${userText}
   // --- 新機能: URL共有ハンドラ ---
   const handleShare = async () => {
     if (!selectedProduct) return;
-    const shareUrl = window.location.href;
+    // window.location.href はチャット/診断経由で商品を開いた場合にホーム(/)のままになり、
+    // ホームが共有されてしまう。商品IDから正規の商品ページURLを必ず組み立てる。
+    // remote-（DB未登録の一時商品）は共有先が404になるため現在地URLにフォールバック。
+    const shareUrl = String(selectedProduct.id).startsWith('remote-')
+      ? window.location.href
+      : `https://honestbaby-care.com/product/${selectedProduct.id}`;
     const shareData = {
       title: `Honest Baby | ${selectedProduct.name}`,
       text: `${selectedProduct.name}をHonest Babyでチェック！`,
@@ -4096,20 +4116,45 @@ ${userText}
             })()}
 
             {/* remote-始まりのID（DB未登録の一時商品）は共有先URLが404になるため、シェアボタンを出さない */}
-            {!String(selectedProduct.id).startsWith('remote-') && (
-            <div className="flex gap-3 mb-8 px-1">
-              <a href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(`https://honestbaby-care.com/product/${selectedProduct.id}`)}`}
-                 target="_blank" rel="noopener noreferrer"
-                 className="flex items-center gap-2 bg-[#06C755] text-white rounded-full px-4 py-2.5 text-xs font-black active:scale-95 transition-transform">
-                LINE でシェア
-              </a>
-              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`${selectedProduct.name} | HonestBaby`)}&url=${encodeURIComponent(`https://honestbaby-care.com/product/${selectedProduct.id}`)}`}
-                 target="_blank" rel="noopener noreferrer"
-                 className="flex items-center gap-2 bg-black text-white rounded-full px-4 py-2.5 text-xs font-black active:scale-95 transition-transform">
-                X でシェア
-              </a>
-            </div>
-            )}
+            {!String(selectedProduct.id).startsWith('remote-') && (() => {
+              const pUrl = `https://honestbaby-care.com/product/${selectedProduct.id}`;
+              const pText = `${selectedProduct.name} | HonestBaby`;
+              const snsButtons = [
+                { key: 'line', label: 'LINE', bg: '#06C755',
+                  href: `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(pUrl)}` },
+                { key: 'x', label: 'X', bg: '#000000',
+                  href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(pText)}&url=${encodeURIComponent(pUrl)}` },
+                { key: 'threads', label: 'Threads', bg: '#000000',
+                  href: `https://www.threads.net/intent/post?text=${encodeURIComponent(`${pText} ${pUrl}`)}` },
+                { key: 'facebook', label: 'Facebook', bg: '#1877F2',
+                  href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pUrl)}` },
+              ];
+              return (
+                <div className="mb-8 px-1">
+                  <p className="text-[11px] font-black text-[#A5A19E] tracking-widest uppercase mb-3">この商品をシェア</p>
+                  <div className="flex items-start gap-4 flex-wrap">
+                    {snsButtons.map((it) => (
+                      <a key={it.key} href={it.href} target="_blank" rel="noopener noreferrer"
+                         aria-label={`${it.label}でシェア`}
+                         className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+                        <span className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm"
+                              style={{ backgroundColor: it.bg }}>
+                          <SnsLogo name={it.key} className="w-[22px] h-[22px] text-white" />
+                        </span>
+                        <span className="text-[10px] font-bold text-[#8E8282]">{it.label}</span>
+                      </a>
+                    ))}
+                    <button onClick={handleShare} aria-label="その他の方法でシェア"
+                            className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+                      <span className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm bg-[#F0EBE6] text-[#7B8E76]">
+                        <Share2 className="w-5 h-5" />
+                      </span>
+                      <span className="text-[10px] font-bold text-[#8E8282]">その他</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {selectedProduct.description && (
               <section className="mb-10 bg-white border border-[#F4EFEB] p-6 rounded-[2rem] shadow-sm">
