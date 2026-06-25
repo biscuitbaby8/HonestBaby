@@ -139,6 +139,20 @@ const CATEGORY_CORE_WORDS = {
   "安全グッズ": ["ゲート", "ガード", "ロック", "モニター", "転倒防止", "ベビーサークル"],
 };
 
+// ジャンル内に混入しやすい無関係商品の除外語（市場網羅エンジン・AIチャット共用）
+const NG_KEYWORDS = [
+  'ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍',
+  'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース',
+  'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
+];
+const CATEGORY_NG = {
+  "おむつ": ["大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用"],
+  "ベビーカー": ["ペット", "犬用", "猫用", "ドッグ", "愛犬", "愛猫", "ペットカート", "ペットバギー"],
+  "抱っこ紐": ["ペット", "犬用", "猫用", "ドッグ", "犬抱っこ"],
+  "車用品": ["犬用", "猫用", "ペット", "ドッグ", "バイク用", "自転車用"],
+  "ウェア": ["大人用", "レディース", "メンズ", "ペット", "犬服", "猫服", "犬用"],
+};
+
 // おむつサイズマッピング（検索精度向上用）
 const DIAPER_SIZE_MAP = {
   '新生児': '新生児', 'S': 'Sサイズ', 'M': 'Mサイズ',
@@ -1604,18 +1618,6 @@ const App = () => {
       return m ? parseInt(m[1]) : null;
     };
 
-    const NG_KEYWORDS = [
-      'ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍',
-      'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース',
-      'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
-    ];
-    const CATEGORY_NG = {
-      "おむつ": ["大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用"],
-      "ベビーカー": ["ペット", "犬用", "猫用", "ドッグ", "愛犬", "愛猫", "ペットカート", "ペットバギー"],
-      "抱っこ紐": ["ペット", "犬用", "猫用", "ドッグ", "犬抱っこ"],
-      "車用品": ["犬用", "猫用", "ペット", "ドッグ", "バイク用", "自転車用"],
-      "ウェア": ["大人用", "レディース", "メンズ", "ペット", "犬服", "猫服", "犬用"],
-    };
     const mapItems = (items, cat) => items
       .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
       .filter(item => {
@@ -2046,27 +2048,45 @@ const App = () => {
       if (contextProducts.length === 0) {
         try {
           const categoryGenreMap = [
-            { keywords: ['ベビーカー', 'バギー', 'ストローラー'], genreId: '200833' },
-            { keywords: ['抱っこ紐', '抱っこひも', 'だっこ', 'スリング'], genreId: '412209' },
-            { keywords: ['おむつ', 'オムツ', 'パンツ型', 'テープ型', 'おしりふき'], genreId: '205197' },
+            { keywords: ['ベビーカー', 'バギー', 'ストローラー'], genreId: '200833', category: 'ベビーカー' },
+            { keywords: ['抱っこ紐', '抱っこひも', 'だっこ', 'スリング'], genreId: '412209', category: '抱っこ紐' },
+            // おしりふきは「おむつ」ジャンルに必ずしも属さないため単独判定＋ジャンル指定なしで検索する
+            { keywords: ['おしりふき', 'おしり拭き', 'お尻拭き', '尻拭き', 'お尻ふき', 'お尻ナップ'], genreId: '205197', category: 'おむつ', skipGenre: true },
+            { keywords: ['おむつ', 'オムツ', 'パンツ型', 'テープ型'], genreId: '205197', category: 'おむつ' },
             { keywords: ['ミルク', '粉ミルク', '授乳', '哺乳瓶', '搾乳'], genreId: '205208' },
-            { keywords: ['ベッド', '寝具', 'ねんね', 'スリーパー'], genreId: '200822' },
-            { keywords: ['おもちゃ', 'ガラガラ', '知育', 'プレイマット', 'ぬいぐるみ'], genreId: '201591' },
-            { keywords: ['チャイルドシート', 'カーシート', 'ジュニアシート'], genreId: '566088' },
+            { keywords: ['ベッド', '寝具', 'ねんね', 'スリーパー'], genreId: '200822', category: '寝具・ベッド' },
+            { keywords: ['おもちゃ', 'ガラガラ', '知育', 'プレイマット', 'ぬいぐるみ'], genreId: '201591', category: 'おもちゃ' },
+            { keywords: ['チャイルドシート', 'カーシート', 'ジュニアシート'], genreId: '566088', category: '車用品' },
             { keywords: ['離乳食', '食器', 'スプーン', 'マグ', 'ベビーフード'], genreId: '213980' },
             { keywords: ['お風呂', 'バス', 'ベビーバス', '沐浴'], genreId: '200815' },
-            { keywords: ['ゲート', 'ガード', 'ベビーモニター', '安全'], genreId: '200841' },
+            { keywords: ['ゲート', 'ガード', 'ベビーモニター', '安全'], genreId: '200841', category: '安全グッズ' },
           ];
           const matched = categoryGenreMap.find(m => m.keywords.some(k => userText.includes(k)));
-          const genreId = matched?.genreId ?? '100533';
+
+          // 人気ランキング（ジャンル内の売れ筋）だけでは「厚手のおしり拭き」のような
+          // 具体的な要望に応えられず無関係な商品が混ざるため、まずユーザーの文章その
+          // ものでキーワード実検索（mode=batch）を行い、ヒットしない場合のみ
+          // ジャンル別人気ランキングにフォールバックする。
           // 楽天APIキーはクライアントに渡さず、/api/rakuten (サーバー側プロキシ) を経由する
-          const res = await fetch(`/api/rakuten?mode=ranking&genreId=${genreId}`);
-          const resData = await res.json();
-          const allItems = (resData.Items || []).map(i => i.Item).filter(Boolean);
-          let filtered = filterAccessories(allItems, item => item.itemName || '');
+          const genreParam = (matched && !matched.skipGenre) ? `&genreId=${matched.genreId}` : '';
+          const searchData = await fetch(`/api/rakuten?mode=batch&keyword=${encodeURIComponent(userText)}${genreParam}`)
+            .then(r => r.json()).catch(() => ({ Items: [] }));
+          let allItems = (searchData.Items || []).map(i => i.Item).filter(Boolean);
+
+          if (allItems.length === 0) {
+            const genreId = matched?.genreId ?? '100533';
+            const res = await fetch(`/api/rakuten?mode=ranking&genreId=${genreId}`);
+            const resData = await res.json();
+            allItems = (resData.Items || []).map(i => i.Item).filter(Boolean);
+          }
+
+          let filtered = filterAccessories(allItems, item => item.itemName || '')
+            .filter(item => !NG_KEYWORDS.some(kw => (item.itemName || '').includes(kw)));
           // カテゴリ固有語でさらに絞り込み（例: ベビーカー → ひざ掛け・ブランケットを除外）
-          if (matched) {
-            const coreWords = CATEGORY_CORE_WORDS[matched.keywords[0]] || [];
+          if (matched?.category) {
+            const ng = CATEGORY_NG[matched.category] || [];
+            if (ng.length > 0) filtered = filtered.filter(item => !ng.some(kw => (item.itemName || '').includes(kw)));
+            const coreWords = CATEGORY_CORE_WORDS[matched.category] || [];
             if (coreWords.length > 0) {
               const strict = filtered.filter(item => coreWords.some(w => (item.itemName || '').includes(w)));
               if (strict.length >= 2) filtered = strict;
@@ -2088,7 +2108,7 @@ const App = () => {
             }))
             .filter(validateProduct);
         } catch (e) {
-          console.error('Ranking chat fetch failed:', e);
+          console.error('Search/Ranking chat fetch failed:', e);
         }
       }
 
