@@ -2047,6 +2047,50 @@ const App = () => {
       let contextProducts = searchResults.length > 0 ? searchResults : [];
 
       if (contextProducts.length === 0) {
+        // まず自社キュレーションDB（dbProducts、起動時にロード済みで追加通信不要）を
+        // カテゴリ／サブカテゴリ判定で検索する。ライブ楽天検索はユーザーの自然文を
+        // そのままキーワードにするため失敗しやすく、ヒットしないと「商品データなし」の
+        // 汎用回答に落ちてしまう。dbProductsは画像・評価も整備済みで信頼性が高いため、
+        // ここでヒットすればライブ検索は行わない。
+        const matchedTreeCat = CATEGORY_TREE.find(cat =>
+          cat.name !== "すべて" && (
+            userText.includes(cat.name) ||
+            (cat.keyword && userText.includes(cat.keyword)) ||
+            cat.subs?.some(s => userText.includes(typeof s === 'string' ? s : s.name))
+          )
+        );
+
+        if (matchedTreeCat) {
+          const catName = matchedTreeCat.name;
+          const subNode = matchedTreeCat.subs?.find(s => userText.includes(typeof s === 'string' ? s : s.name));
+          const subName = subNode ? (typeof subNode === 'string' ? subNode : subNode.name) : null;
+
+          let dbFiltered = dbProducts.filter(p =>
+            p.category === catName || (catName === 'おむつ' && p.category === 'ゴミ箱・袋')
+          );
+
+          if (subName) {
+            const strictSub = dbFiltered.filter(p => (p.subCategory || '').trim() === subName);
+            if (strictSub.length >= 2) dbFiltered = strictSub;
+          }
+
+          const ng = NG_KEYWORDS.concat(CATEGORY_NG[catName] || []);
+          dbFiltered = dbFiltered.filter(p => !ng.some(kw => (p.name || '').includes(kw)));
+
+          const coreWords = CATEGORY_CORE_WORDS[catName] || [];
+          if (coreWords.length > 0 && !subName) {
+            const strictCore = dbFiltered.filter(p => coreWords.some(w => (p.name || '').includes(w)));
+            if (strictCore.length >= 2) dbFiltered = strictCore;
+          }
+
+          contextProducts = dbFiltered
+            .slice()
+            .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+            .slice(0, 6);
+        }
+      }
+
+      if (contextProducts.length === 0) {
         try {
           const categoryGenreMap = [
             { keywords: ['ベビーカー', 'バギー', 'ストローラー'], genreId: '200833', category: 'ベビーカー' },
