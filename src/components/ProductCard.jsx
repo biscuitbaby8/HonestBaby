@@ -2,16 +2,6 @@
 import { Heart, Star, Award, ShieldCheck } from 'lucide-react';
 import { getCardImage, getLowestPrice } from '../lib/products';
 
-// Yahoo画像はAPIが保証する"medium"(/i/g/)だと一覧での画質が粗く見えるため、
-// より大きい/i/k/を先に試す。存在しない画像もあるため失敗時はonErrorで
-// 確実な/i/g/に戻す（DBは変更しないので最悪でも元の画質には戻る）。
-const withYahooUpscaleAttempt = (url) => {
-  if (url && url.indexOf('yimg.jp') !== -1) {
-    return url.replace(/\/i\/g\//, '/i/k/');
-  }
-  return url;
-};
-
 const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock }) => (
   <div
     className="bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full relative active:scale-95 transition-all cursor-pointer border border-[#F4EFEB]"
@@ -22,12 +12,8 @@ const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favo
   >
     <div className="relative aspect-square bg-[#F9F6F3] p-4">
       <img
-        src={withYahooUpscaleAttempt(getCardImage(product.image))}
+        src={getCardImage(product.image)}
         onError={(e) => {
-          if (e.target.src.includes('/i/k/')) {
-            e.target.src = e.target.src.replace('/i/k/', '/i/g/');
-            return;
-          }
           e.target.onerror = null;
           e.target.src = product.image || "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Baby";
         }}
