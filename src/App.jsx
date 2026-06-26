@@ -1466,6 +1466,19 @@ const App = () => {
         };
         const passesRental = (item) => !excludeRental || !isRentalListing(item);
 
+        // 付属品・交換部品の出品を除外（本体より安いため最安として誤採用され、
+        // 「交換用マットのみ」等の部品ページに飛んでしまうのを防ぐ）。
+        // 商品自体が付属品の場合は除外しない。
+        const ACCESSORY_WORDS = ['交換用', '交換パーツ', '替えカバー', '替えマット', '替えシート', '替えゴム',
+          'スペア', '補修用', '別売', '部品', 'パーツ', 'カバーのみ', 'マットのみ', 'シートのみ',
+          '本体別売', '本体なし', '本体は付属しません', '本体は含まれません'];
+        const selfIsAccessory = ACCESSORY_WORDS.some(w => (selectedProduct.name || '').includes(w));
+        const isAccessory = (item) => {
+          const n = (item?.name || '');
+          return ACCESSORY_WORDS.some(w => n.includes(w));
+        };
+        const passesAccessory = (item) => selfIsAccessory || !isAccessory(item);
+
         // --- 口コミ・SNSレビューの最新データをDBから取得 ---
         const fetchReviewsFromDb = async () => {
           const { data: dbProd } = await supabase
@@ -1499,7 +1512,7 @@ const App = () => {
         const newShops = [...cachedShops];
 
         if (rakutenData?.products) {
-          const items = rakutenData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item));
+          const items = rakutenData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item) && passesAccessory(item));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || '楽天市場';
@@ -1514,7 +1527,7 @@ const App = () => {
         }
 
         if (yahooData?.products) {
-          const items = yahooData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item));
+          const items = yahooData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item) && passesAccessory(item));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || 'Yahoo!ショッピング';
@@ -1539,7 +1552,7 @@ const App = () => {
         for (const result of specialtyResults) {
           const { name, source, domain, data } = result;
           if (!data.products?.length) continue;
-          const items = data.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && passesRental(item));
+          const items = data.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && passesRental(item) && passesAccessory(item));
           if (items.length === 0) continue;
           const best = items.sort((a, b) => a.price - b.price)[0];
           const retailer = OFFICIAL_RETAILERS.find(r => r.domain === domain);
