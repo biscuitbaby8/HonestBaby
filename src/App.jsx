@@ -1454,6 +1454,18 @@ const App = () => {
         const USED_KEYWORDS = ['中古', 'リユース', '訳あり', 'アウトレット', '中古品', '再生品'];
         const isNewItem = (name) => !USED_KEYWORDS.some(w => (name || '').includes(w));
 
+        // レンタル業者の出品を除外（購入品の比較にレンタル価格/延長プランが混ざるのを防ぐ）。
+        // この商品自体がレンタルカテゴリの場合は当然除外しない。
+        const RENTAL_WORDS = ['レンタル', 'rental', 'レンタ', 'リース', '貸出', '貸し出し', 'サブスク'];
+        const RENTAL_SHOP_WORDS = ['ナイスベビー', 'nicebaby', 'ベビレンタ', 'かして', 'ダーリング', 'darling'];
+        const excludeRental = selectedProduct.category !== 'レンタル';
+        const isRentalListing = (item) => {
+          const blob = `${item?.name || ''} ${item?.brand || ''}`.toLowerCase();
+          return RENTAL_WORDS.some(w => blob.includes(w.toLowerCase()))
+            || RENTAL_SHOP_WORDS.some(w => blob.includes(w.toLowerCase()));
+        };
+        const passesRental = (item) => !excludeRental || !isRentalListing(item);
+
         // --- 口コミ・SNSレビューの最新データをDBから取得 ---
         const fetchReviewsFromDb = async () => {
           const { data: dbProd } = await supabase
@@ -1487,7 +1499,7 @@ const App = () => {
         const newShops = [...cachedShops];
 
         if (rakutenData?.products) {
-          const items = rakutenData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
+          const items = rakutenData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || '楽天市場';
@@ -1502,7 +1514,7 @@ const App = () => {
         }
 
         if (yahooData?.products) {
-          const items = yahooData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name));
+          const items = yahooData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || 'Yahoo!ショッピング';
@@ -1527,7 +1539,7 @@ const App = () => {
         for (const result of specialtyResults) {
           const { name, source, domain, data } = result;
           if (!data.products?.length) continue;
-          const items = data.products.filter(item => nameMatches(item.name) && priceInRange(item.price));
+          const items = data.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && passesRental(item));
           if (items.length === 0) continue;
           const best = items.sort((a, b) => a.price - b.price)[0];
           const retailer = OFFICIAL_RETAILERS.find(r => r.domain === domain);
@@ -4314,11 +4326,13 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                     });
                   }
 
-                  const RENTAL_KW = ['レンタル', 'rental', 'レンタ', 'リース'];
+                  const RENTAL_KW = ['レンタル', 'rental', 'レンタ', 'リース', '貸出', 'ナイスベビー', 'nicebaby', 'ベビレンタ'];
                   const checkRental = (s) => {
                     const targets = [s.name || '', s.shop_name || '', ...(s.sellers || []).flatMap(sel => [sel.name || '', sel.note || ''])];
-                    return targets.some(t => RENTAL_KW.some(k => t.toLowerCase().includes(k)));
+                    return targets.some(t => RENTAL_KW.some(k => t.toLowerCase().includes(k.toLowerCase())));
                   };
+                  // 購入品の比較にはレンタル出品（延長プラン等）を出さない。商品自体がレンタルなら表示する。
+                  const hideRental = selectedProduct.category !== 'レンタル';
                   return Array.from(shopByKey.values())
                     .map(s => {
                       const sellerName = s.name || s.shop_name || '';
@@ -4330,6 +4344,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                         _sellerLabel: platformLabel && platformLabel !== sellerName ? sellerName : null,
                       };
                     })
+                    .filter(s => !hideRental || !s._isRental)
                     .sort((a, b) => {
                       if (a._isRental !== b._isRental) return a._isRental ? 1 : -1;
                       if (a.lowestPrice === 0) return 1;
