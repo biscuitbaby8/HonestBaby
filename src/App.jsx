@@ -456,6 +456,16 @@ const getAmazonUrl = (keyword) => {
   return `https://www.amazon.co.jp/s?k=${encodeURIComponent(keyword)}&tag=${AMAZON_TAG}`;
 };
 
+// 付属品・交換部品の判定（本体より安い部品を本体として誤表示しないため）。
+// クロスプラットフォーム比較・検索の両方で共用する。
+const ACCESSORY_WORDS = ['交換用', '交換パーツ', '替えカバー', '替えマット', '替えシート', '替えゴム',
+  'スペア', '補修用', '別売', '部品', 'パーツ', 'カバーのみ', 'マットのみ', 'シートのみ',
+  '本体別売', '本体なし', '本体は付属しません', '本体は含まれません'];
+const isAccessoryName = (name) => {
+  const n = name || '';
+  return ACCESSORY_WORDS.some((w) => n.includes(w));
+};
+
 // 各SNSの公式ロゴ（simple-icons準拠の単一パス、currentColorで着色）。
 // lucide-reactにはブランドロゴが無いためインラインSVGで用意する。
 const SNS_LOGO_PATHS = {
@@ -1445,10 +1455,16 @@ const App = () => {
         const selectedWords = keyword.split(' ').filter(w => w.length >= 2).map(w => w.toLowerCase());
         const modelWords = selectedWords.filter(w => /[0-9０-９]/.test(w));
 
+        // 名前一致は厳格に判定する（緩い「どれか1語一致」だと別商品・別ブランドの
+        // 商品を誤って拾い、リンク先が全く違う商品になってしまうため）。
+        //  - 型番(数字を含む語)があれば全て一致必須
+        //  - 重要語(2文字以上)の75%以上が含まれること（最低でも該当語の過半）
         const nameMatches = (itemName) => {
           const lower = (itemName || '').toLowerCase().replace(/[\s　]/g, '');
-          if (modelWords.length > 0) return modelWords.every(w => lower.includes(w));
-          return selectedWords.some(w => lower.includes(w));
+          if (modelWords.length > 0 && !modelWords.every(w => lower.includes(w))) return false;
+          if (selectedWords.length === 0) return true;
+          const hits = selectedWords.filter(w => lower.includes(w)).length;
+          return hits >= Math.ceil(selectedWords.length * 0.75);
         };
         const priceInRange = (p) => origPrice === 0 || (p >= priceMin && p <= priceMax);
         const USED_KEYWORDS = ['中古', 'リユース', '訳あり', 'アウトレット', '中古品', '再生品'];
@@ -1469,15 +1485,8 @@ const App = () => {
         // 付属品・交換部品の出品を除外（本体より安いため最安として誤採用され、
         // 「交換用マットのみ」等の部品ページに飛んでしまうのを防ぐ）。
         // 商品自体が付属品の場合は除外しない。
-        const ACCESSORY_WORDS = ['交換用', '交換パーツ', '替えカバー', '替えマット', '替えシート', '替えゴム',
-          'スペア', '補修用', '別売', '部品', 'パーツ', 'カバーのみ', 'マットのみ', 'シートのみ',
-          '本体別売', '本体なし', '本体は付属しません', '本体は含まれません'];
-        const selfIsAccessory = ACCESSORY_WORDS.some(w => (selectedProduct.name || '').includes(w));
-        const isAccessory = (item) => {
-          const n = (item?.name || '');
-          return ACCESSORY_WORDS.some(w => n.includes(w));
-        };
-        const passesAccessory = (item) => selfIsAccessory || !isAccessory(item);
+        const selfIsAccessory = isAccessoryName(selectedProduct.name);
+        const passesAccessory = (item) => selfIsAccessory || !isAccessoryName(item?.name);
 
         // --- 口コミ・SNSレビューの最新データをDBから取得 ---
         const fetchReviewsFromDb = async () => {
@@ -1645,7 +1654,8 @@ const App = () => {
   const dedupeAndMergeShops = (items) => {
     const map = new Map();
     for (const item of items) {
-      const key = imageKey(item.image) || nameKey(item.name);
+      // 同一商品が別ショップだと画像が異なり重複が残るため、正規化した名前を優先キーにする。
+      const key = nameKey(item.name) || imageKey(item.image);
       if (!key) continue;
       if (!map.has(key)) {
         map.set(key, { ...item, shops: [...item.shops] });
@@ -1943,8 +1953,10 @@ const App = () => {
         : [];
 
       const raw = [...rakutenItems, ...yahooItems];
-      // 検索はユーザーが意図的に指定しているのでアクセサリーフィルタを適用しない
-      const allItems = raw;
+      // 付属品・交換部品は検索結果から除外（本体を探しているのに「交換用マットのみ」等が
+      // 並ぶのを防ぐ）。ただしユーザーが付属品自体を検索している場合は除外しない。
+      const keywordIsAccessory = isAccessoryName(keyword);
+      const allItems = keywordIsAccessory ? raw : raw.filter(it => !isAccessoryName(it.name));
 
       if (allItems.length === 0) {
         setSearchError("検索結果が見つかりませんでした。別のキーワードをお試しください。");
