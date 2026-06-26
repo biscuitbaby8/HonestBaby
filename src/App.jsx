@@ -2770,15 +2770,24 @@ ${userText}
     }
   };
 
+  // 共有先URLを決定する。
+  //  - DB商品: 自サイトの正規商品ページ（SEO・ブランド面で有利）
+  //  - remote(検索の一時商品): DBに無く /product/[id] が404になるため、実際の出品URLを共有
+  const getShareUrl = () => {
+    if (!selectedProduct) return 'https://honestbaby-care.com/';
+    if (!String(selectedProduct.id).startsWith('remote-')) {
+      return `https://honestbaby-care.com/product/${selectedProduct.id}`;
+    }
+    const listingUrl = (selectedProduct.shops || [])
+      .map(s => s.url || (s.sellers || [])[0]?.url)
+      .find(Boolean);
+    return listingUrl || 'https://honestbaby-care.com/';
+  };
+
   // --- 新機能: URL共有ハンドラ ---
   const handleShare = async () => {
     if (!selectedProduct) return;
-    // window.location.href はチャット/診断経由で商品を開いた場合にホーム(/)のままになり、
-    // ホームが共有されてしまう。商品IDから正規の商品ページURLを必ず組み立てる。
-    // remote-（DB未登録の一時商品）は共有先が404になるため現在地URLにフォールバック。
-    const shareUrl = String(selectedProduct.id).startsWith('remote-')
-      ? window.location.href
-      : `https://honestbaby-care.com/product/${selectedProduct.id}`;
+    const shareUrl = getShareUrl();
     const shareData = {
       title: `Honest Baby | ${selectedProduct.name}`,
       text: `${selectedProduct.name}をHonest Babyでチェック！`,
@@ -4152,9 +4161,11 @@ ${userText}
               );
             })()}
 
-            {/* remote-始まりのID（DB未登録の一時商品）は共有先URLが404になるため、シェアボタンを出さない */}
-            {!String(selectedProduct.id).startsWith('remote-') && (() => {
-              const pUrl = `https://honestbaby-care.com/product/${selectedProduct.id}`;
+            {/* SNSシェア: DB商品は自サイトの商品ページ、remote(検索の一時商品)は
+                404を避けるため実際の出品URLを共有する。共有先が全く無い時だけ非表示。 */}
+            {(() => {
+              const pUrl = getShareUrl();
+              if (!pUrl || pUrl === 'https://honestbaby-care.com/') return null;
               const pText = `${selectedProduct.name} | HonestBaby`;
               const snsButtons = [
                 { key: 'line', label: 'LINE', bg: '#06C755',
