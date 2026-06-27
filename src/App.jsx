@@ -12,7 +12,7 @@ import {
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
-import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage } from './lib/products';
+import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, categorizeByName } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -1888,27 +1888,23 @@ const App = () => {
   // ショップURL・価格・安定コードごとサーバー(/api/ingest-product, サービスロール)で保存する。
   // 戻り値: rakuten_item_code → 取り込み済み商品 の対応（呼び出し側でリンク先確定に使える）。
   const autoSaveSearchResultsToDb = async (products, keyword) => {
-    const matchedCat = CATEGORY_TREE.find(cat =>
-      cat.name !== "すべて" && (
-        keyword.includes(cat.name) ||
-        (cat.keyword && keyword.includes(cat.keyword)) ||
-        cat.subs?.some(s => {
-          const sName = typeof s === 'string' ? s : s.name;
-          return keyword.includes(sName);
-        })
-      )
-    );
-    const category = matchedCat?.name || null;
-    const toSave = products.filter(p => p.name && p.image).slice(0, 10);
+    // 取り込みは「商品名からカテゴリが確定できた商品」だけに限定する（精度確保）。
+    // カテゴリ判定は商品名ベース（categorizeByName）で行うのが肝心。
+    const toSave = products
+      .map(p => ({ p, cat: categorizeByName(p.name) }))
+      .filter(({ p, cat }) => p.name && p.image && cat)
+      .slice(0, 10);
     if (toSave.length === 0) return;
 
-    // localStorage（即時・このユーザー）。カテゴリが特定できた時だけカテゴリページ用にキャッシュ。
-    if (category) {
-      try {
-        localStorage.setItem(`honestBabyCache_${category}`, JSON.stringify(toSave));
-        setCachedProducts(prev => ({ ...prev, [category]: toSave }));
-      } catch { }
-    }
+    // localStorage（即時・このユーザー）。カテゴリ別にカテゴリページ用キャッシュへ追加。
+    try {
+      const byCat = {};
+      for (const { p, cat } of toSave) (byCat[cat] = byCat[cat] || []).push({ ...p, category: cat });
+      for (const [cat, list] of Object.entries(byCat)) {
+        localStorage.setItem(`honestBabyCache_${cat}`, JSON.stringify(list));
+        setCachedProducts(prev => ({ ...prev, [cat]: list }));
+      }
+    } catch { }
 
     // サーバー経由でproducts/shops_pricesへ取り込む（自サイト商品ページを生成）
     try {
@@ -1916,11 +1912,11 @@ const App = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          products: toSave.map(p => ({
+          products: toSave.map(({ p, cat }) => ({
             name: p.name,
             rakuten_item_code: p.rakuten_item_code || null,
             image_url: p.image || null,
-            category,
+            category: cat,
             sub_category: '本体',
             brand: p.brand && p.brand !== 'メーカー不明' ? p.brand : null,
             rating: p.rating || 4.0,
@@ -2102,7 +2098,8 @@ const App = () => {
         )
       );
       const resolvedCategory = matchedCat?.name || keyword;
-      const categorized = deduped.map(p => ({ ...p, category: resolvedCategory }));
+      // カテゴリは「商品名」から判定するのが精度の肝。判定不能なら検索語ベースにフォールバック。
+      const categorized = deduped.map(p => ({ ...p, category: categorizeByName(p.name) || resolvedCategory }));
       setSearchResults(categorized);
       autoSaveSearchResultsToDb(categorized, keyword);
     } catch (err) {

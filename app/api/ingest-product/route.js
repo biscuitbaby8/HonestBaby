@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { categorizeByName } from '@/src/lib/products';
 
 // =============================================
 // 検索でヒットした商品をDBへ取り込むAPI
@@ -65,12 +66,16 @@ export async function POST(request) {
       const name = str(it?.name, 200).trim();
       if (!name) continue;
 
+      // カテゴリは商品名からサーバー側で判定する（クライアント値を信頼しない）。
+      // 判定できない商品は取り込まない＝カテゴリ一致した商品だけを保存する。
+      const category = categorizeByName(name);
+      if (!category) continue;
+
       // 取得元の安定コードを正規化（rakuten- 接頭辞は除去して同期データと揃える。yahoo- は維持）。
       let code = str(it?.rakuten_item_code, 120).trim();
       if (code.startsWith('rakuten-')) code = code.slice('rakuten-'.length);
 
       const image_url = str(it?.image_url, 600) || null;
-      const category = str(it?.category, 60) || null;
       const sub_category = str(it?.sub_category, 60) || '本体';
       const brand = str(it?.brand, 80) || null;
       const rating = Math.max(0, Math.min(5, Number(it?.rating) || 0));
