@@ -466,6 +466,11 @@ const isAccessoryName = (name) => {
   return ACCESSORY_WORDS.some((w) => n.includes(w));
 };
 
+// 取り込みAPIが保存する rakuten_item_code の正規化（rakuten- 接頭辞を除去して
+// 同期データと揃える。yahoo- は維持）。サーバー側の正規化と一致させること。
+const siteCode = (code) =>
+  typeof code === 'string' && code.startsWith('rakuten-') ? code.slice('rakuten-'.length) : code;
+
 // 各SNSの公式ロゴ（simple-icons準拠の単一パス、currentColorで着色）。
 // lucide-reactにはブランドロゴが無いためインラインSVGで用意する。
 const SNS_LOGO_PATHS = {
@@ -1879,6 +1884,9 @@ const App = () => {
   };
 
   // --- 既存機能の拡張: AI搭載・楽天＋Yahoo並列検索ロジック ---
+  // 検索結果をDBへ取り込み、自サイトの商品ページ(/product/[code])を持たせる。
+  // ショップURL・価格・安定コードごとサーバー(/api/ingest-product, サービスロール)で保存する。
+  // 戻り値: rakuten_item_code → 取り込み済み商品 の対応（呼び出し側でリンク先確定に使える）。
   const autoSaveSearchResultsToDb = async (products, keyword) => {
     const matchedCat = CATEGORY_TREE.find(cat =>
       cat.name !== "すべて" && (
@@ -1890,31 +1898,62 @@ const App = () => {
         })
       )
     );
-    const category = matchedCat?.name;
-    if (!category) return;
+    const category = matchedCat?.name || null;
     const toSave = products.filter(p => p.name && p.image).slice(0, 10);
     if (toSave.length === 0) return;
 
-    // localStorage（即時・このユーザー）
-    try {
-      localStorage.setItem(`honestBabyCache_${category}`, JSON.stringify(toSave));
-      setCachedProducts(prev => ({ ...prev, [category]: toSave }));
-    } catch { }
+    // localStorage（即時・このユーザー）。カテゴリが特定できた時だけカテゴリページ用にキャッシュ。
+    if (category) {
+      try {
+        localStorage.setItem(`honestBabyCache_${category}`, JSON.stringify(toSave));
+        setCachedProducts(prev => ({ ...prev, [category]: toSave }));
+      } catch { }
+    }
 
-    // Supabase（全ユーザー共有）
+    // サーバー経由でproducts/shops_pricesへ取り込む（自サイト商品ページを生成）
     try {
-      await supabase.from('products').upsert(
-        toSave.map(p => ({
-          name: p.name.slice(0, 200),
-          category,
-          sub_category: '本体',
-          image_url: p.image || null,
-          rating: Math.round((p.rating || 4.0) * 10) / 10,
-          reviews_count: p.reviews_count || 0,
-          ai_analysis: p.ai_analysis || null,
-        })),
-        { onConflict: 'name', ignoreDuplicates: true }
-      );
+      const res = await fetch('/api/ingest-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          products: toSave.map(p => ({
+            name: p.name,
+            rakuten_item_code: p.rakuten_item_code || null,
+            image_url: p.image || null,
+            category,
+            sub_category: '本体',
+            brand: p.brand && p.brand !== 'メーカー不明' ? p.brand : null,
+            rating: p.rating || 4.0,
+            reviews_count: p.reviews_count || 0,
+            ai_analysis: p.ai_analysis || null,
+            shops: (p.shops || []).map(s => ({
+              shop_name: s.shop_name || s.name,
+              shop_type: s.shop_type || 'mall',
+              lowest_price: s.lowest_price ?? s.price ?? 0,
+              url: s.url,
+              source: s.source || p.source || null,
+            })),
+          })),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      const ingested = data?.ingested || [];
+      if (ingested.length > 0) {
+        // 取り込めた商品に自サイトの正規ページID(UUID)を紐づけ、共有/リンクに使う。
+        const findHit = (p) => {
+          const norm = siteCode(p.rakuten_item_code);
+          return ingested.find(g => (norm && g.rakuten_item_code === norm) || g.name === p.name);
+        };
+        setSearchResults(prev => prev.map(p => {
+          const hit = findHit(p);
+          return hit ? { ...p, _siteId: hit.id } : p;
+        }));
+        setSelectedProduct(prev => {
+          if (!prev) return prev;
+          const hit = findHit(prev);
+          return hit ? { ...prev, _siteId: hit.id } : prev;
+        });
+      }
     } catch { }
   };
 
@@ -1934,6 +1973,7 @@ const App = () => {
 
       const rakutenItems = rakutenResult.status === 'fulfilled'
         ? (rakutenResult.value.products || []).map(item => ({
+          code: item.id, // 安定コード（rakuten-{itemCode}）→ DB取り込み・自サイトURLに使う
           name: item.name,
           price: item.price,
           url: item.url,
@@ -1944,6 +1984,7 @@ const App = () => {
 
       const yahooItems = yahooResult.status === 'fulfilled'
         ? (yahooResult.value.products || []).map(item => ({
+          code: item.id, // 安定コード（yahoo-{code}）
           name: item.name,
           price: item.price,
           url: item.url,
@@ -1963,9 +2004,14 @@ const App = () => {
         return;
       }
 
+      // URL→安定コード/source の対応表（AI厳選後の商品にコードを復元するため）
+      const metaByUrl = new Map(raw.filter(p => p.url).map(p => [p.url, { code: p.code, source: p.source }]));
+
       // 生データから整形する共通関数
       const formatRawItems = (items) => items.map((p, i) => ({
         id: `remote-${i}-${Date.now()}`,
+        rakuten_item_code: p.code || null,
+        source: p.source,
         name: p.name,
         brand: "メーカー不明",
         category: keyword,
@@ -1977,7 +2023,8 @@ const App = () => {
           shop_name: p.source === 'rakuten' ? '楽天市場' : 'Yahoo!ショッピング',
           shop_type: 'mall',
           lowest_price: p.price,
-          url: p.url
+          url: p.url,
+          source: p.source
         }]
       }));
 
@@ -2014,22 +2061,29 @@ const App = () => {
         const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 
         if (cleanedProducts.length > 0) {
-          formatted = cleanedProducts.map((p, i) => ({
-            id: `remote-${i}-${Date.now()}`,
-            name: p.name,
-            brand: p.brand || "メーカー不明",
-            category: keyword,
-            image: p.image,
-            rating: 4.0 + (Math.random() * 1.0),
-            reviews_count: Math.floor(Math.random() * 500) + 50,
-            ai_analysis: p.aiAnalysis,
-            shops: [{
-              shop_name: getShopNameFromUrl(p.url),
-              shop_type: 'mall',
-              lowest_price: p.price,
-              url: p.url
-            }]
-          }));
+          formatted = cleanedProducts.map((p, i) => {
+            const meta = metaByUrl.get(p.url) || {};
+            const source = meta.source || p.source || 'rakuten';
+            return {
+              id: `remote-${i}-${Date.now()}`,
+              rakuten_item_code: meta.code || null,
+              source,
+              name: p.name,
+              brand: p.brand || "メーカー不明",
+              category: keyword,
+              image: p.image,
+              rating: 4.0 + (Math.random() * 1.0),
+              reviews_count: Math.floor(Math.random() * 500) + 50,
+              ai_analysis: p.aiAnalysis,
+              shops: [{
+                shop_name: getShopNameFromUrl(p.url),
+                shop_type: 'mall',
+                lowest_price: p.price,
+                url: p.url,
+                source
+              }]
+            };
+          });
         } else {
           // Gemini が空を返したら生データにフォールバック
           formatted = formatRawItems(allItems);
@@ -2734,9 +2788,11 @@ ${userText}
     // /product/[id] への実遷移はSSRページ（Google・直アクセス向け）が担う。
     // ただしremote-始まりのIDはDB未登録の一時商品（AIフォールバック検索結果）のため、
     // SSRページが存在せず404になる。URL書き換え・共有リンクの対象から除外する。
-    const isPersisted = !String(product.id).startsWith('remote-');
-    if (isPersisted && typeof window !== 'undefined') {
-      window.history.replaceState(null, '', `/product/${encodeURIComponent(product.id)}`);
+    // 取り込み済み(検索商品)は自サイトの正規ページID(UUID)を使う。
+    const persistedId = product._siteId
+      || (!String(product.id).startsWith('remote-') ? product.id : null);
+    if (persistedId && typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `/product/${encodeURIComponent(persistedId)}`);
     }
 
     setRecentlyViewed(prev => {
@@ -2775,9 +2831,14 @@ ${userText}
   //  - remote(検索の一時商品): DBに無く /product/[id] が404になるため、実際の出品URLを共有
   const getShareUrl = () => {
     if (!selectedProduct) return 'https://honestbaby-care.com/';
-    if (!String(selectedProduct.id).startsWith('remote-')) {
-      return `https://honestbaby-care.com/product/${selectedProduct.id}`;
+    // 取り込み済み(検索商品)は自サイトの正規ページ(UUID)を使う。
+    if (selectedProduct._siteId) {
+      return `https://honestbaby-care.com/product/${selectedProduct._siteId}`;
     }
+    if (!String(selectedProduct.id).startsWith('remote-')) {
+      return `https://honestbaby-care.com/product/${encodeURIComponent(selectedProduct.id)}`;
+    }
+    // 未取り込みのremote商品は404を避け、実際の出品URLを共有する。
     const listingUrl = (selectedProduct.shops || [])
       .map(s => s.url || (s.sellers || [])[0]?.url)
       .find(Boolean);
