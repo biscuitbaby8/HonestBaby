@@ -169,6 +169,8 @@ const categoryGenreMap = [
   { keywords: ['離乳食', '食器', 'スプーン', 'マグ', 'ベビーフード'], genreId: '213980', category: '離乳食・食器' },
   { keywords: ['お風呂', 'バス', 'ベビーバス', '沐浴'], genreId: '200815', category: 'お風呂用品' },
   { keywords: ['ゲート', 'ガード', 'ベビーモニター', '安全'], genreId: '200841', category: '安全グッズ' },
+  // 絵本は楽天で「本・雑誌・コミック」ジャンル配下のため、ベビー用品ジャンルIDを指定せずキーワードのみで判定する
+  { keywords: ['絵本', 'えほん', 'しかけ絵本'], genreId: '', category: '絵本', skipGenre: true },
 ];
 
 // おむつサイズマッピング（検索精度向上用）
