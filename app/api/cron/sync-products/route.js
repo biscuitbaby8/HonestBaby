@@ -1521,7 +1521,8 @@ export async function GET(request) {
     log.push(`🎯 フィルタ適用: カテゴリ「${filterCat}」のみ同期します`);
   } else if (batch) {
     // 1バッチ=1カテゴリ（ジャンル非制約で取得量が増え、2カテゴリだと60秒制限を超えたため）。
-    // 全15カテゴリ → batch 1〜15。vercel.json で時間帯を分散。
+    // 全16カテゴリ → batch 1〜16。vercel.json で時間帯を分散。
+    // ★カテゴリ追加・順序変更時は CATEGORIES の件数とvercel.jsonのbatch数を必ず一致させること
     const BATCH_SIZE = 1;
     const batchNum = parseInt(batch, 10);
     if (!Number.isInteger(batchNum) || batchNum < 1) {
