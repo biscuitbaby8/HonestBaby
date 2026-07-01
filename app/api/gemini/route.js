@@ -25,7 +25,7 @@ export async function POST(request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'qwen/qwen3.6-27b',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 1024,
         temperature: 0.3,
