@@ -8,6 +8,7 @@ export const revalidate = 3600;
 export default async function sitemap() {
   const staticEntries = [
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1.0 },
+    { url: `${SITE_URL}/iherb`, changeFrequency: 'weekly', priority: 0.7 },
   ];
 
   const categoryEntries = CATEGORY_TREE.filter((c) => c.name !== 'すべて').map((c) => ({
