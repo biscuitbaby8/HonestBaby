@@ -29,6 +29,8 @@ export async function POST(request) {
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 1024,
         temperature: 0.3,
+        reasoning_effort: 'none',
+        reasoning_format: 'hidden',
       }),
     });
 
@@ -39,7 +41,10 @@ export async function POST(request) {
       return Response.json({ text: '', error: errMsg }, { status: 200 });
     }
 
-    const text = data.choices?.[0]?.message?.content || '';
+    // reasoning_format:'hidden' で通常は混入しないが、モデル側の挙動変化に備えた保険として
+    // 万一<think>ブロックが残っていても本文からは除去する。
+    const rawText = data.choices?.[0]?.message?.content || '';
+    const text = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     return Response.json({ text }, { status: 200 });
   } catch (error) {
     return Response.json({ text: '', error: error.message }, { status: 200 });
