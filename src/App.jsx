@@ -362,12 +362,12 @@ const getLowestPrice = (shops) => {
 
 // Yahoo!ショッピング BONUS+優良ストア日（不定期のため毎月更新）
 const YAHOO_BONUS_PLUS_DATES = [
-  '2026-06-04',
-  '2026-06-08',
-  '2026-06-17',
-  '2026-06-23',
-  '2026-06-27',
-  '2026-06-29',
+  '2026-07-03',
+  '2026-07-06',
+  '2026-07-17',
+  '2026-07-20',
+  '2026-07-23',
+  '2026-07-29',
 ];
 
 const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
