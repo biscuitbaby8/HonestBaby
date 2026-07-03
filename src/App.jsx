@@ -403,6 +403,36 @@ const getYahooSaleEvents = (fromDate, count = 5) => {
   return results;
 };
 
+// 楽天市場お得な日（固定ルールのため毎月更新不要）
+const getRakutenSaleEvents = (fromDate, count = 5) => {
+  const today = toYMD(fromDate);
+  const results = [];
+  const seen = new Set();
+
+  for (let i = 0; i < 90 && results.length < count; i++) {
+    const d = new Date(fromDate);
+    d.setDate(fromDate.getDate() + i);
+    const ymd = toYMD(d);
+    const day = d.getDate();
+
+    const events = [];
+    if (day === 5 || day === 10 || day === 15 || day === 20 || day === 25 || day === 30) {
+      events.push({ name: '5と0のつく日', bonus: '+3%', color: 'red' });
+    }
+    if (day === 18) events.push({ name: 'ご愛顧感謝デー', bonus: '+4%', color: 'red' });
+
+    events.forEach(ev => {
+      const key = `${ymd}-${ev.name}`;
+      if (!seen.has(key) && results.length < count) {
+        seen.add(key);
+        results.push({ ...ev, date: ymd, isToday: ymd === today, dateObj: d });
+      }
+    });
+  }
+
+  return results;
+};
+
 
 // ValueCommerce MyLink: 対象ドメインのURLをアフィリエイトURLにラップ
 const VC_SID = process.env.NEXT_PUBLIC_VC_SID || '3768537';
@@ -4340,6 +4370,41 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           <span className="text-xs font-black text-[#8E8282]">{ev.name}</span>
                         </div>
                         <span className="text-xs font-black text-[#E07A30]">{ev.bonus}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
+
+            {/* 楽天市場 お得な日 */}
+            {(() => {
+              const hasRakuten =
+                (selectedProduct.shops || []).some(s => (s.name || '').includes('楽天')) ||
+                crossPlatformShops.some(s => s.source === 'rakuten');
+              if (!hasRakuten) return null;
+              const events = getRakutenSaleEvents(new Date(), 3);
+              if (!events.length) return null;
+              const fmtDate = (d) => {
+                const m = d.getMonth() + 1;
+                const day = d.getDate();
+                const dows = ['日', '月', '火', '水', '木', '金', '土'];
+                return `${m}月${day}日（${dows[d.getDay()]}）`;
+              };
+              return (
+                <section className="mb-8 bg-white border border-[#F7C9C9] rounded-[2rem] p-6 shadow-sm">
+                  <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-4">
+                    <span className="text-base">🛍️</span> 楽天市場のお得な日
+                  </h3>
+                  <div className="space-y-2">
+                    {events.map((ev, i) => (
+                      <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${ev.isToday ? 'bg-[#FDEDED] border border-[#F7C9C9]' : 'bg-[#F9F6F3]'}`}>
+                        <div className="flex items-center gap-2">
+                          {ev.isToday && <span className="text-[10px] font-black text-white bg-[#BF3F3F] px-2 py-0.5 rounded-full">今日</span>}
+                          <span className="text-xs font-bold text-[#5A4C4C]">{fmtDate(ev.dateObj)}</span>
+                          <span className="text-xs font-black text-[#8E8282]">{ev.name}</span>
+                        </div>
+                        <span className="text-xs font-black text-[#BF3F3F]">{ev.bonus}</span>
                       </div>
                     ))}
                   </div>
