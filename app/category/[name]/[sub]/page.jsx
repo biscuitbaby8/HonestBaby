@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { CATEGORY_TREE, formatDbProduct } from '@/src/lib/products';
+import { CATEGORY_GUIDES } from '@/src/lib/categoryGuides';
+import GuideModalButton from '@/src/components/GuideModalButton';
 import SiteHeader from '@/src/components/SiteHeader';
 import CategoryClient from '@/src/components/CategoryClient';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
@@ -106,6 +108,9 @@ export default async function SubCategoryPage({ params }) {
 
         <h1 className="text-xl font-black mb-1 mt-4">{meta.title}</h1>
         <p className="text-xs text-[#8E8282] font-bold mb-4 leading-relaxed">{meta.desc}</p>
+
+        {/* 選び方ガイド（親カテゴリのガイドをモーダルで表示） */}
+        <GuideModalButton guide={CATEGORY_GUIDES[cat] || null} />
 
         {/* クライアント側: サブカテゴリ(リンク)・サブサブ・ソート・商品グリッド */}
         <CategoryClient products={products} cat={cat} sub={sub} />
