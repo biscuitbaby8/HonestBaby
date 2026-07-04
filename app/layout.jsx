@@ -1,4 +1,5 @@
 import Script from 'next/script';
+import AffiliateClickTracker from '../src/components/AffiliateClickTracker';
 import '../src/index.css';
 
 const SITE_URL = 'https://honestbaby-care.com';
@@ -79,6 +80,7 @@ export default function RootLayout({ children }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
         />
         {children}
+        <AffiliateClickTracker />
 
         {/* Google Analytics (GA4) */}
         <Script
