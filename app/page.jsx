@@ -21,6 +21,20 @@ export const metadata = {
 
 const CATEGORY_NAMES = CATEGORY_TREE.map((c) => c.name).filter((n) => n !== 'すべて');
 
+async function fetchLatestArticles() {
+  try {
+    const { data } = await supabaseServer
+      .from('articles')
+      .select('slug, title, meta_description')
+      .eq('published', true)
+      .order('created_at', { ascending: false })
+      .limit(4);
+    return data || [];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchTopProducts() {
   try {
     const { data } = await supabaseServer
@@ -36,7 +50,7 @@ async function fetchTopProducts() {
 }
 
 export default async function Page() {
-  const products = await fetchTopProducts();
+  const [products, articles] = await Promise.all([fetchTopProducts(), fetchLatestArticles()]);
 
   return (
     <HomeClient>
@@ -45,7 +59,7 @@ export default async function Page() {
       <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
         <main className="max-w-5xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-black leading-snug mb-3">
-            本当に良いベビー用品が見つかる、忖度なし比較サイト | HonestBaby
+            本当に良いベビー用品が見つかる、忖度なし比較サイト HonestBaby
           </h1>
           <p className="text-sm text-[#8E8282] font-bold leading-relaxed mb-6">
             パパ・ママのリアルな口コミと、楽天・Yahoo!ショッピングの最安値比較で、
@@ -63,7 +77,7 @@ export default async function Page() {
                     href={`/category/${encodeURIComponent(name)}`}
                     className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]"
                   >
-                    {CAT_META[name]?.title?.split(/[比較|]/)[0]?.trim() || name}
+                    {name}
                   </Link>
                 </li>
               ))}
@@ -111,6 +125,33 @@ export default async function Page() {
                   );
                 })}
               </ul>
+            </section>
+          )}
+
+          {/* 選び方ガイド・記事（内部リンク） */}
+          {articles.length > 0 && (
+            <section className="mt-10">
+              <h2 className="text-lg font-black mb-4">選び方ガイド・記事</h2>
+              <ul className="space-y-3">
+                {articles.map((a) => (
+                  <li key={a.slug}>
+                    <Link
+                      href={`/article/${encodeURIComponent(a.slug)}`}
+                      className="block bg-white rounded-2xl border border-[#F4EFEB] p-4 hover:shadow-sm"
+                    >
+                      <p className="text-sm font-bold leading-snug mb-1">{a.title}</p>
+                      {a.meta_description && (
+                        <p className="text-xs text-[#8E8282] leading-relaxed line-clamp-2">
+                          {a.meta_description}
+                        </p>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/article" className="inline-block mt-3 text-xs font-black text-[#7B8E76] hover:underline">
+                記事・ガイドをすべて見る →
+              </Link>
             </section>
           )}
         </main>

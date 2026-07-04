@@ -1,16 +1,27 @@
 'use client';
+import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { CATEGORY_TREE, CATEGORY_AGE_SUGGESTIONS, getLowestPrice } from '../lib/products';
-import { CATEGORY_GUIDES } from '../lib/categoryGuides';
 import ProductCardLink from './ProductCardLink';
 
 // subs は string | { name, subsubs? } の混在
 const getSubName = (sub) => (typeof sub === 'string' ? sub : sub.name);
 
-export default function CategoryClient({ products, cat }) {
-  const [subCat, setSubCat] = useState('すべて');
+// サブカテゴリは URL（/category/[name]/[sub]）で表す。クローラーが辿れる
+// 実リンクになり、サブカテゴリごとに検索ランディングページを持てる。
+// サブサブ（サイズ・月齢）とソートは従来通りクライアント状態。
+export default function CategoryClient({ products, cat, sub = null }) {
+  const subCat = sub || 'すべて';
   const [subSubCat, setSubSubCat] = useState('すべて');
   const [sortOrder, setSortOrder] = useState('standard');
+
+  // 月齢サジェストからの遷移（?ss=M など）でサブサブ初期値を受け取る
+  useEffect(() => {
+    try {
+      const ss = new URLSearchParams(window.location.search).get('ss');
+      if (ss) setSubSubCat(ss);
+    } catch { /* noop */ }
+  }, []);
 
   // サーバーレンダリング対象のためlocalStorageは初期値に使えず、useEffectで読み込む
   const [babyInfo, setBabyInfo] = useState(null);
@@ -39,7 +50,16 @@ export default function CategoryClient({ products, cat }) {
   const currentSubEntry = subs.find((s) => getSubName(s) === subCat);
   const subsubs = currentSubEntry?.subsubs || [];
 
-  const guide = CATEGORY_GUIDES[cat];
+  const subHref = (name) =>
+    name === 'すべて'
+      ? `/category/${encodeURIComponent(cat)}`
+      : `/category/${encodeURIComponent(cat)}/${encodeURIComponent(name)}`;
+
+  // 月齢サジェストの遷移先（sub指定ありならそのページへ、subsubは ?ss= で引き継ぐ）
+  const suggestionHref = ageSuggestionEntry
+    ? subHref(ageSuggestionEntry.sub || subCat) +
+      (ageSuggestionEntry.subsub ? `?ss=${encodeURIComponent(ageSuggestionEntry.subsub)}` : '')
+    : null;
 
   const filtered = useMemo(() => {
     let result = products.filter((p) => {
@@ -66,32 +86,30 @@ export default function CategoryClient({ products, cat }) {
             {babyInfo.name || 'お子さま'}（{babyAgeLabel}）には<br />
             <span className="text-[#F2ABAC] font-black">{ageSuggestionEntry.label}</span>がおすすめです
           </p>
-          <button
-            onClick={() => {
-              if (ageSuggestionEntry.sub) setSubCat(ageSuggestionEntry.sub);
-              setSubSubCat(ageSuggestionEntry.subsub || 'すべて');
-            }}
+          <Link
+            href={suggestionHref}
+            onClick={() => setSubSubCat(ageSuggestionEntry.subsub || 'すべて')}
             className="bg-[#F2ABAC] text-white text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform whitespace-nowrap ml-3"
           >
             {ageSuggestionEntry.label}を見る
-          </button>
+          </Link>
         </div>
       )}
 
-      {/* サブカテゴリタブ */}
+      {/* サブカテゴリタブ（実リンク: サブカテゴリページへ） */}
       {subNames.length > 0 && (
         <div className="mb-3">
           <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1 lg:flex-wrap lg:overflow-visible lg:mx-0 lg:px-0">
-            {['すべて', ...subNames].map((sub) => (
-              <button
-                key={sub}
-                onClick={() => { setSubCat(sub); setSubSubCat('すべて'); }}
+            {['すべて', ...subNames].map((name) => (
+              <Link
+                key={name}
+                href={subHref(name)}
                 className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all duration-150 active:scale-95 ${
-                  subCat === sub ? 'bg-[#5A4C4C] text-white shadow-sm' : 'bg-[#F0EBE6] text-[#7B8E76]'
+                  subCat === name ? 'bg-[#5A4C4C] text-white shadow-sm' : 'bg-[#F0EBE6] text-[#7B8E76]'
                 }`}
               >
-                {sub}
-              </button>
+                {name}
+              </Link>
             ))}
           </div>
         </div>
@@ -147,39 +165,6 @@ export default function CategoryClient({ products, cat }) {
             <ProductCardLink key={p.id} product={p} />
           ))}
         </div>
-      )}
-
-      {/* 選び方ガイド本文（薄いコンテンツ対策・SEO用） */}
-      {guide && (
-        <section className="bg-white rounded-[2rem] border border-[#F4EFEB] p-6 mb-10">
-          <h2 className="text-base font-black text-[#5A4C4C] mb-3">{guide.heading}</h2>
-          <p className="text-xs text-[#8E8282] font-bold leading-relaxed mb-5">{guide.intro}</p>
-
-          {guide.types?.length > 0 && (
-            <div className="space-y-3 mb-6">
-              {guide.types.map((t) => (
-                <div key={t.name}>
-                  <p className="text-xs font-black text-[#7B8E76] mb-1">{t.name}</p>
-                  <p className="text-xs text-[#8E8282] leading-relaxed">{t.body}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {guide.checklist?.length > 0 && (
-            <div>
-              <p className="text-xs font-black text-[#5A4C4C] mb-2">忖度なしチェックポイント</p>
-              <ul className="space-y-1.5">
-                {guide.checklist.map((item, i) => (
-                  <li key={i} className="text-xs text-[#8E8282] leading-relaxed flex gap-1.5">
-                    <span className="text-[#7B8E76] font-black">{i + 1}.</span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
       )}
     </>
   );

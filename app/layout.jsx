@@ -1,4 +1,5 @@
 import Script from 'next/script';
+import AffiliateClickTracker from '../src/components/AffiliateClickTracker';
 import '../src/index.css';
 
 const SITE_URL = 'https://honestbaby-care.com';
@@ -8,7 +9,8 @@ const DESCRIPTION =
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
-  title: TITLE,
+  // 子ページは title に文字列だけ設定すればテンプレートが適用される
+  title: { default: TITLE, template: '%s | HonestBaby' },
   description: DESCRIPTION,
   icons: {
     icon: [
@@ -78,6 +80,7 @@ export default function RootLayout({ children }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
         />
         {children}
+        <AffiliateClickTracker />
 
         {/* Google Analytics (GA4) */}
         <Script

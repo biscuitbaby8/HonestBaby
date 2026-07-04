@@ -8,14 +8,25 @@ export const revalidate = 3600;
 export default async function sitemap() {
   const staticEntries = [
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1.0 },
+    { url: `${SITE_URL}/article`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${SITE_URL}/iherb`, changeFrequency: 'weekly', priority: 0.7 },
   ];
 
-  const categoryEntries = CATEGORY_TREE.filter((c) => c.name !== 'すべて').map((c) => ({
+  const categories = CATEGORY_TREE.filter((c) => c.name !== 'すべて');
+  const categoryEntries = categories.map((c) => ({
     url: `${SITE_URL}/category/${encodeURIComponent(c.name)}`,
     changeFrequency: 'daily',
     priority: 0.9,
   }));
+
+  // サブカテゴリ（/category/[name]/[sub]）。subs は string | { name } の混在。
+  const subCategoryEntries = categories.flatMap((c) =>
+    (c.subs || []).map((s) => ({
+      url: `${SITE_URL}/category/${encodeURIComponent(c.name)}/${encodeURIComponent(typeof s === 'string' ? s : s.name)}`,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    }))
+  );
 
   let productEntries = [];
   try {
@@ -35,5 +46,47 @@ export default async function sitemap() {
     // Supabase 未設定時はビルドを止めない
   }
 
-  return [...staticEntries, ...categoryEntries, ...productEntries];
+  let brandEntries = [];
+  try {
+    const { data: brandRows } = await supabaseServer
+      .from('products')
+      .select('brand')
+      .not('brand', 'is', null)
+      .or('is_blocked.is.null,is_blocked.eq.false');
+
+    const brands = [...new Set((brandRows || []).map((r) => r.brand).filter(Boolean))];
+    brandEntries = brands.map((b) => ({
+      url: `${SITE_URL}/brand/${encodeURIComponent(b)}`,
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    }));
+  } catch {
+    // Supabase 未設定時はビルドを止めない
+  }
+
+  let articleEntries = [];
+  try {
+    const { data: articles } = await supabaseServer
+      .from('articles')
+      .select('slug, created_at')
+      .eq('published', true);
+
+    articleEntries = (articles || []).map((a) => ({
+      url: `${SITE_URL}/article/${encodeURIComponent(a.slug)}`,
+      lastModified: a.created_at ? new Date(a.created_at) : new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    }));
+  } catch {
+    // Supabase 未設定時はビルドを止めない
+  }
+
+  return [
+    ...staticEntries,
+    ...categoryEntries,
+    ...subCategoryEntries,
+    ...brandEntries,
+    ...articleEntries,
+    ...productEntries,
+  ];
 }

@@ -10,7 +10,7 @@ const SITE_URL = 'https://honestbaby-care.com';
 export const revalidate = 3600;
 
 export function generateMetadata() {
-  const title = 'iHerbで買えるベビー・マタニティ用品まとめ | HonestBaby';
+  const title = 'iHerbで買えるベビー・マタニティ用品まとめ';
   const desc = 'iHerbで購入できるベビーオイル・マタニティサプリ・スキンケアをまとめて紹介。海外の人気ナチュラルケア用品を口コミと価格でチェック。';
   const url = `${SITE_URL}/iherb`;
   return {
