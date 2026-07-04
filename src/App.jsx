@@ -38,7 +38,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   }
 };
 import { supabase } from './lib/supabaseClient';
-import { toVCUrl } from './lib/affiliate';
+import { toVCUrl, getAmazonUrl } from './lib/affiliate';
 import ProductCard from './components/ProductCard';
 
 // ＝＝＝＝＝ 商品データはSupabaseから取得します ＝＝＝＝＝
@@ -434,12 +434,6 @@ const getRakutenSaleEvents = (fromDate, count = 5) => {
   return results;
 };
 
-
-const AMAZON_TAG = process.env.NEXT_PUBLIC_AMAZON_TAG || 'honestbaby-22';
-
-const getAmazonUrl = (keyword) => {
-  return `https://www.amazon.co.jp/s?k=${encodeURIComponent(keyword)}&tag=${AMAZON_TAG}`;
-};
 
 // 付属品・交換部品の判定（本体より安い部品を本体として誤表示しないため）。
 // クロスプラットフォーム比較・検索の両方で共用する。

@@ -21,6 +21,12 @@ export const toVCUrl = (url) => {
   }
 };
 
+// Amazonアソシエイトの検索結果リンク（PA-API導入までの暫定形）。
+// SPAの商品モーダルとSSR商品ページで共用する。
+const AMAZON_TAG = process.env.NEXT_PUBLIC_AMAZON_TAG || 'honestbaby-22';
+export const getAmazonUrl = (keyword) =>
+  `https://www.amazon.co.jp/s?k=${encodeURIComponent(keyword)}&tag=${AMAZON_TAG}`;
+
 // iHerb（Partnerize経由）のアフィリエイトトラッキングURLを付与する。
 // Camref未設定（審査待ち）の間は元URLをそのまま返す安全側フォールバック。
 export function addIherbAffiliate(rawUrl) {
