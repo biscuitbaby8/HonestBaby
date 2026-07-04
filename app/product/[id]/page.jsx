@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
-import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage } from '@/src/lib/products';
+import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
@@ -55,8 +55,9 @@ export async function generateMetadata({ params }) {
   const product = await fetchProduct(id);
   if (!product) return { title: 'HonestBaby' };
 
-  const title = `${product.name} の最安値・価格比較`;
-  const desc = `${product.name}の最安値・価格比較。評価${product.rating || ''}★。楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`;
+  const shortName = cleanProductName(product.name);
+  const title = `${shortName} の最安値・価格比較`;
+  const desc = `${shortName}の最安値・価格比較。${product.rating > 0 ? `評価${product.rating}★。` : ''}楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`;
   const url = `${SITE_URL}/product/${encodeURIComponent(product.id)}`;
   return {
     title,
@@ -96,11 +97,16 @@ export default async function ProductPage({ params }) {
   const reviewCount = Number(product.reviewsCount) || reviews.length || 0;
   const hasRating = product.rating > 0 && reviewCount > 0;
 
+  const pageUrl = `${SITE_URL}/product/${encodeURIComponent(product.id)}`;
   const productLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
     image: product.image,
+    url: pageUrl,
+    ...(product.description
+      ? { description: String(product.description).slice(0, 500) }
+      : {}),
     ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
     ...(price > 0 && {
       offers: {
@@ -119,6 +125,17 @@ export default async function ProductPage({ params }) {
         bestRating: 5,
         worstRating: 1,
       },
+      // 個別レビュー（aggregateRating がある場合のみ、上位3件）
+      ...(reviews.length > 0 && {
+        review: reviews.slice(0, 3).map((r) => ({
+          '@type': 'Review',
+          ...(r.rating && {
+            reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
+          }),
+          author: { '@type': 'Person', name: r.user_name || 'ユーザー' },
+          reviewBody: r.comment,
+        })),
+      }),
     }),
   };
 
@@ -231,6 +248,20 @@ export default async function ProductPage({ params }) {
             </Link>
           </div>
         </div>
+
+        {product.description && (
+          <section className="mt-8 bg-white rounded-[2rem] border border-[#F4EFEB] p-6">
+            <h2 className="text-lg font-black mb-3">商品説明</h2>
+            <p className="text-xs text-[#8E8282] leading-relaxed whitespace-pre-line">{product.description}</p>
+          </section>
+        )}
+
+        {product.aiAnalysis && (
+          <section className="mt-8 bg-white rounded-[2rem] border border-[#F4EFEB] p-6">
+            <h2 className="text-lg font-black mb-3">HonestBaby のAI分析</h2>
+            <p className="text-xs text-[#8E8282] leading-relaxed whitespace-pre-line">{product.aiAnalysis}</p>
+          </section>
+        )}
 
         {reviews.length > 0 && (
           <section className="mt-8">

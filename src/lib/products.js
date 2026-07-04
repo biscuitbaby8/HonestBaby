@@ -79,6 +79,24 @@ export const CAT_META = {
   'レンタル':     { title: 'ベビー用品レンタル比較', desc: 'ベビーカー・チャイルドシート・ベビーベッドなど、楽天市場のレンタルサービスを比較。短い期間しか使わないアイテムはレンタルがお得です。' },
 };
 
+// 楽天・Yahoo由来の商品名は【送料無料】等の販促ノイズで長くなりがちで、
+// そのまま<title>に使うと全商品ページが類似タイトルになりCTRも下がる。
+// 販促ブロックだけを除去し、長すぎる場合は語境界で切り詰める（SEO用）。
+const PROMO_WORDS_RE = /(送料無料|ポイント\d*倍|クーポン|あす楽|即納|翌日発送|正規品|公式|ラッピング|のし|熨斗|母の日|父の日|ギフト対応|ランキング\d*位|楽天\S*1位|SALE|セール|期間限定|割引|%OFF|お買い物マラソン|スーパーセール|レビュー特典|プレゼント付き?)/i;
+export const cleanProductName = (name, maxLen = 50) => {
+  let n = String(name || '');
+  n = n.replace(/[【\[（(]([^】\]）)]*)[】\]）)]/g, (m, inner) =>
+    PROMO_WORDS_RE.test(inner) ? ' ' : m
+  );
+  n = n.replace(/\s+/g, ' ').trim();
+  if (n.length > maxLen) {
+    const cut = n.slice(0, maxLen);
+    const lastSpace = cut.lastIndexOf(' ');
+    n = (lastSpace > maxLen * 0.6 ? cut.slice(0, lastSpace) : cut).trim();
+  }
+  return n || String(name || '');
+};
+
 export const getHighResImage = (url) => {
   if (!url) return 'https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby';
   try {
