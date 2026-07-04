@@ -12,7 +12,7 @@ import {
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
-import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, categorizeByName } from './lib/products';
+import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, getHighResImage, categorizeByName } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -462,24 +462,6 @@ const toVCUrl = (url) => {
     if (!pid) return url;
     return `https://ck.jp.ap.valuecommerce.com/servlet/referral?sid=${VC_SID}&pid=${pid}&vc_url=${encodeURIComponent(normalized)}`;
   } catch {
-    return url;
-  }
-};
-
-const getHighResImage = (url) => {
-  if (!url) return "https://placehold.jp/24/7b8e76/ffffff/400x400.png?text=Honest+Baby";
-  try {
-    // 楽天: ?_ex=NxN を 1000x1000 に上書き（元のサイズより大きくする）
-    if (url.indexOf('rakuten.co.jp') !== -1) {
-      return url.split('?_ex=')[0] + '?_ex=1000x1000';
-    }
-    // Yahoo yimg.jp: /i/j/ は存在しないショップが多く画像が表示されないため、
-    // 確実に表示できる native medium (/i/g/) を使う（その他のサイズコードは温存）。
-    if (url.indexOf('yimg.jp') !== -1) {
-      return url.replace(/\/i\/j\//, '/i/g/');
-    }
-    return url;
-  } catch (e) {
     return url;
   }
 };
