@@ -197,7 +197,14 @@ export default async function ProductPage({ params }) {
               {product.rating > 0 && (
                 <span className="bg-[#FFF9E6] text-[#D4AF37] px-2.5 py-1 rounded-full text-xs font-black">★ {product.rating}</span>
               )}
-              {product.brand && <span className="text-xs text-[#8E8282] font-bold">{product.brand}</span>}
+              {product.brand && (
+                <Link
+                  href={`/brand/${encodeURIComponent(product.brand)}`}
+                  className="text-xs text-[#8E8282] font-bold hover:text-[#7B8E76] underline decoration-dotted underline-offset-2"
+                >
+                  {product.brand}
+                </Link>
+              )}
             </div>
             <p className="text-3xl font-black text-[#7B8E76] leading-none mb-6">
               <span className="text-base mr-1">¥</span>

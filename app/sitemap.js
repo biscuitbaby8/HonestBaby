@@ -46,6 +46,24 @@ export default async function sitemap() {
     // Supabase 未設定時はビルドを止めない
   }
 
+  let brandEntries = [];
+  try {
+    const { data: brandRows } = await supabaseServer
+      .from('products')
+      .select('brand')
+      .not('brand', 'is', null)
+      .or('is_blocked.is.null,is_blocked.eq.false');
+
+    const brands = [...new Set((brandRows || []).map((r) => r.brand).filter(Boolean))];
+    brandEntries = brands.map((b) => ({
+      url: `${SITE_URL}/brand/${encodeURIComponent(b)}`,
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    }));
+  } catch {
+    // Supabase 未設定時はビルドを止めない
+  }
+
   let articleEntries = [];
   try {
     const { data: articles } = await supabaseServer
@@ -63,5 +81,12 @@ export default async function sitemap() {
     // Supabase 未設定時はビルドを止めない
   }
 
-  return [...staticEntries, ...categoryEntries, ...subCategoryEntries, ...articleEntries, ...productEntries];
+  return [
+    ...staticEntries,
+    ...categoryEntries,
+    ...subCategoryEntries,
+    ...brandEntries,
+    ...articleEntries,
+    ...productEntries,
+  ];
 }
