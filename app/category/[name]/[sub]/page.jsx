@@ -109,8 +109,16 @@ export default async function SubCategoryPage({ params }) {
         <h1 className="text-xl font-black mb-1 mt-4">{meta.title}</h1>
         <p className="text-xs text-[#8E8282] font-bold mb-4 leading-relaxed">{meta.desc}</p>
 
-        {/* 選び方ガイド（親カテゴリのガイドをモーダルで表示） */}
-        <GuideModalButton guide={CATEGORY_GUIDES[cat] || null} />
+        {/* 選び方ガイド（親カテゴリのガイドをモーダルで表示）・ランキング導線 */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <GuideModalButton guide={CATEGORY_GUIDES[cat] || null} />
+          <Link
+            href={`/ranking/${encodeURIComponent(cat)}`}
+            className="inline-flex items-center gap-1.5 bg-[#FFF0F0] border border-[#F8D7D8] text-[#D98A8B] text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform"
+          >
+            人気ランキングTOP20 →
+          </Link>
+        </div>
 
         {/* クライアント側: サブカテゴリ(リンク)・サブサブ・ソート・商品グリッド */}
         <CategoryClient products={products} cat={cat} sub={sub} />

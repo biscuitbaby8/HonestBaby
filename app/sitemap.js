@@ -1,6 +1,7 @@
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { CATEGORY_TREE } from '@/src/lib/products';
 import { fetchBrandCounts } from '@/src/lib/brands';
+import { AGE_GUIDES } from '@/src/lib/ageGuides';
 
 const SITE_URL = 'https://honestbaby-care.com';
 
@@ -19,6 +20,20 @@ export default async function sitemap() {
     url: `${SITE_URL}/category/${encodeURIComponent(c.name)}`,
     changeFrequency: 'daily',
     priority: 0.9,
+  }));
+
+  // 月齢別ページ（/age/[slug]）
+  const ageEntries = AGE_GUIDES.map((g) => ({
+    url: `${SITE_URL}/age/${g.slug}`,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
+
+  // カテゴリ別ランキング（/ranking/[category]）
+  const rankingEntries = categories.map((c) => ({
+    url: `${SITE_URL}/ranking/${encodeURIComponent(c.name)}`,
+    changeFrequency: 'daily',
+    priority: 0.8,
   }));
 
   // サブカテゴリ（/category/[name]/[sub]）。subs は string | { name } の混在。
@@ -74,6 +89,8 @@ export default async function sitemap() {
   return [
     ...staticEntries,
     ...categoryEntries,
+    ...ageEntries,
+    ...rankingEntries,
     ...subCategoryEntries,
     ...brandEntries,
     ...articleEntries,

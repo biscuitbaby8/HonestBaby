@@ -15,6 +15,8 @@ export default function ProductCardLink({ product }) {
           src={getProxiedImage(product.image, 'card')}
           className="w-full h-full object-cover rounded-[1.5rem]"
           alt={product.name}
+          width={600}
+          height={600}
           loading="lazy"
           decoding="async"
         />

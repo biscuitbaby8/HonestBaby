@@ -38,6 +38,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   }
 };
 import { supabase } from './lib/supabaseClient';
+import { toVCUrl } from './lib/affiliate';
 import ProductCard from './components/ProductCard';
 
 // ＝＝＝＝＝ 商品データはSupabaseから取得します ＝＝＝＝＝
@@ -434,37 +435,7 @@ const getRakutenSaleEvents = (fromDate, count = 5) => {
 };
 
 
-// ValueCommerce MyLink: 対象ドメインのURLをアフィリエイトURLにラップ
-const VC_SID = process.env.NEXT_PUBLIC_VC_SID || '3768537';
-const VC_DOMAIN_PIDS = {
-  'dadway-onlineshop.com': process.env.NEXT_PUBLIC_VC_PID_DADWAY || '892608374',
-  'ergobaby.jp': process.env.NEXT_PUBLIC_VC_PID_ERGOBABY || '892609670',
-  'shopping.yahoo.co.jp': process.env.NEXT_PUBLIC_VC_PID_YAHOO || '892613329',
-};
 const AMAZON_TAG = process.env.NEXT_PUBLIC_AMAZON_TAG || 'honestbaby-22';
-
-// VAPID公開鍵をUint8Arrayに変換（Web Push API用）
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  const output = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) output[i] = rawData.charCodeAt(i);
-  return output;
-}
-
-const toVCUrl = (url) => {
-  if (!url || url === '#') return url;
-  try {
-    const normalized = url.startsWith('//') ? 'https:' + url : url;
-    const hostname = new URL(normalized).hostname;
-    const pid = Object.entries(VC_DOMAIN_PIDS).find(([domain]) => hostname.includes(domain))?.[1];
-    if (!pid) return url;
-    return `https://ck.jp.ap.valuecommerce.com/servlet/referral?sid=${VC_SID}&pid=${pid}&vc_url=${encodeURIComponent(normalized)}`;
-  } catch {
-    return url;
-  }
-};
 
 const getAmazonUrl = (keyword) => {
   return `https://www.amazon.co.jp/s?k=${encodeURIComponent(keyword)}&tag=${AMAZON_TAG}`;

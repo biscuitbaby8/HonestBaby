@@ -36,6 +36,9 @@ export const metadata = {
   verification: {
     google: 'bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI',
   },
+  alternates: {
+    types: { 'application/rss+xml': [{ url: '/feed.xml', title: 'HonestBaby 記事フィード' }] },
+  },
 };
 
 export const viewport = {

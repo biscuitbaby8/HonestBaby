@@ -1,3 +1,26 @@
+// ValueCommerce 直リンク変換。対応ドメイン（Yahoo!ショッピング・提携公式EC）の
+// URLを ck.jp.ap.valuecommerce.com 経由の成果計測URLに変換する。
+// SPA（App.jsx）とSSR商品ページの両方で使う（NEXT_PUBLIC_はビルド時に両方へ展開される）。
+const VC_SID = process.env.NEXT_PUBLIC_VC_SID || '3768537';
+const VC_DOMAIN_PIDS = {
+  'dadway-onlineshop.com': process.env.NEXT_PUBLIC_VC_PID_DADWAY || '892608374',
+  'ergobaby.jp': process.env.NEXT_PUBLIC_VC_PID_ERGOBABY || '892609670',
+  'shopping.yahoo.co.jp': process.env.NEXT_PUBLIC_VC_PID_YAHOO || '892613329',
+};
+
+export const toVCUrl = (url) => {
+  if (!url || url === '#') return url;
+  try {
+    const normalized = url.startsWith('//') ? 'https:' + url : url;
+    const hostname = new URL(normalized).hostname;
+    const pid = Object.entries(VC_DOMAIN_PIDS).find(([domain]) => hostname.includes(domain))?.[1];
+    if (!pid) return url;
+    return `https://ck.jp.ap.valuecommerce.com/servlet/referral?sid=${VC_SID}&pid=${pid}&vc_url=${encodeURIComponent(normalized)}`;
+  } catch {
+    return url;
+  }
+};
+
 // iHerb（Partnerize経由）のアフィリエイトトラッキングURLを付与する。
 // Camref未設定（審査待ち）の間は元URLをそのまま返す安全側フォールバック。
 export function addIherbAffiliate(rawUrl) {

@@ -132,8 +132,16 @@ export default async function CategoryPage({ params }) {
           {meta?.desc || `${cat}のベビー用品を楽天・Yahooの最安値と口コミで比較。`}
         </p>
 
-        {/* 選び方ガイドをモーダルで開くボタン（ガイドがあるカテゴリのみ） */}
-        <GuideModalButton guide={CATEGORY_GUIDES[cat] || null} />
+        {/* 選び方ガイド・ランキングへのショートカット */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <GuideModalButton guide={CATEGORY_GUIDES[cat] || null} />
+          <Link
+            href={`/ranking/${encodeURIComponent(cat)}`}
+            className="inline-flex items-center gap-1.5 bg-[#FFF0F0] border border-[#F8D7D8] text-[#D98A8B] text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform"
+          >
+            人気ランキングTOP20 →
+          </Link>
+        </div>
 
         {/* クライアント側: サブカテゴリ・ソート・商品グリッド */}
         <CategoryClient products={products} cat={cat} />

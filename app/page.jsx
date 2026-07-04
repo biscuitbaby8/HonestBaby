@@ -9,6 +9,7 @@ import {
   getProxiedImage,
 } from '@/src/lib/products';
 import { fetchBrandCounts } from '@/src/lib/brands';
+import { AGE_GUIDES } from '@/src/lib/ageGuides';
 
 const SITE_URL = 'https://honestbaby-care.com';
 
@@ -84,6 +85,23 @@ export default async function Page() {
                     className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]"
                   >
                     {name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* 月齢別ガイド（内部リンク） */}
+          <nav aria-label="月齢" className="mb-8">
+            <h2 className="text-lg font-black mb-3">月齢から探す</h2>
+            <ul className="flex flex-wrap gap-2">
+              {AGE_GUIDES.map((g) => (
+                <li key={g.slug}>
+                  <Link
+                    href={`/age/${g.slug}`}
+                    className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]"
+                  >
+                    {g.label}
                   </Link>
                 </li>
               ))}
