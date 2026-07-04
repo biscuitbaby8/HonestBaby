@@ -21,6 +21,13 @@ export default async function sitemap() {
     priority: 0.9,
   }));
 
+  // カテゴリ別ランキング（/ranking/[category]）
+  const rankingEntries = categories.map((c) => ({
+    url: `${SITE_URL}/ranking/${encodeURIComponent(c.name)}`,
+    changeFrequency: 'daily',
+    priority: 0.8,
+  }));
+
   // サブカテゴリ（/category/[name]/[sub]）。subs は string | { name } の混在。
   const subCategoryEntries = categories.flatMap((c) =>
     (c.subs || []).map((s) => ({
@@ -74,6 +81,7 @@ export default async function sitemap() {
   return [
     ...staticEntries,
     ...categoryEntries,
+    ...rankingEntries,
     ...subCategoryEntries,
     ...brandEntries,
     ...articleEntries,

@@ -24,7 +24,7 @@ export default function GuideModalButton({ guide }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 bg-[#FFF9E6] border border-[#F2E3AE] text-[#B8933D] text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform mb-4"
+        className="inline-flex items-center gap-1.5 bg-[#FFF9E6] border border-[#F2E3AE] text-[#B8933D] text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform"
       >
         <Lightbulb className="w-3.5 h-3.5" strokeWidth={2.5} />
         選び方ガイドを見る
