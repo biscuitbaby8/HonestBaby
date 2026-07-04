@@ -8,6 +8,7 @@ import {
   getLowestPrice,
   getProxiedImage,
 } from '@/src/lib/products';
+import { fetchBrandCounts } from '@/src/lib/brands';
 
 const SITE_URL = 'https://honestbaby-care.com';
 
@@ -50,7 +51,12 @@ async function fetchTopProducts() {
 }
 
 export default async function Page() {
-  const [products, articles] = await Promise.all([fetchTopProducts(), fetchLatestArticles()]);
+  const [products, articles, brands] = await Promise.all([
+    fetchTopProducts(),
+    fetchLatestArticles(),
+    fetchBrandCounts(),
+  ]);
+  const topBrands = brands.slice(0, 12);
 
   return (
     <HomeClient>
@@ -83,6 +89,33 @@ export default async function Page() {
               ))}
             </ul>
           </nav>
+
+          {/* ブランド一覧（内部リンク） */}
+          {topBrands.length > 0 && (
+            <nav aria-label="ブランド" className="mb-8">
+              <h2 className="text-lg font-black mb-3">ブランドから探す</h2>
+              <ul className="flex flex-wrap gap-2">
+                {topBrands.map((b) => (
+                  <li key={b.name}>
+                    <Link
+                      href={`/brand/${encodeURIComponent(b.name)}`}
+                      className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]"
+                    >
+                      {b.name}
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <Link
+                    href="/brand"
+                    className="inline-block px-4 py-2 rounded-full text-xs font-black text-[#7B8E76] border border-[#7B8E76]/30 hover:bg-[#7B8E76]/5"
+                  >
+                    すべてのブランドを見る →
+                  </Link>
+                </li>
+              </ul>
+            </nav>
+          )}
 
           {/* 人気商品（内部リンク + 構造化テキスト） */}
           {products.length > 0 && (

@@ -1,5 +1,6 @@
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { CATEGORY_TREE } from '@/src/lib/products';
+import { fetchBrandCounts } from '@/src/lib/brands';
 
 const SITE_URL = 'https://honestbaby-care.com';
 
@@ -9,6 +10,7 @@ export default async function sitemap() {
   const staticEntries = [
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1.0 },
     { url: `${SITE_URL}/article`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${SITE_URL}/brand`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${SITE_URL}/iherb`, changeFrequency: 'weekly', priority: 0.7 },
   ];
 
@@ -46,23 +48,11 @@ export default async function sitemap() {
     // Supabase 未設定時はビルドを止めない
   }
 
-  let brandEntries = [];
-  try {
-    const { data: brandRows } = await supabaseServer
-      .from('products')
-      .select('brand')
-      .not('brand', 'is', null)
-      .or('is_blocked.is.null,is_blocked.eq.false');
-
-    const brands = [...new Set((brandRows || []).map((r) => r.brand).filter(Boolean))];
-    brandEntries = brands.map((b) => ({
-      url: `${SITE_URL}/brand/${encodeURIComponent(b)}`,
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    }));
-  } catch {
-    // Supabase 未設定時はビルドを止めない
-  }
+  const brandEntries = (await fetchBrandCounts()).map((b) => ({
+    url: `${SITE_URL}/brand/${encodeURIComponent(b.name)}`,
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  }));
 
   let articleEntries = [];
   try {
