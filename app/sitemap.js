@@ -8,6 +8,7 @@ export const revalidate = 3600;
 export default async function sitemap() {
   const staticEntries = [
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1.0 },
+    { url: `${SITE_URL}/article`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${SITE_URL}/iherb`, changeFrequency: 'weekly', priority: 0.7 },
   ];
 
@@ -35,5 +36,22 @@ export default async function sitemap() {
     // Supabase 未設定時はビルドを止めない
   }
 
-  return [...staticEntries, ...categoryEntries, ...productEntries];
+  let articleEntries = [];
+  try {
+    const { data: articles } = await supabaseServer
+      .from('articles')
+      .select('slug, created_at')
+      .eq('published', true);
+
+    articleEntries = (articles || []).map((a) => ({
+      url: `${SITE_URL}/article/${encodeURIComponent(a.slug)}`,
+      lastModified: a.created_at ? new Date(a.created_at) : new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    }));
+  } catch {
+    // Supabase 未設定時はビルドを止めない
+  }
+
+  return [...staticEntries, ...categoryEntries, ...articleEntries, ...productEntries];
 }
