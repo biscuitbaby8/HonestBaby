@@ -229,12 +229,19 @@ export const formatDbProduct = (p) => {
       if (typeof sellers === 'string') {
         try { sellers = JSON.parse(sellers); } catch { sellers = []; }
       }
+      const sellersArr = Array.isArray(sellers) ? sellers : [];
+      // ショップ代表URL: shops_prices に url 列は無く、URLは sellers 内にのみ
+      // 存在する（楽天はアフィリエイトURL済み）。最安セラーのURLを採用する。
+      const cheapestWithUrl = sellersArr
+        .filter((x) => x && x.url && Number(x.price) > 0)
+        .sort((a, b) => Number(a.price) - Number(b.price))[0];
       return {
         ...s,
         name: s.shop_name,
         type: s.shop_type,
         lowestPrice: s.lowest_price,
-        sellers: Array.isArray(sellers) ? sellers : [],
+        sellers: sellersArr,
+        url: s.url || cheapestWithUrl?.url || null,
       };
     }),
   };

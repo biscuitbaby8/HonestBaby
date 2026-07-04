@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
-import { toVCUrl } from '@/src/lib/affiliate';
+import { toVCUrl, getAmazonUrl } from '@/src/lib/affiliate';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
@@ -222,43 +222,55 @@ export default async function ProductPage({ params }) {
               <span className="text-xs text-[#A5A19E] ml-1 font-normal">{price > 0 ? '〜' : ''}</span>
             </p>
 
-            {shops.length > 0 && (
-              <div className="mb-6">
-                <h2 className="text-sm font-black mb-3">ショップ価格比較</h2>
-                <ul className="space-y-2">
-                  {shops.map((s, i) => {
-                    const periodSellers = (s.sellers || [])
-                      .filter((sl) => sl.period && Number(sl.price) > 0)
-                      .sort((a, b) => Number(a.price) - Number(b.price));
-                    return (
-                      <li key={i} className="bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
-                          <span className="flex items-center gap-3">
-                            <span className="text-sm font-black text-[#7B8E76]">¥{Number(s.lowestPrice).toLocaleString()}</span>
-                            {s.url && (
-                              <a href={toVCUrl(s.url)} target="_blank" rel="noopener noreferrer sponsored" className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full">
-                                見る
-                              </a>
-                            )}
-                          </span>
-                        </div>
-                        {periodSellers.length > 1 && (
-                          <ul className="mt-2 pt-2 border-t border-[#EFE7E0] space-y-1">
-                            {periodSellers.map((sl, j) => (
-                              <li key={j} className="flex items-center justify-between text-[11px]">
-                                <span className="text-[#8E8282] font-bold">{sl.period}</span>
-                                <span className="text-[#5A4C4C] font-black">¥{Number(sl.price).toLocaleString()}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
+            <div className="mb-6">
+              <h2 className="text-sm font-black mb-3">ショップ価格比較</h2>
+              <ul className="space-y-2">
+                {shops.map((s, i) => {
+                  const periodSellers = (s.sellers || [])
+                    .filter((sl) => sl.period && Number(sl.price) > 0)
+                    .sort((a, b) => Number(a.price) - Number(b.price));
+                  return (
+                    <li key={i} className="bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
+                        <span className="flex items-center gap-3">
+                          <span className="text-sm font-black text-[#7B8E76]">¥{Number(s.lowestPrice).toLocaleString()}</span>
+                          {s.url && (
+                            <a href={toVCUrl(s.url)} target="_blank" rel="noopener noreferrer sponsored" className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full">
+                              見る
+                            </a>
+                          )}
+                        </span>
+                      </div>
+                      {periodSellers.length > 1 && (
+                        <ul className="mt-2 pt-2 border-t border-[#EFE7E0] space-y-1">
+                          {periodSellers.map((sl, j) => (
+                            <li key={j} className="flex items-center justify-between text-[11px]">
+                              <span className="text-[#8E8282] font-bold">{sl.period}</span>
+                              <span className="text-[#5A4C4C] font-black">¥{Number(sl.price).toLocaleString()}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+                {/* Amazon: DBには持たないため検索リンク（SPAの商品モーダルと同等の導線） */}
+                <li className="bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#5A4C4C]">Amazon.co.jp</span>
+                    <a
+                      href={getAmazonUrl(cleanProductName(product.name, 40))}
+                      target="_blank"
+                      rel="noopener noreferrer sponsored"
+                      className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full"
+                    >
+                      最安値をチェック
+                    </a>
+                  </div>
+                </li>
+              </ul>
+            </div>
 
           </div>
         </div>
