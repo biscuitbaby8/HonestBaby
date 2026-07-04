@@ -12,11 +12,21 @@ export default async function sitemap() {
     { url: `${SITE_URL}/iherb`, changeFrequency: 'weekly', priority: 0.7 },
   ];
 
-  const categoryEntries = CATEGORY_TREE.filter((c) => c.name !== 'すべて').map((c) => ({
+  const categories = CATEGORY_TREE.filter((c) => c.name !== 'すべて');
+  const categoryEntries = categories.map((c) => ({
     url: `${SITE_URL}/category/${encodeURIComponent(c.name)}`,
     changeFrequency: 'daily',
     priority: 0.9,
   }));
+
+  // サブカテゴリ（/category/[name]/[sub]）。subs は string | { name } の混在。
+  const subCategoryEntries = categories.flatMap((c) =>
+    (c.subs || []).map((s) => ({
+      url: `${SITE_URL}/category/${encodeURIComponent(c.name)}/${encodeURIComponent(typeof s === 'string' ? s : s.name)}`,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    }))
+  );
 
   let productEntries = [];
   try {
@@ -53,5 +63,5 @@ export default async function sitemap() {
     // Supabase 未設定時はビルドを止めない
   }
 
-  return [...staticEntries, ...categoryEntries, ...articleEntries, ...productEntries];
+  return [...staticEntries, ...categoryEntries, ...subCategoryEntries, ...articleEntries, ...productEntries];
 }
