@@ -61,6 +61,16 @@ export default async function CategoryPage({ params }) {
     // Supabase接続失敗時は空リストで表示
   }
 
+  // このカテゴリに商品があるブランド上位12件（出現数順）
+  const brandCounts = new Map();
+  for (const p of products) {
+    if (p.brand) brandCounts.set(p.brand, (brandCounts.get(p.brand) || 0) + 1);
+  }
+  const catBrands = [...brandCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([b]) => b);
+
   const meta = CAT_META[cat];
   const collectionLd = {
     '@context': 'https://schema.org',
@@ -127,6 +137,30 @@ export default async function CategoryPage({ params }) {
 
         {/* クライアント側: サブカテゴリ・ソート・商品グリッド */}
         <CategoryClient products={products} cat={cat} />
+
+        {/* このカテゴリのブランド（内部リンク） */}
+        {catBrands.length > 0 && (
+          <section className="mb-10">
+            <h2 className="text-base font-black mb-3">{cat}のブランドから探す</h2>
+            <div className="flex flex-wrap gap-2">
+              {catBrands.map((b) => (
+                <Link
+                  key={b}
+                  href={`/brand/${encodeURIComponent(b)}`}
+                  className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]"
+                >
+                  {b}
+                </Link>
+              ))}
+              <Link
+                href="/brand"
+                className="inline-block px-4 py-2 rounded-full text-xs font-black text-[#7B8E76] border border-[#7B8E76]/30 hover:bg-[#7B8E76]/5"
+              >
+                ブランド一覧 →
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* 選び方ガイド（サーバー描画・SEO本文） */}
         <CategoryGuide cat={cat} />

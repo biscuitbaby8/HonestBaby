@@ -76,7 +76,8 @@ export default async function BrandPage({ params }) {
       '@type': 'BreadcrumbList',
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'ホーム', item: `${SITE_URL}/` },
-        { '@type': 'ListItem', position: 2, name: brand, item: url },
+        { '@type': 'ListItem', position: 2, name: 'ブランド一覧', item: `${SITE_URL}/brand` },
+        { '@type': 'ListItem', position: 3, name: brand, item: url },
       ],
     },
   ];
@@ -87,6 +88,8 @@ export default async function BrandPage({ params }) {
       <main className="px-4 pt-6 pb-32 lg:max-w-7xl lg:mx-auto lg:px-10 lg:pt-8">
         <nav className="text-[11px] text-[#A5A19E] font-bold mb-4">
           <Link href="/" className="hover:text-[#7B8E76]">ホーム</Link>
+          <span className="mx-1.5">›</span>
+          <Link href="/brand" className="hover:text-[#7B8E76]">ブランド一覧</Link>
           <span className="mx-1.5">›</span>
           <span className="text-[#5A4C4C]">{brand}</span>
         </nav>
