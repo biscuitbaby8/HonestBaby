@@ -6,7 +6,6 @@ import { toVCUrl } from '@/src/lib/affiliate';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
-import ProductClient from './ProductClient';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -167,9 +166,10 @@ export default async function ProductPage({ params }) {
 
   return (
     <>
-      {/* 構造化データは常時出力（アプリ起動後にSSRページが入れ替わってもSEOには影響しない） */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <ProductClient productId={product.id}>
+      {/* SSRページを実表示として使う（SPAの自動起動はしない）。
+          アプリ機能（口コミ投稿・お気に入り・価格アラート）は
+          /?product= リンクからアプリを起動して利用する。 */}
         <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
           <SiteHeader />
           <main className="max-w-3xl mx-auto px-4 py-8">
@@ -187,7 +187,15 @@ export default async function ProductPage({ params }) {
 
         <div className="bg-white rounded-[2rem] border border-[#F4EFEB] overflow-hidden shadow-sm">
           <div className="aspect-square bg-[#F9F6F3] p-6">
-            <img src={getProxiedImage(product.image, 'hero')} alt={product.name} className="w-full h-full object-contain rounded-[1.5rem]" />
+            <img
+              src={getProxiedImage(product.image, 'hero')}
+              alt={product.name}
+              width={1000}
+              height={1000}
+              fetchPriority="high"
+              decoding="async"
+              className="w-full h-full object-contain rounded-[1.5rem]"
+            />
           </div>
           <div className="p-6">
             {product.category && (
@@ -251,8 +259,11 @@ export default async function ProductPage({ params }) {
               </div>
             )}
 
-            <Link href="/" className="block text-center text-sm font-black text-white bg-[#7B8E76] px-6 py-3.5 rounded-full active:scale-95 transition-transform">
-              アプリで詳しく見る（最新価格・口コミ）
+            <Link
+              href={`/?product=${encodeURIComponent(product.id)}`}
+              className="block text-center text-sm font-black text-white bg-[#7B8E76] px-6 py-3.5 rounded-full active:scale-95 transition-transform"
+            >
+              アプリで開く（口コミ投稿・お気に入り・価格アラート）
             </Link>
           </div>
         </div>
@@ -304,7 +315,6 @@ export default async function ProductPage({ params }) {
 
           <SpaBottomNav />
         </div>
-      </ProductClient>
     </>
   );
 }
