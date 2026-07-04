@@ -11,7 +11,10 @@ export const metadata = {
   title: '子育てグッズの選び方ガイド・記事一覧',
   description:
     'ベビー用品の選び方・比較・お得な買い方をまとめた記事一覧。おむつ・ベビーカー・抱っこ紐など、パパママ目線の忖度なしガイドを掲載。',
-  alternates: { canonical: `${SITE_URL}/article` },
+  alternates: {
+    canonical: `${SITE_URL}/article`,
+    types: { 'application/rss+xml': [{ url: '/feed.xml', title: 'HonestBaby 記事フィード' }] },
+  },
   openGraph: {
     title: '子育てグッズの選び方ガイド・記事一覧',
     description: 'ベビー用品の選び方・比較・お得な買い方をまとめた記事一覧。',
@@ -67,6 +70,7 @@ export default async function ArticleListPage() {
         <h1 className="text-xl font-black mb-1">子育てグッズの選び方ガイド・記事一覧</h1>
         <p className="text-xs text-[#8E8282] font-bold mb-6 leading-relaxed">
           ベビー用品の選び方・比較・お得な買い方を、パパママ目線で忖度なしにまとめています。
+          <a href="/feed.xml" className="ml-2 text-[#7B8E76] underline decoration-dotted underline-offset-2">RSS</a>
         </p>
 
         {articles.length === 0 ? (
