@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getProxiedImage, getLowestPrice } from '../lib/products';
+import { getProxiedImage, getLowestPrice, cleanProductName } from '../lib/products';
 
 // サーバーコンポーネント: 商品カードを /product/[id] への <a> リンクとして描画。
 // Google がクロールできる実HTMLのリンク・商品情報を提供する。
@@ -35,7 +35,7 @@ export default function ProductCardLink({ product }) {
             </div>
           )}
         </div>
-        <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{product.name}</h3>
+        <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{cleanProductName(product.name, 60)}</h3>
         <div className="mt-auto">
           {(product.shops?.length || 0) >= 2 && (
             <p className="text-[9px] text-[#7B8E76] font-black mb-1 uppercase tracking-wider">

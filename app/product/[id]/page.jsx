@@ -101,7 +101,7 @@ export default async function ProductPage({ params }) {
   const productLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
-    name: product.name,
+    name: cleanProductName(product.name, 100),
     image: product.image,
     url: pageUrl,
     ...(product.description
@@ -201,7 +201,7 @@ export default async function ProductPage({ params }) {
             {product.category && (
               <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest">{product.category}</span>
             )}
-            <h1 className="text-xl font-black leading-snug mt-1 mb-3">{product.name}</h1>
+            <h1 className="text-xl font-black leading-snug mt-1 mb-3">{cleanProductName(product.name, 100)}</h1>
             <div className="flex items-center gap-3 mb-4">
               {product.rating > 0 && (
                 <span className="bg-[#FFF9E6] text-[#D4AF37] px-2.5 py-1 rounded-full text-xs font-black">★ {product.rating}</span>
