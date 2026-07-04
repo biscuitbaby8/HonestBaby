@@ -6,6 +6,7 @@ import { toVCUrl } from '@/src/lib/affiliate';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
+import ProductAppGate from '@/src/components/ProductAppGate';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -167,9 +168,9 @@ export default async function ProductPage({ params }) {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      {/* SSRページを実表示として使う（SPAの自動起動はしない）。
-          アプリ機能（口コミ投稿・お気に入り・価格アラート）は
-          /?product= リンクからアプリを起動して利用する。 */}
+      {/* アプリ利用経験者はその場でアプリ起動（従来の商品モーダル表示）、
+          検索エンジン・初訪問者にはこのSSRページをそのまま表示する。 */}
+      <ProductAppGate productId={product.id}>
         <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
           <SiteHeader />
           <main className="max-w-3xl mx-auto px-4 py-8">
@@ -259,12 +260,6 @@ export default async function ProductPage({ params }) {
               </div>
             )}
 
-            <Link
-              href={`/?product=${encodeURIComponent(product.id)}`}
-              className="block text-center text-sm font-black text-white bg-[#7B8E76] px-6 py-3.5 rounded-full active:scale-95 transition-transform"
-            >
-              アプリで開く（口コミ投稿・お気に入り・価格アラート）
-            </Link>
           </div>
         </div>
 
@@ -315,6 +310,7 @@ export default async function ProductPage({ params }) {
 
           <SpaBottomNav />
         </div>
+      </ProductAppGate>
     </>
   );
 }
