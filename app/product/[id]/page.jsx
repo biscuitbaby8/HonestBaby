@@ -55,7 +55,7 @@ export async function generateMetadata({ params }) {
   const product = await fetchProduct(id);
   if (!product) return { title: 'HonestBaby' };
 
-  const title = `${product.name} の最安値・価格比較 | HonestBaby`;
+  const title = `${product.name} の最安値・価格比較`;
   const desc = `${product.name}の最安値・価格比較。評価${product.rating || ''}★。楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`;
   const url = `${SITE_URL}/product/${encodeURIComponent(product.id)}`;
   return {

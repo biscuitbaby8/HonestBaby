@@ -45,7 +45,7 @@ export default async function Page() {
       <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
         <main className="max-w-5xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-black leading-snug mb-3">
-            本当に良いベビー用品が見つかる、忖度なし比較サイト | HonestBaby
+            本当に良いベビー用品が見つかる、忖度なし比較サイト HonestBaby
           </h1>
           <p className="text-sm text-[#8E8282] font-bold leading-relaxed mb-6">
             パパ・ママのリアルな口コミと、楽天・Yahoo!ショッピングの最安値比較で、
@@ -63,7 +63,7 @@ export default async function Page() {
                     href={`/category/${encodeURIComponent(name)}`}
                     className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]"
                   >
-                    {CAT_META[name]?.title?.split(/[比較|]/)[0]?.trim() || name}
+                    {name}
                   </Link>
                 </li>
               ))}

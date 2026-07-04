@@ -24,7 +24,7 @@ export async function generateMetadata({ params }) {
   const { name } = await params;
   const cat = resolveName(name);
   const meta = CAT_META[cat] || {
-    title: `${cat}のベビー用品 価格比較・口コミ | HonestBaby`,
+    title: `${cat}のベビー用品 価格比較・口コミ`,
     desc: `${cat}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。`,
   };
   const url = `${SITE_URL}/category/${encodeURIComponent(cat)}`;
@@ -62,7 +62,7 @@ export default async function CategoryPage({ params }) {
   const collectionLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
-    name: meta?.title || `${cat}のベビー用品 | HonestBaby`,
+    name: meta?.title || `${cat}のベビー用品`,
     description: meta?.desc || `${cat}のベビー用品を価格比較。`,
     url: `${SITE_URL}/category/${encodeURIComponent(cat)}`,
   };
@@ -113,7 +113,7 @@ export default async function CategoryPage({ params }) {
         <h1 className="text-xl font-black mb-1 mt-4">
           {cat === 'すべて'
             ? 'おすすめピックアップ'
-            : (meta?.title || `${cat}のベビー用品 価格比較・口コミ`).replace(/\s*\|\s*HonestBaby$/, '')}
+            : meta?.title || `${cat}のベビー用品 価格比較・口コミ`}
         </h1>
         <p className="text-xs text-[#8E8282] font-bold mb-4 leading-relaxed">
           {meta?.desc || `${cat}のベビー用品を楽天・Yahooの最安値と口コミで比較。`}

@@ -8,7 +8,8 @@ const DESCRIPTION =
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
-  title: TITLE,
+  // 子ページは title に文字列だけ設定すればテンプレートが適用される
+  title: { default: TITLE, template: '%s | HonestBaby' },
   description: DESCRIPTION,
   icons: {
     icon: [
