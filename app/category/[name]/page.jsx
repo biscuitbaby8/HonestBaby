@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { CATEGORY_TREE, CAT_META, formatDbProduct } from '@/src/lib/products';
+import { CATEGORY_GUIDES } from '@/src/lib/categoryGuides';
+import GuideModalButton from '@/src/components/GuideModalButton';
 import SiteHeader from '@/src/components/SiteHeader';
 import CategoryClient from '@/src/components/CategoryClient';
 import CategoryGuide from '@/src/components/CategoryGuide';
@@ -119,6 +121,9 @@ export default async function CategoryPage({ params }) {
         <p className="text-xs text-[#8E8282] font-bold mb-4 leading-relaxed">
           {meta?.desc || `${cat}のベビー用品を楽天・Yahooの最安値と口コミで比較。`}
         </p>
+
+        {/* 選び方ガイドをモーダルで開くボタン（ガイドがあるカテゴリのみ） */}
+        <GuideModalButton guide={CATEGORY_GUIDES[cat] || null} />
 
         {/* クライアント側: サブカテゴリ・ソート・商品グリッド */}
         <CategoryClient products={products} cat={cat} />
