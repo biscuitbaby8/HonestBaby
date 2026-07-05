@@ -114,6 +114,9 @@ export default async function ProductPage({ params }) {
         '@type': 'AggregateOffer',
         priceCurrency: 'JPY',
         lowPrice: price,
+        // shops は価格昇順ソート済み。単一ショップ時は lowPrice と同値
+        // （Search Console の「highPrice がありません」推奨対応）
+        highPrice: shops.length > 0 ? Number(shops[shops.length - 1].lowestPrice) : price,
         offerCount: shops.length || 1,
         availability: 'https://schema.org/InStock',
       },
