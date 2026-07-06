@@ -7,6 +7,7 @@ import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
 import ProductAppGate from '@/src/components/ProductAppGate';
+import ReviewHelpfulButton from '@/src/components/ReviewHelpfulButton';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -302,7 +303,17 @@ export default async function ProductPage({ params }) {
                     <span className="text-xs font-black text-[#5A4C4C]">{r.user_name || 'ユーザー'}</span>
                     {r.rating && <span className="text-[#D4AF37] text-xs font-black">★ {r.rating}</span>}
                   </div>
-                  <p className="text-xs text-[#8E8282] leading-relaxed">{r.comment}</p>
+                  {(r.tags || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-1.5">
+                      {r.tags.map((t) => (
+                        <span key={t} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EBF0EA] text-[#7B8E76]">{t}</span>
+                      ))}
+                    </div>
+                  )}
+                  {r.comment && <p className="text-xs text-[#8E8282] leading-relaxed">{r.comment}</p>}
+                  <div className="mt-2.5">
+                    <ReviewHelpfulButton reviewId={r.id} initialCount={r.helpful_count} />
+                  </div>
                 </div>
               ))}
             </div>
