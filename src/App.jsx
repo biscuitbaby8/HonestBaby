@@ -39,6 +39,14 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
 };
 import { supabase } from './lib/supabaseClient';
 import { toVCUrl, getAmazonUrl } from './lib/affiliate';
+import ReviewHelpfulButton from './components/ReviewHelpfulButton';
+
+// 30秒レビュー用の選択チップ（タグだけでも投稿可能にして投稿ハードルを下げる）
+const REVIEW_TAGS = [
+  '買ってよかった', 'コスパ◎', 'サイズ感ぴったり', '思ったより大きい',
+  '使いやすい', '洗いやすい', '丈夫', 'デザインが好き',
+  '赤ちゃんが気に入った', 'プレゼントに◎', 'リピートしたい', 'うちの子には合わなかった',
+];
 import ProductCard from './components/ProductCard';
 
 // ＝＝＝＝＝ 商品データはSupabaseから取得します ＝＝＝＝＝
@@ -911,7 +919,27 @@ const App = () => {
   // --- 新機能: 口コミ関連 States ---
 
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
-  const [reviewForm, setReviewForm] = useState({ rating: 5, content: "" });
+  const [reviewForm, setReviewForm] = useState({ rating: 5, content: "", tags: [] });
+
+  // 「使ってみてどうでした？」投稿促しカード: 表示済み/投稿済みの商品ID
+  const [reviewPromptDone, setReviewPromptDone] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('honestBabyReviewPromptDone') || '[]'); } catch { return []; }
+  });
+  const markReviewPromptDone = (...ids) => {
+    setReviewPromptDone(prev => {
+      const next = [...new Set([...prev, ...ids.filter(Boolean)])];
+      try { localStorage.setItem('honestBabyReviewPromptDone', JSON.stringify(next)); } catch { }
+      return next;
+    });
+  };
+  // 7日以上前に見た商品のうち、まだ促していない最初の1件
+  const reviewPromptItem = useMemo(() => {
+    const WEEK = 7 * 24 * 60 * 60 * 1000;
+    return recentlyViewed.find(p =>
+      p && p.id && !reviewPromptDone.includes(p.id) &&
+      (!p.viewedAt || Date.now() - p.viewedAt > WEEK)
+    ) || null;
+  }, [recentlyViewed, reviewPromptDone]);
   const [reviewPhotoFile, setReviewPhotoFile] = useState(null);
   const [reviewPhotoPreview, setReviewPhotoPreview] = useState(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -2658,7 +2686,8 @@ ${userText}
 
   // --- 新機能: レビュー投稿ハンドラ ---
   const submitReview = async () => {
-    if (!reviewForm.content.trim() || !selectedProduct) return;
+    // タグだけでも投稿可能（30秒レビュー）
+    if ((!reviewForm.content.trim() && reviewForm.tags.length === 0) || !selectedProduct) return;
     if (!user) {
       alert("口コミを投稿するにはGoogleアカウントでログインしてください。\nマイページからログインできます。");
       return;
@@ -2717,6 +2746,8 @@ ${userText}
           product_id: productId,
           rating: reviewForm.rating,
           comment: reviewForm.content,
+          tags: reviewForm.tags,
+          user_id: user.id, // 「役に立った」Push通知の宛先に使う
           user_name: displayName,
           image_url: uploadedImageUrl,
           baby_age_months: babyAgeMonths,
@@ -2742,9 +2773,10 @@ ${userText}
         setDbProducts(prev => prev.map(p => p.id === updatedProduct.id || p.id === selectedProduct.id ? updatedProduct : p));
 
         setIsReviewFormOpen(false);
-        setReviewForm({ rating: 5, content: "" });
+        setReviewForm({ rating: 5, content: "", tags: [] });
         setReviewPhotoFile(null);
         setReviewPhotoPreview(null);
+        markReviewPromptDone(productId, selectedProduct.id); // 投稿済み商品は促しカードに出さない
         alert("口コミを投稿しました！ありがとうございます。");
       }
     } catch (e) {
@@ -2773,7 +2805,7 @@ ${userText}
 
     setRecentlyViewed(prev => {
       const filtered = prev.filter(p => p.id !== product.id);
-      return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating }, ...filtered].slice(0, 10);
+      return [{ id: product.id, name: product.name, image: product.image, price: product.price, rating: product.rating, viewedAt: Date.now() }, ...filtered].slice(0, 10);
     });
 
     // 2. 口コミデータなどはバックグラウンドで非同期に取得
@@ -2927,6 +2959,38 @@ ${userText}
 
     return (
       <div className="animate-in fade-in duration-500">
+        {/* ─── 口コミ投稿の促しカード（7日以上前に見た商品・1件だけ） ─── */}
+        {reviewPromptItem && (
+          <div className="flex items-center gap-3 bg-[#FFF9E6] border border-[#F2E3AE] rounded-[1.75rem] p-4 mb-6">
+            <img
+              src={getProxiedImage(reviewPromptItem.image, 'card')}
+              alt={reviewPromptItem.name}
+              className="w-14 h-14 object-cover rounded-xl flex-shrink-0"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-[#5A4C4C] leading-snug line-clamp-1">{reviewPromptItem.name}</p>
+              <p className="text-[11px] font-bold text-[#B8933D] mt-0.5">使ってみてどうでしたか？30秒で口コミを書けます</p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => {
+                    openProduct(reviewPromptItem);
+                    setIsReviewFormOpen(true);
+                  }}
+                  className="bg-[#7B8E76] text-white text-[11px] font-black px-4 py-1.5 rounded-full active:scale-95 transition-transform"
+                >
+                  口コミを書く
+                </button>
+                <button
+                  onClick={() => markReviewPromptDone(reviewPromptItem.id)}
+                  className="text-[11px] font-bold text-[#A5A19E] px-2"
+                >
+                  あとで
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ─── クイックアクセスタイル（モバイル専用・AIコンサル / 出産準備診断 / Yahoo!お得情報 / 記事・コラム） ─── */}
         <div className="grid grid-cols-2 gap-3 mb-6 lg:hidden">
           <div
@@ -4621,7 +4685,17 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                                 <Heart className="w-5 h-5 fill-current" />
                                 <span className="text-xs font-black text-[#5A4C4C]">使ってよかった</span>
                               </div>
-                              <p className="text-sm text-[#5A4C4C] leading-relaxed font-medium">{review.comment}</p>
+                              {(review.tags || []).length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                  {review.tags.map((t) => (
+                                    <span key={t} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EBF0EA] text-[#7B8E76]">{t}</span>
+                                  ))}
+                                </div>
+                              )}
+                              {review.comment && <p className="text-sm text-[#5A4C4C] leading-relaxed font-medium">{review.comment}</p>}
+                              <div className="mt-3">
+                                <ReviewHelpfulButton reviewId={review.id} initialCount={review.helpful_count} />
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -4639,7 +4713,17 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                                 {[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-200'}`} />)}
                               </div>
                             </div>
-                            <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.comment}"</p>
+                            {(review.tags || []).length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-2">
+                                {review.tags.map((t) => (
+                                  <span key={t} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EBF0EA] text-[#7B8E76]">{t}</span>
+                                ))}
+                              </div>
+                            )}
+                            {review.comment && <p className="text-xs text-[#5A4C4C] leading-relaxed font-medium">"{review.comment}"</p>}
+                            <div className="mt-3">
+                              <ReviewHelpfulButton reviewId={review.id} initialCount={review.helpful_count} />
+                            </div>
                           </div>
                         )
                       ))
@@ -4681,11 +4765,35 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               </div>
             </div>
 
+            {/* 30秒レビュー: あてはまるタグをタップ（タグだけでも投稿OK） */}
+            <div className="mb-4">
+              <p className="text-[10px] font-bold text-[#A5A19E] mb-2 text-center">あてはまるものをタップ（タグだけでも投稿できます）</p>
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                {REVIEW_TAGS.map((tag) => {
+                  const on = reviewForm.tags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => setReviewForm({
+                        ...reviewForm,
+                        tags: on ? reviewForm.tags.filter((t) => t !== tag) : [...reviewForm.tags, tag],
+                      })}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
+                        on ? 'bg-[#7B8E76] text-white shadow-sm' : 'bg-[#F4EFEB] text-[#8E8282]'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="mb-6">
               <textarea
                 className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-[1.5rem] p-4 text-sm focus:outline-none focus:border-[#F2ABAC] focus:ring-4 focus:ring-[#F2ABAC]/10 transition-all resize-none font-medium text-[#5A4C4C]"
-                rows="4"
-                placeholder="実際に使ってみた感想を教えてください！"
+                rows="3"
+                placeholder="ひとこと感想があればぜひ！（任意）"
                 value={reviewForm.content}
                 onChange={(e) => setReviewForm({ ...reviewForm, content: e.target.value })}
               />
@@ -4719,7 +4827,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
 
             <button
               onClick={submitReview}
-              disabled={!reviewForm.content.trim() || isSubmittingReview}
+              disabled={(!reviewForm.content.trim() && reviewForm.tags.length === 0) || isSubmittingReview}
               className="w-full py-4 bg-[#7B8E76] text-white rounded-full font-black shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
             >
               {isSubmittingReview ? "送信中..." : "投稿する"}
