@@ -775,14 +775,22 @@ const App = () => {
   };
 
   // --- Web Push 通知購読 ---
+  // 戻り値: { ok: true } | { ok: false, reason: 'unsupported'|'no-key'|'denied'|'error' }
   const subscribeToPushNotifications = async (userId) => {
     try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
-      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidPublicKey) return false;
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return { ok: false, reason: 'unsupported' };
+      // 公開鍵: ビルド時env → サーバー配布(/api/push-key)の順で取得
+      let vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        try {
+          const res = await fetch('/api/push-key');
+          vapidPublicKey = (await res.json())?.key;
+        } catch { }
+      }
+      if (!vapidPublicKey) return { ok: false, reason: 'no-key' };
 
       const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return false;
+      if (permission !== 'granted') return { ok: false, reason: 'denied' };
 
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
@@ -801,10 +809,10 @@ const App = () => {
         auth: subJson.keys.auth,
         user_agent: navigator.userAgent,
       }, { onConflict: 'endpoint' });
-      return true;
+      return { ok: true };
     } catch (e) {
       console.warn('Push subscription failed:', e);
-      return false;
+      return { ok: false, reason: 'error' };
     }
   };
 
@@ -841,13 +849,21 @@ const App = () => {
       setActiveTab('user');
       return;
     }
-    const ok = await subscribeToPushNotifications(user.id);
-    if (ok) {
+    const result = await subscribeToPushNotifications(user.id);
+    if (result.ok) {
       setPushStatus('on');
       dismissPushPrompt();
       alert('通知をオンにしました！セール・お得情報をお届けします。');
+      return;
+    }
+    if (result.reason === 'unsupported') {
+      alert('この開き方では通知を利用できません。\nSafariの共有メニューから「ホーム画面に追加」し、追加されたアイコンから開いてお試しください。');
+    } else if (result.reason === 'no-key') {
+      alert('通知の設定がサーバー側で未完了です（VAPID鍵未設定）。管理者にご連絡ください。');
+    } else if (result.reason === 'denied') {
+      alert('通知が許可されませんでした。\niPhoneの「設定」→「通知」→「HonestBaby」から通知を許可した後、もう一度お試しください。');
     } else {
-      alert('通知を有効にできませんでした。\n端末の設定アプリで HonestBaby の通知が許可されているかご確認ください。');
+      alert('通知の登録に失敗しました。時間をおいて再度お試しください。');
     }
   };
 
