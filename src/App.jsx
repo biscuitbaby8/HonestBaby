@@ -808,6 +808,61 @@ const App = () => {
     }
   };
 
+  // --- 通知のオン/オフ（マイページのトグル・ホームの案内カードで使用） ---
+  // 'unsupported' | 'off' | 'on'
+  const [pushStatus, setPushStatus] = useState('off');
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+          setPushStatus('unsupported');
+          return;
+        }
+        if (Notification.permission !== 'granted') { setPushStatus('off'); return; }
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        setPushStatus(sub ? 'on' : 'off');
+      } catch { setPushStatus('off'); }
+    })();
+  }, []);
+
+  // ホームの通知案内カード（一度closeしたら出さない）
+  const [pushPromptDismissed, setPushPromptDismissed] = useState(() => {
+    try { return localStorage.getItem('honestBabyPushPromptDismissed') === '1'; } catch { return true; }
+  });
+  const dismissPushPrompt = () => {
+    setPushPromptDismissed(true);
+    try { localStorage.setItem('honestBabyPushPromptDismissed', '1'); } catch { }
+  };
+
+  const enablePush = async () => {
+    if (!user) {
+      alert('通知を受け取るにはGoogleログインが必要です。\nマイページからログインしてください。');
+      setActiveTab('user');
+      return;
+    }
+    const ok = await subscribeToPushNotifications(user.id);
+    if (ok) {
+      setPushStatus('on');
+      dismissPushPrompt();
+      alert('通知をオンにしました！セール・お得情報をお届けします。');
+    } else {
+      alert('通知を有効にできませんでした。\n端末の設定アプリで HonestBaby の通知が許可されているかご確認ください。');
+    }
+  };
+
+  const disablePush = async () => {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        try { await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint); } catch { }
+        await sub.unsubscribe();
+      }
+    } catch { }
+    setPushStatus('off');
+  };
+
   const deletePriceAlertFromDB = async (userId, productCode) => {
     try {
       await supabase.from('price_alerts')
@@ -3010,6 +3065,30 @@ ${userText}
           </a>
         )}
 
+        {/* ─── 通知オプトインの案内カード（未購読・未却下のときだけ） ─── */}
+        {pushStatus === 'off' && !pushPromptDismissed && (
+          <div className="flex items-center gap-3 bg-[#FFF9E6] border border-[#F2E3AE] rounded-[1.75rem] p-4 mb-4">
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#D4AF37] flex-shrink-0">
+              <BellRing className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-[#5A4C4C] leading-snug">セール・値下げ情報を通知で受け取る</p>
+              <p className="text-[10px] font-bold text-[#A5A19E] mt-0.5">プライムデーなどの買い時を見逃しません</p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={enablePush}
+                  className="bg-[#D4AF37] text-white text-[11px] font-black px-4 py-1.5 rounded-full active:scale-95 transition-transform"
+                >
+                  受け取る
+                </button>
+                <button onClick={dismissPushPrompt} className="text-[11px] font-bold text-[#A5A19E] px-2">
+                  今はしない
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ─── 口コミ投稿の促しカード（7日以上前に見た商品・1件だけ） ─── */}
         {reviewPromptItem && (
           <div className="flex items-center gap-3 bg-[#FFF9E6] border border-[#F2E3AE] rounded-[1.75rem] p-4 mb-6">
@@ -3616,6 +3695,29 @@ ${userText}
               )}
             </div>
           </div>
+
+          {/* お知らせ通知トグル */}
+          {pushStatus !== 'unsupported' && (
+            <div className="bg-white p-5 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#F4EFEB] mt-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 bg-[#FFF9E6] rounded-[1rem] flex items-center justify-center text-[#D4AF37] flex-shrink-0">
+                  <BellRing className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-[#5A4C4C]">お知らせ通知</p>
+                  <p className="text-[10px] font-bold text-[#A5A19E] leading-snug">セール・値下げ・お得情報をプッシュ通知で受け取る</p>
+                </div>
+              </div>
+              <button
+                onClick={pushStatus === 'on' ? disablePush : enablePush}
+                className={`flex-shrink-0 text-[11px] font-black px-4 py-2 rounded-full active:scale-95 transition-all ${
+                  pushStatus === 'on' ? 'bg-[#7B8E76] text-white' : 'bg-[#F4EFEB] text-[#8E8282]'
+                }`}
+              >
+                {pushStatus === 'on' ? 'オン' : 'オフ'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Myベビー情報 */}
