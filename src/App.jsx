@@ -2265,6 +2265,15 @@ const App = () => {
       return da - db;
     });
   }, [selectedProduct, babyAgeMonths]);
+  // AI応答の残留Markdown（### / ** / *箇条書き）をアプリの表示形式（■/・）へ変換する。
+  // プロンプトで禁止していても混入することがあるため、描画前の保険として通す。
+  const formatAiText = (raw) => String(raw || '')
+    .replace(/^#{1,6}\s*/gm, '■ ')          // 見出し → ■
+    .replace(/^\s*[*-]\s+/gm, '・')          // 箇条書き記号 → ・
+    .replace(/\*\*(.+?)\*\*/g, '$1')         // **太字** → 素のテキスト
+    .replace(/\*\*/g, '')                    // 対になっていない ** の残骸を除去
+    .replace(/■\s*(\d+)[.．]\s*/g, '■ ');   // 「■ 1. タイトル」の番号を除去
+
   const handleSendMessage = async () => {
     if (!userInput.trim()) return;
     const userText = userInput;
@@ -2394,7 +2403,12 @@ const App = () => {
 2. 専門家から見たメリット・デメリット
 3. どんなユーザーにおすすめか
 決して嘘をつかず、具体的な数値（価格など）に言及して、ユーザーの決断を助けてください。
-回答は簡潔に、箇条書きを活用して読みやすくしてください。
+
+【回答フォーマット（厳守）】
+- マークダウン記法は使用禁止（#の見出し、**太字**、*や-の箇条書きを出力しない）
+- セクションの見出しは「■ タイトル：本文」の形式だけを使う
+- 細かい列挙が必要なときは「・」で始める
+- 全体で400字以内に簡潔にまとめる
 
 【ユーザーからの相談】
 ${userText}`;
@@ -2457,15 +2471,14 @@ ${userText}
       }
       const aiText = data.text || "すみません、一時的にエラーが発生しました。もう一度お試しください。";
 
-      // AIテキスト内で実際に言及された商品だけカードに表示する
-      const mentionedProducts = contextProducts.filter(p =>
+      // 商品カードは「AIが実際に言及した商品」だけに限定する。
+      // 以前は言及ゼロでも検索結果を3件出すフォールバックがあり、
+      // 商品詳細の質問（さらに聞く）に無関係なカードが付く原因になっていた。
+      const mentionedProducts = isExpert ? [] : contextProducts.filter(p =>
         aiText.includes(p.name) || aiText.includes(p.name.slice(0, 15))
       );
-      const productsToShow = mentionedProducts.length > 0
-        ? mentionedProducts.slice(0, 3)
-        : contextProducts.slice(0, 3);
 
-      setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: productsToShow }]);
+      setChatMessages([...newMessages, { role: 'assistant', text: aiText, products: mentionedProducts.slice(0, 3) }]);
     } catch (e) {
       console.error("AI Chat Error:", e);
       setChatMessages([...newMessages, { role: 'assistant', text: `⚠️ ${e.message}` }]);
@@ -4201,7 +4214,7 @@ ${userText}
                   <div className={`max-w-[85%] p-4 text-sm font-medium leading-relaxed ${msg.role === 'user' ? 'bg-[#7B8E76] text-white rounded-[1.5rem] rounded-tr-sm shadow-md' : 'bg-white text-[#5A4C4C] rounded-[1.5rem] rounded-tl-sm border border-[#F4EFEB] shadow-sm'}`}>
                     {msg.role === 'assistant' ? (
                       <div className="space-y-3">
-                        {msg.text.split(/(?=■)/).map((chunk, ci) => {
+                        {formatAiText(msg.text).split(/(?=■)/).map((chunk, ci) => {
                           const trimmed = chunk.trim();
                           if (!trimmed) return null;
                           if (trimmed.startsWith('■')) {
