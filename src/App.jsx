@@ -39,7 +39,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
 };
 import { supabase } from './lib/supabaseClient';
 import { toVCUrl, getAmazonUrl } from './lib/affiliate';
-import { getActiveSale, saleStatusLabel } from './lib/sales';
+import { getActiveSale, saleStatusLabel, saleBadgeLabel, saleMatchesShop } from './lib/sales';
 import ReviewHelpfulButton from './components/ReviewHelpfulButton';
 
 // 30秒レビュー用の選択チップ（タグだけでも投稿可能にして投稿ハードルを下げる）
@@ -4737,6 +4737,11 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           {shop.type === 'official' && (
                             <span className="bg-gradient-to-r from-[#F2ABAC] to-[#F78CA0] text-white text-[9px] font-black px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
                               <ShieldCheck className="w-2.5 h-2.5" /> 公式
+                            </span>
+                          )}
+                          {activeSale && saleMatchesShop(activeSale, shop._displayName || shop.name || '', shop.source || '') && (
+                            <span className="bg-white border border-[#E8894A] text-[#E8894A] text-[9px] font-black px-2.5 py-1 rounded-full whitespace-nowrap">
+                              {saleBadgeLabel(activeSale)}
                             </span>
                           )}
                           {shop._isRental && (

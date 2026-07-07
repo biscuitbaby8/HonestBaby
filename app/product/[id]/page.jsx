@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
 import { toVCUrl, getAmazonUrl } from '@/src/lib/affiliate';
-import { getActiveSale } from '@/src/lib/sales';
+import { getActiveSale, saleBadgeLabel, saleMatchesShop } from '@/src/lib/sales';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
@@ -83,6 +83,7 @@ export default async function ProductPage({ params }) {
   if (!product) notFound();
 
   const related = await fetchRelated(product.category, product.id);
+  const activeSale = getActiveSale();
   const price = getLowestPrice(product.shops);
   const shops = (product.shops || [])
     .filter((s) => {
@@ -237,7 +238,14 @@ export default async function ProductPage({ params }) {
                   return (
                     <li key={i} className="bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
+                          {saleMatchesShop(activeSale, s.name || '') && (
+                            <span className="bg-white border border-[#E8894A] text-[#E8894A] text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
+                              {saleBadgeLabel(activeSale)}
+                            </span>
+                          )}
+                        </span>
                         <span className="flex items-center gap-3">
                           <span className="text-sm font-black text-[#7B8E76]">¥{Number(s.lowestPrice).toLocaleString()}</span>
                           {s.url && (
@@ -263,14 +271,21 @@ export default async function ProductPage({ params }) {
                 {/* Amazon: DBには持たないため検索リンク（SPAの商品モーダルと同等の導線） */}
                 <li className="bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#5A4C4C]">Amazon.co.jp</span>
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs font-bold text-[#5A4C4C]">Amazon.co.jp</span>
+                      {activeSale?.shop === 'amazon' && (
+                        <span className="bg-white border border-[#E8894A] text-[#E8894A] text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
+                          {saleBadgeLabel(activeSale)}
+                        </span>
+                      )}
+                    </span>
                     <a
                       href={getAmazonUrl(cleanProductName(product.name, 40))}
                       target="_blank"
                       rel="noopener noreferrer sponsored"
                       className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full"
                     >
-                      {getActiveSale()?.shop === 'amazon' ? 'セール価格をチェック🔥' : '最安値をチェック'}
+                      {activeSale?.shop === 'amazon' ? 'セール価格をチェック🔥' : '最安値をチェック'}
                     </a>
                   </div>
                 </li>
