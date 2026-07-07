@@ -1,24 +1,23 @@
-// セール開催情報の単一の設定源。
-// 次回のセールは、この配列に日付と文言を追加/書き換えるだけで
-// /sale ページ・トップバナー・商品ページのラベルが切り替わる。
-// ISR（最大1時間）の遅延があるため、開始・終了の境界は多少ズレてよい前提。
-export const SALES = [
-  {
-    id: 'amazon-prime-day-2026-07',
-    shop: 'amazon',
-    name: 'Amazonプライムデー',
-    shortName: 'プライムデー',
-    // 先行セール開始〜本セール終了（JST）
-    start: '2026-07-07T00:00:00+09:00',
-    mainStart: '2026-07-10T00:00:00+09:00',
-    end: '2026-07-14T00:00:00+09:00', // 7/13 23:59 まで（終端は排他的）
-    periodLabel: '先行セール 7/7(火)〜7/9(木)・本セール 7/10(金)〜7/13(月)',
-  },
-];
+// セール表示の共通ヘルパー（サーバー/クライアント両用・純粋関数のみ）。
+// 不定期セール（プライムデー・楽天スーパーセール等）の実データは
+// Supabase の sales テーブルで管理する（?admin=1 → セール管理から登録）。
+// サーバー側の取得は src/lib/salesServer.js を使う。
+
+// DBの行（snake_case）を表示用の形へ正規化
+export const normalizeSaleRow = (r) => ({
+  id: r.id,
+  shop: r.shop,
+  name: r.name,
+  shortName: r.short_name ?? r.shortName ?? null,
+  start: r.start_at ?? r.start,
+  mainStart: r.main_start_at ?? r.mainStart ?? null,
+  end: r.end_at ?? r.end,
+  periodLabel: r.period_label ?? r.periodLabel ?? null,
+});
 
 // 開催中のセール（なければ null）
-export const getActiveSale = (now = Date.now()) =>
-  SALES.find((s) => now >= Date.parse(s.start) && now < Date.parse(s.end)) || null;
+export const pickActiveSale = (sales, now = Date.now()) =>
+  (sales || []).find((s) => s && now >= Date.parse(s.start) && now < Date.parse(s.end)) || null;
 
 // 「先行セール開催中」/「開催中」の表示用ラベル
 export const saleStatusLabel = (sale, now = Date.now()) =>
@@ -41,6 +40,34 @@ export const saleMatchesShop = (sale, shopName = '', source = '') => {
   if (sale.shop === 'yahoo') return /yahoo|ヤフー/i.test(shopName);
   if (sale.shop === 'amazon') return /amazon/i.test(shopName);
   return false;
+};
+
+// 固定ルールの「今日のお得な日」（JST基準・毎月更新不要）。
+// 該当ショップ行のバッジ表示に使う。ショップごとに還元率が高いものを1つ返す。
+export const getTodayDeals = (now = Date.now()) => {
+  const jst = new Date(now + 9 * 60 * 60 * 1000);
+  const day = jst.getUTCDate();
+  const dow = jst.getUTCDay();
+
+  const deals = [];
+  // 楽天（還元率が高い方を優先）
+  if (day === 18) deals.push({ shop: 'rakuten', label: '本日ご愛顧感謝デー' });
+  else if (day % 5 === 0) deals.push({ shop: 'rakuten', label: '本日5と0のつく日' });
+  // Yahoo!ショッピング
+  if (day === 1) deals.push({ shop: 'yahoo', label: '本日ファーストデイ' });
+  else if (day === 5 || day === 15 || day === 25) deals.push({ shop: 'yahoo', label: '本日5のつく日' });
+  else if (day === 11 || day === 22) deals.push({ shop: 'yahoo', label: '本日ヤフショ感謝デー' });
+  else if (dow === 0) deals.push({ shop: 'yahoo', label: '本日プレミアムな日曜日' });
+  return deals;
+};
+
+// ショップ行のバッジ判定: 不定期セール優先、なければ固定のお得な日
+export const getShopBadge = (activeSale, todayDeals, shopName = '', source = '') => {
+  if (activeSale && saleMatchesShop(activeSale, shopName, source)) {
+    return { kind: 'sale', label: saleBadgeLabel(activeSale) };
+  }
+  const deal = (todayDeals || []).find((d) => saleMatchesShop({ shop: d.shop }, shopName, source));
+  return deal ? { kind: 'deal', label: deal.label } : null;
 };
 
 // 年間の買い時パターン（常設コンテンツ。/sale ページで表示）
