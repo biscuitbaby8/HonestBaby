@@ -39,6 +39,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
 };
 import { supabase } from './lib/supabaseClient';
 import { toVCUrl, getAmazonUrl } from './lib/affiliate';
+import { getActiveSale, saleStatusLabel } from './lib/sales';
 import ReviewHelpfulButton from './components/ReviewHelpfulButton';
 
 // 30秒レビュー用の選択チップ（タグだけでも投稿可能にして投稿ハードルを下げる）
@@ -932,6 +933,9 @@ const App = () => {
       return next;
     });
   };
+  // 開催中のセール（クライアント側なので日時判定は正確）
+  const activeSale = useMemo(() => getActiveSale(), []);
+
   // 7日以上前に見た商品のうち、まだ促していない最初の1件
   const reviewPromptItem = useMemo(() => {
     const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -2602,6 +2606,39 @@ ${userText}
     }, 0);
   };
 
+  // 管理者: 全購読者へのPush一斉配信（セール告知等）。
+  // 開催中セールがあればその告知文をデフォルトとして提案する。
+  const sendBroadcastPush = async () => {
+    const password = getAdminPassword();
+    if (!password) return;
+    const sale = getActiveSale();
+    const title = window.prompt(
+      '通知タイトル',
+      sale ? `${sale.name}が${saleStatusLabel(sale)}です🔥` : 'HonestBabyからのお知らせ'
+    );
+    if (!title) return;
+    const message = window.prompt(
+      '通知本文',
+      sale ? 'おむつ・ミルクの買いだめ時。セール価格が本当に安いか、買い時ガイドでチェック！' : ''
+    );
+    if (!message) return;
+    const url = window.prompt('タップ時に開くURL（パス）', sale ? '/sale' : '/');
+    if (url === null) return;
+    if (!window.confirm(`全購読者に送信します。よろしいですか？\n\n${title}\n${message}\n→ ${url}`)) return;
+    try {
+      const res = await fetch('/api/admin-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, title, message, url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.status);
+      alert(`送信完了: ${data.sent}件成功 / ${data.failed}件失敗（購読切れ${data.cleaned}件を削除）`);
+    } catch (e) {
+      alert('送信に失敗しました: ' + e.message);
+    }
+  };
+
   // --- 記事管理ハンドラ ---
   const articleAdminCall = async (action, params = {}) => {
     const res = await fetch('/api/admin-article', {
@@ -2959,6 +2996,20 @@ ${userText}
 
     return (
       <div className="animate-in fade-in duration-500">
+        {/* ─── 開催中のセールバナー（/sale へ） ─── */}
+        {activeSale && (
+          <a
+            href="/sale"
+            className="flex items-center justify-between bg-gradient-to-br from-[#FFF3E8] to-[#FFE9D6] border border-[#F5D5B8] rounded-[1.75rem] px-5 py-4 mb-4 active:scale-[0.99] transition-transform"
+          >
+            <span className="text-sm font-black text-[#5A4C4C]">
+              <span className="bg-[#E8894A] text-white text-[10px] font-black px-2 py-0.5 rounded-full mr-2 animate-pulse">{saleStatusLabel(activeSale)}</span>
+              {activeSale.name}
+            </span>
+            <span className="text-xs font-black text-[#E8894A] whitespace-nowrap ml-2">買い時をチェック →</span>
+          </a>
+        )}
+
         {/* ─── 口コミ投稿の促しカード（7日以上前に見た商品・1件だけ） ─── */}
         {reviewPromptItem && (
           <div className="flex items-center gap-3 bg-[#FFF9E6] border border-[#F2E3AE] rounded-[1.75rem] p-4 mb-6">
@@ -4006,6 +4057,10 @@ ${userText}
             onClick={() => { setShowBlockedList(true); fetchBlockedProducts(); }}
             className="bg-red-500 text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
           >🚫 非表示リスト</button>
+          <button
+            onClick={sendBroadcastPush}
+            className="bg-[#E8894A] text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+          >📣 Push配信</button>
         </div>
       )}
 

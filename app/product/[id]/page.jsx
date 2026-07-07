@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
 import { toVCUrl, getAmazonUrl } from '@/src/lib/affiliate';
+import { getActiveSale } from '@/src/lib/sales';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
@@ -269,7 +270,7 @@ export default async function ProductPage({ params }) {
                       rel="noopener noreferrer sponsored"
                       className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full"
                     >
-                      最安値をチェック
+                      {getActiveSale()?.shop === 'amazon' ? 'セール価格をチェック🔥' : '最安値をチェック'}
                     </a>
                   </div>
                 </li>

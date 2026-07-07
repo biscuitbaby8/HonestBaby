@@ -12,6 +12,7 @@ export default async function sitemap() {
     { url: `${SITE_URL}/`, changeFrequency: 'daily', priority: 1.0 },
     { url: `${SITE_URL}/article`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${SITE_URL}/brand`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${SITE_URL}/sale`, changeFrequency: 'daily', priority: 0.8 },
     { url: `${SITE_URL}/iherb`, changeFrequency: 'weekly', priority: 0.7 },
   ];
 
