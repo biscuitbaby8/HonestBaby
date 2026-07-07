@@ -10,6 +10,7 @@ import {
 } from '@/src/lib/products';
 import { fetchBrandCounts } from '@/src/lib/brands';
 import { AGE_GUIDES } from '@/src/lib/ageGuides';
+import { getActiveSale, saleStatusLabel } from '@/src/lib/sales';
 
 const SITE_URL = 'https://honestbaby-care.com';
 
@@ -73,6 +74,24 @@ export default async function Page() {
             おむつ・ベビーカー・抱っこ紐・チャイルドシートなど人気のベビー用品を
             ブランド横断で比較できます。エルゴ・コンビ・アップリカ・ピジョンなど主要ブランドを網羅。
           </p>
+
+          {/* 開催中のセールバナー */}
+          {(() => {
+            const sale = getActiveSale();
+            if (!sale) return null;
+            return (
+              <Link
+                href="/sale"
+                className="flex items-center justify-between bg-gradient-to-br from-[#FFF3E8] to-[#FFE9D6] border border-[#F5D5B8] rounded-2xl px-5 py-4 mb-8"
+              >
+                <span className="text-sm font-black text-[#5A4C4C]">
+                  <span className="bg-[#E8894A] text-white text-[10px] font-black px-2 py-0.5 rounded-full mr-2">{saleStatusLabel(sale)}</span>
+                  {sale.name}
+                </span>
+                <span className="text-xs font-black text-[#E8894A]">買い時をチェック →</span>
+              </Link>
+            );
+          })()}
 
           {/* カテゴリ一覧（内部リンク） */}
           <nav aria-label="カテゴリ" className="mb-8">
