@@ -7,6 +7,7 @@ export const SALES = [
     id: 'amazon-prime-day-2026-07',
     shop: 'amazon',
     name: 'Amazonプライムデー',
+    shortName: 'プライムデー',
     // 先行セール開始〜本セール終了（JST）
     start: '2026-07-07T00:00:00+09:00',
     mainStart: '2026-07-10T00:00:00+09:00',
@@ -22,6 +23,25 @@ export const getActiveSale = (now = Date.now()) =>
 // 「先行セール開催中」/「開催中」の表示用ラベル
 export const saleStatusLabel = (sale, now = Date.now()) =>
   sale.mainStart && now < Date.parse(sale.mainStart) ? '先行セール開催中' : '開催中';
+
+// ショップボタンに添える短いバッジ文言（例: プライムデー先行セール中！）
+export const saleBadgeLabel = (sale, now = Date.now()) => {
+  const name = sale.shortName || sale.name;
+  return sale.mainStart && now < Date.parse(sale.mainStart)
+    ? `${name}先行セール中！`
+    : `${name}開催中！`;
+};
+
+// セールがそのショップ行に該当するか（表示名ベースの判定。
+// rakuten/yahoo/amazon のセールを同じ仕組みでバッジ表示できる）
+export const saleMatchesShop = (sale, shopName = '', source = '') => {
+  if (!sale) return false;
+  if (source && source === sale.shop) return true;
+  if (sale.shop === 'rakuten') return shopName.includes('楽天');
+  if (sale.shop === 'yahoo') return /yahoo|ヤフー/i.test(shopName);
+  if (sale.shop === 'amazon') return /amazon/i.test(shopName);
+  return false;
+};
 
 // 年間の買い時パターン（常設コンテンツ。/sale ページで表示）
 export const SALE_CALENDAR = [
