@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { getActiveSale, saleStatusLabel, SALE_CALENDAR, AMAZON_SALE_KEYWORDS } from '@/src/lib/sales';
+import { saleStatusLabel, SALE_CALENDAR, AMAZON_SALE_KEYWORDS } from '@/src/lib/sales';
+import { fetchActiveSale } from '@/src/lib/salesServer';
 import { getAmazonUrl, getAmazonDealsUrl } from '@/src/lib/affiliate';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
@@ -23,8 +24,8 @@ export const metadata = {
   twitter: { card: 'summary_large_image', title: 'ベビー用品のセール・買い時カレンダー' },
 };
 
-export default function SalePage() {
-  const sale = getActiveSale();
+export default async function SalePage() {
+  const sale = await fetchActiveSale();
 
   const jsonLd = [
     {

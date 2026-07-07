@@ -39,7 +39,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
 };
 import { supabase } from './lib/supabaseClient';
 import { toVCUrl, getAmazonUrl } from './lib/affiliate';
-import { getActiveSale, saleStatusLabel, saleBadgeLabel, saleMatchesShop } from './lib/sales';
+import { pickActiveSale, normalizeSaleRow, saleStatusLabel, getTodayDeals, getShopBadge } from './lib/sales';
 import ReviewHelpfulButton from './components/ReviewHelpfulButton';
 
 // 30秒レビュー用の選択チップ（タグだけでも投稿可能にして投稿ハードルを下げる）
@@ -1022,8 +1022,18 @@ const App = () => {
       return next;
     });
   };
-  // 開催中のセール（クライアント側なので日時判定は正確）
-  const activeSale = useMemo(() => getActiveSale(), []);
+  // 不定期セール: DB(salesテーブル)から取得（?admin=1のセール管理で登録）
+  const [salesList, setSalesList] = useState([]);
+  const reloadSales = async () => {
+    try {
+      const { data } = await supabase.from('sales').select('*');
+      setSalesList((data || []).map(normalizeSaleRow));
+    } catch { }
+  };
+  useEffect(() => { reloadSales(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const activeSale = useMemo(() => pickActiveSale(salesList), [salesList]);
+  // 固定ルールの「今日のお得な日」（5と0のつく日等）
+  const todayDeals = useMemo(() => getTodayDeals(), []);
 
   // 7日以上前に見た商品のうち、まだ促していない最初の1件
   const reviewPromptItem = useMemo(() => {
@@ -2700,7 +2710,7 @@ ${userText}
   const sendBroadcastPush = async () => {
     const password = getAdminPassword();
     if (!password) return;
-    const sale = getActiveSale();
+    const sale = activeSale;
     const title = window.prompt(
       '通知タイトル',
       sale ? `${sale.name}が${saleStatusLabel(sale)}です🔥` : 'HonestBabyからのお知らせ'
@@ -2726,6 +2736,72 @@ ${userText}
     } catch (e) {
       alert('送信に失敗しました: ' + e.message);
     }
+  };
+
+  // --- セール管理（?admin=1 → 🛍 セール管理） ---
+  const EMPTY_SALE_FORM = { id: null, shop: 'rakuten', name: '', short_name: '', start_at: '', main_start_at: '', end_at: '', period_label: '' };
+  const [showSaleAdmin, setShowSaleAdmin] = useState(false);
+  const [saleAdminList, setSaleAdminList] = useState([]);
+  const [saleForm, setSaleForm] = useState(EMPTY_SALE_FORM);
+
+  const callSaleAdminApi = async (payload) => {
+    const res = await fetch('/api/admin-sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: getAdminPassword(), ...payload }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.status);
+    return data;
+  };
+
+  const openSaleAdmin = async () => {
+    if (!getAdminPassword()) return;
+    setShowSaleAdmin(true);
+    try {
+      const data = await callSaleAdminApi({ action: 'list' });
+      setSaleAdminList(data.sales || []);
+    } catch (e) { alert('一覧の取得に失敗: ' + e.message); }
+  };
+
+  // ISO ⇄ datetime-local（端末ローカル時刻）変換
+  const isoToLocalInput = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+
+  const saveSaleForm = async () => {
+    if (!saleForm.name || !saleForm.start_at || !saleForm.end_at) { alert('セール名・開始・終了は必須です'); return; }
+    const toIso = (v) => (v ? new Date(v).toISOString() : null);
+    try {
+      await callSaleAdminApi({
+        action: 'save',
+        id: saleForm.id || undefined,
+        shop: saleForm.shop,
+        name: saleForm.name,
+        short_name: saleForm.short_name,
+        start_at: toIso(saleForm.start_at),
+        main_start_at: toIso(saleForm.main_start_at),
+        end_at: toIso(saleForm.end_at),
+        period_label: saleForm.period_label,
+      });
+      setSaleForm(EMPTY_SALE_FORM);
+      const data = await callSaleAdminApi({ action: 'list' });
+      setSaleAdminList(data.sales || []);
+      await reloadSales();
+      alert('保存しました。バナー・バッジ・/sale ページに反映されます。');
+    } catch (e) { alert('保存に失敗: ' + e.message); }
+  };
+
+  const deleteSaleRow = async (id) => {
+    if (!window.confirm('このセールを削除しますか？')) return;
+    try {
+      await callSaleAdminApi({ action: 'delete', id });
+      const data = await callSaleAdminApi({ action: 'list' });
+      setSaleAdminList(data.sales || []);
+      await reloadSales();
+    } catch (e) { alert('削除に失敗: ' + e.message); }
   };
 
   // --- 記事管理ハンドラ ---
@@ -4197,6 +4273,101 @@ ${userText}
             onClick={sendBroadcastPush}
             className="bg-[#E8894A] text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
           >📣 Push配信</button>
+          <button
+            onClick={openSaleAdmin}
+            className="bg-[#D4AF37] text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+          >🛍 セール管理</button>
+        </div>
+      )}
+
+      {/* ＝＝＝＝＝ 管理者: セール管理モーダル ＝＝＝＝＝ */}
+      {showSaleAdmin && (
+        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end sm:items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) setShowSaleAdmin(false); }}>
+          <div className="bg-[#FFFDFB] w-full max-w-lg rounded-t-[2rem] sm:rounded-[2rem] max-h-[92svh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-[#FFFDFB] px-6 pt-5 pb-4 flex items-center justify-between border-b border-[#F4EFEB] z-10">
+              <span className="font-black text-[#5A4C4C]">🛍 セール管理</span>
+              <button onClick={() => setShowSaleAdmin(false)} className="w-8 h-8 bg-[#F9F6F3] rounded-full flex items-center justify-center"><X className="w-4 h-4 text-[#A5A19E]" /></button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* 登録フォーム */}
+              <div className="bg-white border border-[#F4EFEB] rounded-2xl p-4 space-y-3">
+                <p className="text-xs font-black text-[#5A4C4C]">{saleForm.id ? 'セールを編集' : '新しいセールを登録'}</p>
+                <div className="flex gap-2">
+                  {[['rakuten', '楽天'], ['yahoo', 'Yahoo'], ['amazon', 'Amazon']].map(([v, label]) => (
+                    <button key={v} onClick={() => setSaleForm({ ...saleForm, shop: v })}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold ${saleForm.shop === v ? 'bg-[#5A4C4C] text-white' : 'bg-[#F4EFEB] text-[#8E8282]'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <input value={saleForm.name} onChange={e => setSaleForm({ ...saleForm, name: e.target.value })} placeholder="セール名（例: 楽天スーパーセール）"
+                  className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-xl px-3 py-2.5 text-sm" />
+                <input value={saleForm.short_name} onChange={e => setSaleForm({ ...saleForm, short_name: e.target.value })} placeholder="バッジ用短縮名（例: スーパーセール）任意"
+                  className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-xl px-3 py-2.5 text-sm" />
+                <label className="block text-[10px] font-bold text-[#A5A19E]">開始（先行セール含む）
+                  <input type="datetime-local" value={saleForm.start_at} onChange={e => setSaleForm({ ...saleForm, start_at: e.target.value })}
+                    className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-xl px-3 py-2.5 text-sm mt-1" />
+                </label>
+                <label className="block text-[10px] font-bold text-[#A5A19E]">本セール開始（先行が無ければ空欄）
+                  <input type="datetime-local" value={saleForm.main_start_at} onChange={e => setSaleForm({ ...saleForm, main_start_at: e.target.value })}
+                    className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-xl px-3 py-2.5 text-sm mt-1" />
+                </label>
+                <label className="block text-[10px] font-bold text-[#A5A19E]">終了
+                  <input type="datetime-local" value={saleForm.end_at} onChange={e => setSaleForm({ ...saleForm, end_at: e.target.value })}
+                    className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-xl px-3 py-2.5 text-sm mt-1" />
+                </label>
+                <input value={saleForm.period_label} onChange={e => setSaleForm({ ...saleForm, period_label: e.target.value })} placeholder="表示用期間（例: 9/4(木)20:00〜9/11(木)）任意"
+                  className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-xl px-3 py-2.5 text-sm" />
+                <div className="flex gap-2">
+                  <button onClick={saveSaleForm} className="flex-1 py-3 bg-[#7B8E76] text-white rounded-full text-xs font-black active:scale-95 transition-transform">
+                    {saleForm.id ? '更新する' : '登録する'}
+                  </button>
+                  {saleForm.id && (
+                    <button onClick={() => setSaleForm(EMPTY_SALE_FORM)} className="px-4 py-3 bg-[#F4EFEB] text-[#8E8282] rounded-full text-xs font-black">
+                      新規に戻す
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 登録済み一覧 */}
+              <div>
+                <p className="text-xs font-black text-[#5A4C4C] mb-2">登録済みのセール</p>
+                {saleAdminList.length === 0 ? (
+                  <p className="text-[11px] text-[#A5A19E] font-bold">登録がありません</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {saleAdminList.map((s) => {
+                      const now = Date.now();
+                      const active = now >= Date.parse(s.start_at) && now < Date.parse(s.end_at);
+                      return (
+                        <li key={s.id} className="bg-white border border-[#F4EFEB] rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-[#5A4C4C] truncate">
+                              {active && <span className="text-[#E8894A] mr-1">●</span>}
+                              {s.name}
+                              <span className="text-[#A5A19E] ml-1">({s.shop})</span>
+                            </p>
+                            <p className="text-[10px] text-[#A5A19E] font-bold">
+                              {new Date(s.start_at).toLocaleDateString('ja-JP')} 〜 {new Date(s.end_at).toLocaleDateString('ja-JP')}
+                            </p>
+                          </div>
+                          <div className="flex gap-1.5 flex-shrink-0">
+                            <button onClick={() => setSaleForm({
+                              id: s.id, shop: s.shop, name: s.name, short_name: s.short_name || '',
+                              start_at: isoToLocalInput(s.start_at), main_start_at: isoToLocalInput(s.main_start_at),
+                              end_at: isoToLocalInput(s.end_at), period_label: s.period_label || '',
+                            })} className="text-[10px] font-black text-[#7B8E76] bg-[#EBF0EA] px-2.5 py-1.5 rounded-full">編集</button>
+                            <button onClick={() => deleteSaleRow(s.id)} className="text-[10px] font-black text-white bg-red-400 px-2.5 py-1.5 rounded-full">削除</button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -4739,11 +4910,17 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                               <ShieldCheck className="w-2.5 h-2.5" /> 公式
                             </span>
                           )}
-                          {activeSale && saleMatchesShop(activeSale, shop._displayName || shop.name || '', shop.source || '') && (
-                            <span className="bg-white border border-[#E8894A] text-[#E8894A] text-[9px] font-black px-2.5 py-1 rounded-full whitespace-nowrap">
-                              {saleBadgeLabel(activeSale)}
-                            </span>
-                          )}
+                          {(() => {
+                            const b = getShopBadge(activeSale, todayDeals, shop._displayName || shop.name || '', shop.source || '');
+                            if (!b) return null;
+                            return (
+                              <span className={`text-[9px] font-black px-2.5 py-1 rounded-full whitespace-nowrap border ${
+                                b.kind === 'sale' ? 'bg-white border-[#E8894A] text-[#E8894A]' : 'bg-[#FFF9E6] border-[#F2E3AE] text-[#B8933D]'
+                              }`}>
+                                {b.label}
+                              </span>
+                            );
+                          })()}
                           {shop._isRental && (
                             <span className="bg-[#7BA7CC] text-white text-[9px] font-black px-2.5 py-1 rounded-md">
                               レンタル

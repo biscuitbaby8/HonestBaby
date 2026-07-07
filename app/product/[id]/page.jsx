@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
 import { toVCUrl, getAmazonUrl } from '@/src/lib/affiliate';
-import { getActiveSale, saleBadgeLabel, saleMatchesShop } from '@/src/lib/sales';
+import { saleBadgeLabel, saleMatchesShop, getTodayDeals, getShopBadge } from '@/src/lib/sales';
+import { fetchActiveSale } from '@/src/lib/salesServer';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
@@ -83,7 +84,8 @@ export default async function ProductPage({ params }) {
   if (!product) notFound();
 
   const related = await fetchRelated(product.category, product.id);
-  const activeSale = getActiveSale();
+  const activeSale = await fetchActiveSale();
+  const todayDeals = getTodayDeals();
   const price = getLowestPrice(product.shops);
   const shops = (product.shops || [])
     .filter((s) => {
@@ -240,11 +242,17 @@ export default async function ProductPage({ params }) {
                       <div className="flex items-center justify-between">
                         <span className="flex items-center gap-1.5 min-w-0">
                           <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
-                          {saleMatchesShop(activeSale, s.name || '') && (
-                            <span className="bg-white border border-[#E8894A] text-[#E8894A] text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
-                              {saleBadgeLabel(activeSale)}
-                            </span>
-                          )}
+                          {(() => {
+                            const b = getShopBadge(activeSale, todayDeals, s.name || '');
+                            if (!b) return null;
+                            return (
+                              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap border ${
+                                b.kind === 'sale' ? 'bg-white border-[#E8894A] text-[#E8894A]' : 'bg-[#FFF9E6] border-[#F2E3AE] text-[#B8933D]'
+                              }`}>
+                                {b.label}
+                              </span>
+                            );
+                          })()}
                         </span>
                         <span className="flex items-center gap-3">
                           <span className="text-sm font-black text-[#7B8E76]">¥{Number(s.lowestPrice).toLocaleString()}</span>
@@ -274,7 +282,7 @@ export default async function ProductPage({ params }) {
                     <span className="flex items-center gap-1.5 min-w-0">
                       <span className="text-xs font-bold text-[#5A4C4C]">Amazon.co.jp</span>
                       {activeSale?.shop === 'amazon' && (
-                        <span className="bg-white border border-[#E8894A] text-[#E8894A] text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <span className="bg-white border border-[#E8894A] text-[9px] text-[#E8894A] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
                           {saleBadgeLabel(activeSale)}
                         </span>
                       )}
