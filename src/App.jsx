@@ -779,6 +779,14 @@ const App = () => {
   const subscribeToPushNotifications = async (userId) => {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return { ok: false, reason: 'unsupported' };
+
+      // iOSは許可ダイアログを「タップ直後」にしか出せないため、
+      // fetch等のawaitを挟む前に最初に許可を要求する
+      const permission = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission();
+      if (permission !== 'granted') return { ok: false, reason: 'denied' };
+
       // 公開鍵: ビルド時env → サーバー配布(/api/push-key)の順で取得
       let vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) {
@@ -788,9 +796,6 @@ const App = () => {
         } catch { }
       }
       if (!vapidPublicKey) return { ok: false, reason: 'no-key' };
-
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return { ok: false, reason: 'denied' };
 
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
@@ -802,17 +807,18 @@ const App = () => {
       }
 
       const subJson = subscription.toJSON();
-      await supabase.from('push_subscriptions').upsert({
+      const { error: dbErr } = await supabase.from('push_subscriptions').upsert({
         user_id: userId,
         endpoint: subJson.endpoint,
         p256dh: subJson.keys.p256dh,
         auth: subJson.keys.auth,
         user_agent: navigator.userAgent,
       }, { onConflict: 'endpoint' });
+      if (dbErr) return { ok: false, reason: 'db', detail: dbErr.message };
       return { ok: true };
     } catch (e) {
       console.warn('Push subscription failed:', e);
-      return { ok: false, reason: 'error' };
+      return { ok: false, reason: 'error', detail: e?.message || String(e) };
     }
   };
 
@@ -862,8 +868,10 @@ const App = () => {
       alert('通知の設定がサーバー側で未完了です（VAPID鍵未設定）。管理者にご連絡ください。');
     } else if (result.reason === 'denied') {
       alert('通知が許可されませんでした。\niPhoneの「設定」→「通知」→「HonestBaby」から通知を許可した後、もう一度お試しください。');
+    } else if (result.reason === 'db') {
+      alert(`購読情報の保存に失敗しました。\nログインし直してからもう一度お試しください。\n(${result.detail || ''})`);
     } else {
-      alert('通知の登録に失敗しました。時間をおいて再度お試しください。');
+      alert(`通知の登録に失敗しました。時間をおいて再度お試しください。\n(${result.detail || ''})`);
     }
   };
 
