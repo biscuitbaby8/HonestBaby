@@ -774,8 +774,18 @@ const App = () => {
     } catch { }
   };
 
+  // VAPID公開鍵(base64url)を pushManager.subscribe が要求する Uint8Array へ変換
+  const urlBase64ToUint8Array = (base64String) => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  };
+
   // --- Web Push 通知購読 ---
-  // 戻り値: { ok: true } | { ok: false, reason: 'unsupported'|'no-key'|'denied'|'error' }
+  // 戻り値: { ok: true } | { ok: false, reason: 'unsupported'|'no-key'|'denied'|'db'|'error' }
   const subscribeToPushNotifications = async (userId) => {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return { ok: false, reason: 'unsupported' };
