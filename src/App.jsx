@@ -4715,69 +4715,62 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               </section>
             )}
 
-            {/* Yahoo!ショッピング お得な日 */}
+            {/* お得な日カレンダー（楽天・Yahooを1カード2カラムに集約してコンパクト表示） */}
             {(() => {
               const hasYahoo =
                 (selectedProduct.shops || []).some(s => (s.name || '').includes('Yahoo')) ||
                 crossPlatformShops.some(s => s.source === 'yahoo');
-              if (!hasYahoo) return null;
-              const events = getYahooSaleEvents(new Date(), 3);
-              if (!events.length) return null;
-              const fmtDate = (d) => {
-                const m = d.getMonth() + 1;
-                const day = d.getDate();
-                const dows = ['日', '月', '火', '水', '木', '金', '土'];
-                return `${m}月${day}日（${dows[d.getDay()]}）`;
-              };
-              return (
-                <section className="mb-8 bg-white border border-[#FFD9B5] rounded-[2rem] p-6 shadow-sm">
-                  <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-4">
-                    <span className="text-base">🛒</span> Yahoo!ショッピングのお得な日
-                  </h3>
-                  <div className="space-y-2">
-                    {events.map((ev, i) => (
-                      <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${ev.isToday ? 'bg-[#FFF3E8] border border-[#FFD9B5]' : 'bg-[#F9F6F3]'}`}>
-                        <div className="flex items-center gap-2">
-                          {ev.isToday && <span className="text-[10px] font-black text-white bg-[#E07A30] px-2 py-0.5 rounded-full">今日</span>}
-                          <span className="text-xs font-bold text-[#5A4C4C]">{fmtDate(ev.dateObj)}</span>
-                          <span className="text-xs font-black text-[#8E8282]">{ev.name}</span>
-                        </div>
-                        <span className="text-xs font-black text-[#E07A30]">{ev.bonus}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              );
-            })()}
-
-            {/* 楽天市場 お得な日 */}
-            {(() => {
               const hasRakuten =
                 (selectedProduct.shops || []).some(s => (s.name || '').includes('楽天')) ||
                 crossPlatformShops.some(s => s.source === 'rakuten');
-              if (!hasRakuten) return null;
-              const events = getRakutenSaleEvents(new Date(), 3);
-              if (!events.length) return null;
-              const fmtDate = (d) => {
-                const m = d.getMonth() + 1;
-                const day = d.getDate();
-                const dows = ['日', '月', '火', '水', '木', '金', '土'];
-                return `${m}月${day}日（${dows[d.getDay()]}）`;
-              };
+
+              const cols = [];
+              if (hasRakuten) {
+                const events = getRakutenSaleEvents(new Date(), 3);
+                if (events.length) cols.push({ key: 'rakuten', icon: '🛍️', label: '楽天市場', accent: '#BF3F3F', softBg: '#FDEDED', softBorder: '#F7C9C9', events });
+              }
+              if (hasYahoo) {
+                const events = getYahooSaleEvents(new Date(), 3);
+                if (events.length) cols.push({ key: 'yahoo', icon: '🛒', label: 'Yahoo!', accent: '#E07A30', softBg: '#FFF3E8', softBorder: '#FFD9B5', events });
+              }
+              if (!cols.length) return null;
+
+              const fmt = (d) => `${d.getMonth() + 1}/${d.getDate()}(${['日', '月', '火', '水', '木', '金', '土'][d.getDay()]})`;
+
               return (
-                <section className="mb-8 bg-white border border-[#F7C9C9] rounded-[2rem] p-6 shadow-sm">
-                  <h3 className="font-black text-[#5A4C4C] flex items-center gap-2 mb-4">
-                    <span className="text-base">🛍️</span> 楽天市場のお得な日
+                <section className="mb-8 bg-white border border-[#F4EFEB] rounded-[2rem] p-5 shadow-sm">
+                  <h3 className="font-black text-[#5A4C4C] text-sm flex items-center gap-2 mb-3">
+                    <span className="text-base">📅</span> ポイントアップの日
+                    <span className="text-[9px] text-[#A5A19E] font-bold ml-auto">この日に買うとお得</span>
                   </h3>
-                  <div className="space-y-2">
-                    {events.map((ev, i) => (
-                      <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${ev.isToday ? 'bg-[#FDEDED] border border-[#F7C9C9]' : 'bg-[#F9F6F3]'}`}>
-                        <div className="flex items-center gap-2">
-                          {ev.isToday && <span className="text-[10px] font-black text-white bg-[#BF3F3F] px-2 py-0.5 rounded-full">今日</span>}
-                          <span className="text-xs font-bold text-[#5A4C4C]">{fmtDate(ev.dateObj)}</span>
-                          <span className="text-xs font-black text-[#8E8282]">{ev.name}</span>
-                        </div>
-                        <span className="text-xs font-black text-[#BF3F3F]">{ev.bonus}</span>
+                  <div className={`grid gap-3 ${cols.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {cols.map((col) => (
+                      <div key={col.key} className="rounded-2xl border p-3" style={{ borderColor: col.softBorder }}>
+                        <p className="text-[11px] font-black mb-2 flex items-center gap-1" style={{ color: col.accent }}>
+                          <span>{col.icon}</span>{col.label}
+                        </p>
+                        <ul className="space-y-1.5">
+                          {col.events.map((ev, i) => (
+                            <li
+                              key={i}
+                              className={`rounded-lg px-2 py-1.5 ${ev.isToday ? '' : 'bg-[#F9F6F3]'}`}
+                              style={ev.isToday ? { backgroundColor: col.softBg } : undefined}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  className="text-[11px] font-black whitespace-nowrap"
+                                  style={{ color: ev.isToday ? col.accent : '#5A4C4C' }}
+                                >
+                                  {ev.isToday ? '今日！' : fmt(ev.dateObj)}
+                                </span>
+                                <span className="text-[11px] font-black whitespace-nowrap" style={{ color: col.accent }}>
+                                  {ev.bonus}
+                                </span>
+                              </div>
+                              <p className="text-[9px] font-bold text-[#8E8282] leading-tight truncate">{ev.name}</p>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     ))}
                   </div>
