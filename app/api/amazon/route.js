@@ -1,4 +1,4 @@
-import { searchAmazonItems } from '@/lib/amazonApi';
+import { searchAmazonItems, diagnoseAmazonApi } from '@/lib/amazonApi';
 import { checkRateLimit } from '@/lib/rateLimit';
 
 // SPA（商品モーダル）用のAmazon商品検索プロキシ。
@@ -9,6 +9,18 @@ export async function GET(request) {
   if (limited) return limited;
 
   const { searchParams } = new URL(request.url);
+
+  // 診断モード（キー設定の検証用・管理者パスワード必須）
+  if (searchParams.get('diag') === '1') {
+    const pass = searchParams.get('pass') || request.headers.get('x-admin-pass');
+    const expected = process.env.ADMIN_PASSWORD;
+    if (!expected || pass !== expected) {
+      return Response.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    const diag = await diagnoseAmazonApi();
+    return Response.json(diag, { status: 200, headers: { 'Cache-Control': 'no-store' } });
+  }
+
   const q = (searchParams.get('q') || '').slice(0, 100).trim();
   if (!q) return Response.json({ items: [], eligible: false }, { status: 200 });
 
