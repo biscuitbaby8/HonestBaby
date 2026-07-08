@@ -2788,6 +2788,35 @@ ${userText}
     }
   };
 
+  // Amazon Creators API のキー設定・開通状況を診断（?admin=1 → 🔍 Amazon診断）。
+  // パスワードは x-admin-pass ヘッダで送るためURLの特殊文字問題が起きない。
+  const diagnoseAmazon = async () => {
+    const password = getAdminPassword();
+    if (!password) return;
+    try {
+      const res = await fetch('/api/amazon?diag=1', { headers: { 'x-admin-pass': password } });
+      if (res.status === 401) {
+        alert('管理者パスワードが一致しませんでした。\nVercelの ADMIN_PASSWORD と同じ値か確認してください。');
+        try { sessionStorage.removeItem('honestBabyAdminPassword'); } catch { }
+        return;
+      }
+      const d = await res.json();
+      let verdict;
+      if (!d.configured) {
+        verdict = '❌ キー未反映\nVercelに AMZ_CREATORS_CLIENT_ID / AMZ_CREATORS_CLIENT_SECRET が設定されていないか、再デプロイがまだです。';
+      } else if (!d.tokenOk) {
+        verdict = `⚠️ キーの値が誤り（token ${d.tokenStatus}）\nシークレットを再作成して設定し直してください。`;
+      } else if (d.eligible) {
+        verdict = `🎉 開通済み！実価格表示が有効です（取得 ${d.itemCount} 件）`;
+      } else {
+        verdict = `✅ キー設定は成功。\nあとは「売上10件/30日」の条件待ちです（正常な休眠状態）。\nsearchItems: ${d.itemsStatus}`;
+      }
+      alert(`Amazon Creators API 診断\n\n${verdict}\n\n[詳細] ${JSON.stringify(d)}`);
+    } catch (e) {
+      alert('診断に失敗しました: ' + e.message);
+    }
+  };
+
   // --- セール管理（?admin=1 → 🛍 セール管理） ---
   const EMPTY_SALE_FORM = { id: null, shop: 'rakuten', name: '', short_name: '', start_at: '', main_start_at: '', end_at: '', period_label: '' };
   const [showSaleAdmin, setShowSaleAdmin] = useState(false);
@@ -4327,6 +4356,10 @@ ${userText}
             onClick={openSaleAdmin}
             className="bg-[#D4AF37] text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
           >🛍 セール管理</button>
+          <button
+            onClick={diagnoseAmazon}
+            className="bg-[#232F3E] text-white text-[11px] font-black px-4 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform"
+          >🔍 Amazon診断</button>
         </div>
       )}
 
