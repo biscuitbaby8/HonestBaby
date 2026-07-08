@@ -38,7 +38,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   }
 };
 import { supabase } from './lib/supabaseClient';
-import { toVCUrl, getAmazonUrl } from './lib/affiliate';
+import { toVCUrl, getAmazonUrl, withAmazonTag } from './lib/affiliate';
 import { pickActiveSale, normalizeSaleRow, saleStatusLabel, getTodayDeals, getShopBadge } from './lib/sales';
 import ReviewHelpfulButton from './components/ReviewHelpfulButton';
 import PriceHistoryChart from './components/PriceHistoryChart';
@@ -984,6 +984,22 @@ const App = () => {
   // モーダル制御
   const [showBabyModal, setShowBabyModal] = useState(false);
   const [showPriceAlertModal, setShowPriceAlertModal] = useState(false);
+
+  // Amazon実価格（Creators API・資格未達時はnullのまま=検索リンク表示）
+  const [amazonLive, setAmazonLive] = useState(null);
+  useEffect(() => {
+    setAmazonLive(null);
+    const name = selectedProduct?.name;
+    if (!name) return;
+    const keyword = name.split(/[\s　]+/).slice(0, 4).join(' ');
+    fetch(`/api/amazon?q=${encodeURIComponent(keyword)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const item = (d?.items || []).find((it) => Number(it.price) > 0);
+        if (item) setAmazonLive(item);
+      })
+      .catch(() => { });
+  }, [selectedProduct?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 価格推移（過去90日）: DB保存済み商品（UUID）のみ日次スナップショットを取得
   const [priceHistory, setPriceHistory] = useState([]);
@@ -4894,8 +4910,11 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       name: 'Amazon.co.jp',
                       source: 'amazon',
                       type: 'mall',
-                      lowestPrice: 0,
-                      url: getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ')),
+                      // Creators APIで実価格が取れていれば直リンク+価格表示、未開通時は検索リンク
+                      lowestPrice: amazonLive?.price || 0,
+                      url: amazonLive?.url
+                        ? withAmazonTag(amazonLive.url)
+                        : getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ')),
                       sellers: []
                     });
                   }

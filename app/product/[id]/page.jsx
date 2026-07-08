@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
-import { toVCUrl, getAmazonUrl } from '@/src/lib/affiliate';
+import { toVCUrl, getAmazonUrl, withAmazonTag } from '@/src/lib/affiliate';
+import { searchAmazonItems } from '@/lib/amazonApi';
 import { saleBadgeLabel, saleMatchesShop, getTodayDeals, getShopBadge } from '@/src/lib/sales';
 import { fetchActiveSale } from '@/src/lib/salesServer';
 import SiteHeader from '@/src/components/SiteHeader';
@@ -100,11 +101,26 @@ export default async function ProductPage({ params }) {
   const product = await fetchProduct(id);
   if (!product) notFound();
 
-  const [related, activeSale, priceHistory] = await Promise.all([
+  const [related, activeSale, priceHistory, amazonResult] = await Promise.all([
     fetchRelated(product.category, product.id),
     fetchActiveSale(),
     fetchPriceHistory(product.id),
+    // Creators API（資格未達・未設定時は eligible:false → 検索リンク表示に自動フォールバック）
+    searchAmazonItems(cleanProductName(product.name, 40), 1),
   ]);
+  const amazonItem = amazonResult.items.find((it) => it.price > 0) || null;
+  // Amazonの実価格が取れたら価格履歴にも記録（1日1行、ベストエフォート）
+  if (amazonItem) {
+    try {
+      const jstDate = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      await supabaseServer.from('price_history').upsert([{
+        product_id: product.id,
+        shop_name: 'Amazon',
+        price: amazonItem.price,
+        recorded_on: jstDate,
+      }], { onConflict: 'product_id,shop_name,recorded_on' });
+    } catch { /* noop */ }
+  }
   const todayDeals = getTodayDeals();
   const price = getLowestPrice(product.shops);
   const shops = (product.shops || [])
@@ -296,7 +312,7 @@ export default async function ProductPage({ params }) {
                     </li>
                   );
                 })}
-                {/* Amazon: DBには持たないため検索リンク（SPAの商品モーダルと同等の導線） */}
+                {/* Amazon: Creators APIで実価格が取れれば直リンク、未開通時はタグ付き検索リンク */}
                 <li className="bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 min-w-0">
@@ -307,14 +323,19 @@ export default async function ProductPage({ params }) {
                         </span>
                       )}
                     </span>
-                    <a
-                      href={getAmazonUrl(cleanProductName(product.name, 40))}
-                      target="_blank"
-                      rel="noopener noreferrer sponsored"
-                      className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full"
-                    >
-                      {activeSale?.shop === 'amazon' ? 'セール価格をチェック🔥' : '最安値をチェック'}
-                    </a>
+                    <span className="flex items-center gap-3">
+                      {amazonItem && (
+                        <span className="text-sm font-black text-[#7B8E76]">¥{amazonItem.price.toLocaleString()}</span>
+                      )}
+                      <a
+                        href={amazonItem ? withAmazonTag(amazonItem.url) : getAmazonUrl(cleanProductName(product.name, 40))}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full"
+                      >
+                        {amazonItem ? '見る' : activeSale?.shop === 'amazon' ? 'セール価格をチェック🔥' : '最安値をチェック'}
+                      </a>
+                    </span>
                   </div>
                 </li>
               </ul>

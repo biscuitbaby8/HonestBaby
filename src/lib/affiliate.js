@@ -30,6 +30,18 @@ export const getAmazonUrl = (keyword) =>
 // Amazonのセール会場（タイムセール一覧）へのタグ付きリンク
 export const getAmazonDealsUrl = () => `https://www.amazon.co.jp/deals?tag=${AMAZON_TAG}`;
 
+// Amazon商品URLにアソシエイトタグが無ければ付与する
+// （Creators APIのdetailPageUrlにタグが含まれない場合の保険）
+export const withAmazonTag = (url) => {
+  try {
+    const u = new URL(url);
+    if (!u.searchParams.get('tag')) u.searchParams.set('tag', AMAZON_TAG);
+    return u.toString();
+  } catch {
+    return url;
+  }
+};
+
 // iHerb（Partnerize経由）のアフィリエイトトラッキングURLを付与する。
 // Camref未設定（審査待ち）の間は元URLをそのまま返す安全側フォールバック。
 export function addIherbAffiliate(rawUrl) {
