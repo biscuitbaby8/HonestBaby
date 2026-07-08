@@ -10,6 +10,7 @@ import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
 import ProductAppGate from '@/src/components/ProductAppGate';
 import ReviewHelpfulButton from '@/src/components/ReviewHelpfulButton';
+import PriceHistoryChart from '@/src/components/PriceHistoryChart';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -33,6 +34,22 @@ async function fetchProduct(rawId) {
     return data ? formatDbProduct(data) : null;
   } catch {
     return null;
+  }
+}
+
+// 価格推移（過去90日）。日次cronが記録した最安値スナップショット。
+async function fetchPriceHistory(productId) {
+  try {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { data } = await supabaseServer
+      .from('price_history')
+      .select('shop_name, price, recorded_on')
+      .eq('product_id', productId)
+      .gte('recorded_on', since)
+      .order('recorded_on', { ascending: true });
+    return data || [];
+  } catch {
+    return [];
   }
 }
 
@@ -83,8 +100,11 @@ export default async function ProductPage({ params }) {
   const product = await fetchProduct(id);
   if (!product) notFound();
 
-  const related = await fetchRelated(product.category, product.id);
-  const activeSale = await fetchActiveSale();
+  const [related, activeSale, priceHistory] = await Promise.all([
+    fetchRelated(product.category, product.id),
+    fetchActiveSale(),
+    fetchPriceHistory(product.id),
+  ]);
   const todayDeals = getTodayDeals();
   const price = getLowestPrice(product.shops);
   const shops = (product.shops || [])
@@ -302,6 +322,15 @@ export default async function ProductPage({ params }) {
 
           </div>
         </div>
+
+        {priceHistory.length > 0 && (
+          <div className="mt-8">
+            <PriceHistoryChart history={priceHistory} />
+            <p className="text-[10px] text-[#A5A19E] font-bold mt-2 px-1">
+              💡 底値を待つなら、アプリの価格アラート（目標価格になったら通知）が便利です
+            </p>
+          </div>
+        )}
 
         {product.description && (
           <section className="mt-8 bg-white rounded-[2rem] border border-[#F4EFEB] p-6">
