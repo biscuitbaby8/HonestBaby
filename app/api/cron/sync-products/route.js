@@ -16,6 +16,21 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'placeholder_key'
 );
 
+// 価格履歴を記録（価格推移チャート用）。1商品×1ショップ×1日=1行、
+// 同日の再同期は最新値で上書き。履歴はベストエフォート（同期本体を止めない）。
+async function recordPriceHistory(productId, shopName, price) {
+  if (!productId || !(price > 0)) return;
+  const jstDate = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  try {
+    await supabase.from('price_history').upsert([{
+      product_id: productId,
+      shop_name: shopName,
+      price,
+      recorded_on: jstDate,
+    }], { onConflict: 'product_id,shop_name,recorded_on' });
+  } catch { /* noop */ }
+}
+
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || process.env.VITE_RAKUTEN_APP_ID;
 const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || process.env.VITE_RAKUTEN_ACCESS_KEY || '';
 const RAKUTEN_AFFILIATE_ID = process.env.RAKUTEN_AFFILIATE_ID || process.env.VITE_RAKUTEN_AFFILIATE_ID || '';
@@ -1119,6 +1134,7 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
           source: 'rakuten',
           sellers: JSON.stringify(rankedRakuten.slice(0, 5).map(serializeSeller))
         }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+      await recordPriceHistory(productId, '楽天市場', rakutenLowest);
 
       // --- Yahoo価格を取得（上位5件のみ詳細調査、複数 seller を集約） ---
       if (includeYahooPrice && i < 5) {
@@ -1150,6 +1166,7 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
               source: 'yahoo',
               sellers: JSON.stringify(rankedYahoo.slice(0, 5).map(serializeSeller))
             }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+          await recordPriceHistory(productId, 'Yahoo!ショッピング', yahooLowest);
         }
       }
 
@@ -1218,6 +1235,7 @@ async function saveSubCatProduct(product, seller, source, shopName) {
       source,
       sellers: JSON.stringify(sellersOut),
     }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+    await recordPriceHistory(productId, shopName, lowestPrice);
 
     return true;
   } catch {

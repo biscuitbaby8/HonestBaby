@@ -41,6 +41,7 @@ import { supabase } from './lib/supabaseClient';
 import { toVCUrl, getAmazonUrl } from './lib/affiliate';
 import { pickActiveSale, normalizeSaleRow, saleStatusLabel, getTodayDeals, getShopBadge } from './lib/sales';
 import ReviewHelpfulButton from './components/ReviewHelpfulButton';
+import PriceHistoryChart from './components/PriceHistoryChart';
 
 // 30秒レビュー用の選択チップ（タグだけでも投稿可能にして投稿ハードルを下げる）
 const REVIEW_TAGS = [
@@ -983,6 +984,26 @@ const App = () => {
   // モーダル制御
   const [showBabyModal, setShowBabyModal] = useState(false);
   const [showPriceAlertModal, setShowPriceAlertModal] = useState(false);
+
+  // 価格推移（過去90日）: DB保存済み商品（UUID）のみ日次スナップショットを取得
+  const [priceHistory, setPriceHistory] = useState([]);
+  useEffect(() => {
+    const id = selectedProduct?.id;
+    setPriceHistory([]);
+    if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
+    (async () => {
+      try {
+        const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        const { data } = await supabase
+          .from('price_history')
+          .select('shop_name, price, recorded_on')
+          .eq('product_id', id)
+          .gte('recorded_on', since)
+          .order('recorded_on', { ascending: true });
+        setPriceHistory(data || []);
+      } catch { setPriceHistory([]); }
+    })();
+  }, [selectedProduct?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showSaveSearchModal, setShowSaveSearchModal] = useState(false);
 
   // PWA ホーム追加プロンプト
@@ -4726,6 +4747,19 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   <span className="text-lg font-black text-[#7B8E76]">{selectedProduct.usedPrice}</span>
                 </div>
               </section>
+            )}
+
+            {/* 価格推移チャート（過去90日・日次記録） */}
+            {priceHistory.length > 0 && (
+              <div className="mb-8">
+                <PriceHistoryChart history={priceHistory} />
+                <button
+                  onClick={() => { setAlertTargetPrice(''); setShowPriceAlertModal(true); }}
+                  className="mt-2 px-1 text-[10px] font-black text-[#B8860B] flex items-center gap-1 active:scale-95 transition-transform"
+                >
+                  <BellRing className="w-3 h-3" /> 目標価格になったら通知を受け取る（価格アラート）
+                </button>
+              </div>
             )}
 
             {/* お得な日カレンダー（楽天・Yahooを1カード2カラムに集約してコンパクト表示） */}
