@@ -6,6 +6,7 @@
 const SHOP_STYLES = {
   '楽天市場': { color: '#BF3F3F', label: '楽天' },
   'Yahoo!ショッピング': { color: '#E07A30', label: 'Yahoo!' },
+  'Amazon': { color: '#232F3E', label: 'Amazon' },
 };
 
 const W = 320;
