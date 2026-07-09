@@ -341,6 +341,18 @@ const CATEGORY_NG_KEYWORDS = {
 // （「メール便可」等の機能説明としての言及は許容するため、名前全体が一致した場合のみ無効化）
 const JUNK_EXACT_NAMES = new Set(["ネコポス", "ネコポス発送", "メール便", "宅配便", "ファルスカ", "クリックポスト", "日本", "エトヴォス", "ママフィ", "ドクターブロナー", "Poled", "全国", "18日エントリーポイント最大5倍+最大1000円クーポン", "エントリーで全品P5倍", "セール 30%OFF", "セール 30%OFF ネコポス便にて", "一部", "部分", "ニオイ逃がさん消臭剤配合", "＼レビューで1000円クーポン／ ニオイ逃がさん消臭剤配合"]);
 
+// 付属品・交換用パーツ単体の出品を示すキーワード。deduplicateProducts の
+// 名前統合（先頭30文字一致）で本体商品と同じグループに紛れ込んだ際、
+// 本体よりずっと安いこれらの出品が「最安値」として誤って選ばれ、リンク先が
+// 付属品のみのページになってしまうのを防ぐため、seller候補から除外する。
+const ACCESSORY_ONLY_KEYWORDS = [
+  '本体は付属しません', '本体は含まれ', '本体別売', '本体なし', '本体は別売',
+  '付属品のみ', '付属品単品', 'パーツのみ', '部品のみ', 'スペアのみ',
+  '交換用のみ', '交換パーツのみ', 'カバーのみ', 'ケースのみ', '替えのみ',
+];
+const isAccessoryOnlyListing = (name) =>
+  !!name && ACCESSORY_ONLY_KEYWORDS.some((kw) => name.includes(kw));
+
 // Yahoo画像URLはAPIが返すサイズコード（/i/g/=ショップが実際に保持する画像）を
 // そのまま使う。以前は /i/j/ に書き換えていたが、/i/j/ は存在しないショップが多く
 // 商品画像が一切表示されない原因になっていた。万一 /i/j/ が紛れ込んでも確実に
@@ -707,6 +719,7 @@ function normalizeYahooItem(item, category) {
       reviews_count: parseInt(item.review?.count) || 0,
       period,
       rakuten_item_code: `yahoo-${item.code}`,
+      item_name: rawName,
     }
   };
 }
@@ -825,6 +838,7 @@ function normalizeRakutenItems(items, category) {
           reviews_count: parseInt(item.Item.reviewCount) || 0,
           period,
           rakuten_item_code: item.Item.itemCode,
+          item_name: rawName,
         }
       };
     });
@@ -854,15 +868,21 @@ function assignRoles(sellers) {
   if (!sellers || sellers.length === 0) return [];
   // 同一ショップ名は除去（同じ店が複数入るのを防ぐ）。
   // レンタル商品は同じ店が期間バリアントごとに複数seller化するため、期間も含めてキー化する。
-  const unique = [];
+  const uniqueRaw = [];
   const seen = new Set();
   for (const s of sellers) {
     const shopKey = (s.shop_name || s.name || '').trim();
     const key = shopKey + '|' + (s.period || '');
     if (!shopKey || seen.has(key)) continue;
     seen.add(key);
-    unique.push({ ...s, isOfficial: /公式|直営|メーカー/.test(shopKey) });
+    uniqueRaw.push({ ...s, isOfficial: /公式|直営|メーカー/.test(shopKey) });
   }
+
+  // 名前統合（deduplicateProducts の先頭30文字一致）で本体商品と同じグループに
+  // 紛れ込んだ、付属品・交換用パーツ単体の出品を除外する。全出品がアクセサリー
+  // 扱いになる場合はこの商品自体がアクセサリー単体商品なので除外しない。
+  const nonAccessory = uniqueRaw.filter((s) => !isAccessoryOnlyListing(s.item_name));
+  const unique = nonAccessory.length > 0 ? nonAccessory : uniqueRaw;
 
   const withPrice = unique.filter(s => (s.price || 0) > 0);
   if (withPrice.length === 0) return unique;
