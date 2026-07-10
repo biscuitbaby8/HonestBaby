@@ -992,7 +992,10 @@ const App = () => {
     const name = selectedProduct?.name;
     if (!name) return;
     const keyword = name.split(/[\s　]+/).slice(0, 4).join(' ');
-    fetch(`/api/amazon?q=${encodeURIComponent(keyword)}`)
+    // name/ref を渡すとAPI側で「本体」出品だけに絞られる（付属品のみの出品や、
+    // 楽天/Yahoo最安値と乖離しすぎる誤マッチ価格は返ってこない → 検索リンク表示に落ちる）
+    const refPrice = getLowestPrice(selectedProduct?.shops) || 0;
+    fetch(`/api/amazon?q=${encodeURIComponent(keyword)}&name=${encodeURIComponent(name.slice(0, 200))}&ref=${refPrice}`)
       .then((r) => r.json())
       .then((d) => {
         const item = (d?.items || []).find((it) => Number(it.price) > 0);
