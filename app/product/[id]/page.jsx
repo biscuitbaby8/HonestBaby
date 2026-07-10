@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
 import { toVCUrl, getAmazonUrl, withAmazonTag } from '@/src/lib/affiliate';
-import { searchAmazonItems } from '@/lib/amazonApi';
+import { searchAmazonItems, selectAmazonItem } from '@/lib/amazonApi';
 import { saleBadgeLabel, saleMatchesShop, getTodayDeals, getShopBadge } from '@/src/lib/sales';
 import { fetchActiveSale } from '@/src/lib/salesServer';
 import SiteHeader from '@/src/components/SiteHeader';
@@ -106,9 +106,14 @@ export default async function ProductPage({ params }) {
     fetchActiveSale(),
     fetchPriceHistory(product.id),
     // Creators API（資格未達・未設定時は eligible:false → 検索リンク表示に自動フォールバック）
-    searchAmazonItems(cleanProductName(product.name, 40), 1),
+    searchAmazonItems(cleanProductName(product.name, 40), 5),
   ]);
-  const amazonItem = amazonResult.items.find((it) => it.price > 0) || null;
+  // 検索結果から「本体」とみなせる出品だけを採用（付属品のみの出品や
+  // 楽天/Yahoo最安値と乖離しすぎる価格は誤マッチとして棄却 → 検索リンク表示に落ちる）
+  const amazonItem = selectAmazonItem(amazonResult.items, {
+    productName: product.name,
+    referencePrice: getLowestPrice(product.shops),
+  });
   // Amazonの実価格が取れたら価格履歴にも記録（1日1行、ベストエフォート）
   if (amazonItem) {
     try {

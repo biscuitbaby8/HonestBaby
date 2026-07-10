@@ -1,4 +1,4 @@
-import { searchAmazonItems, diagnoseAmazonApi } from '@/lib/amazonApi';
+import { searchAmazonItems, selectAmazonItem, diagnoseAmazonApi } from '@/lib/amazonApi';
 import { checkRateLimit } from '@/lib/rateLimit';
 
 // SPA（商品モーダル）用のAmazon商品検索プロキシ。
@@ -24,8 +24,15 @@ export async function GET(request) {
   const q = (searchParams.get('q') || '').slice(0, 100).trim();
   if (!q) return Response.json({ items: [], eligible: false }, { status: 200 });
 
+  // name: サイト側の完全な商品名（付属品語の照合用。省略時は検索語で代用）
+  // ref:  楽天/Yahoo等の既知最安値。検索結果から「本体」とみなせる出品だけを返し、
+  //       付属品のみの出品（本体よりずっと安い）が価格として表示されるのを防ぐ。
+  const name = (searchParams.get('name') || q).slice(0, 200).trim();
+  const ref = Number(searchParams.get('ref')) || 0;
+
   const result = await searchAmazonItems(q);
-  return Response.json(result, {
+  const item = selectAmazonItem(result.items, { productName: name, referencePrice: ref });
+  return Response.json({ items: item ? [item] : [], eligible: result.eligible }, {
     status: 200,
     headers: { 'Cache-Control': 's-maxage=3600, stale-while-revalidate=86400' },
   });
