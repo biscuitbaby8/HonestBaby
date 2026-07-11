@@ -1638,10 +1638,14 @@ const App = () => {
         const passesRental = (item) => !excludeRental || !isRentalListing(item);
 
         // 付属品・交換部品の出品を除外（本体より安いため最安として誤採用され、
-        // 「交換用マットのみ」等の部品ページに飛んでしまうのを防ぐ）。
-        // 商品自体が付属品の場合は除外しない。
-        const selfIsAccessory = isAccessoryName(selectedProduct.name);
-        const passesAccessory = (item) => selfIsAccessory || !isAccessoryName(item?.name);
+        // 「ハンドルカバー」「レインカバー」等のアクセサリーページに飛んでしまうのを防ぐ）。
+        // 判定は ACCESSORY_WORDS（交換用/カバーのみ 等）に加え、ハンドルカバー・
+        // フットマフ・サンシェード等の周辺グッズ名（ACCESSORY_EXCLUDE_WORDS）も対象にする。
+        // 商品自体が付属品カテゴリの場合は除外しない。
+        const isAccessoryForCompare = (name) =>
+          isAccessoryName(name) || ACCESSORY_EXCLUDE_WORDS.some((w) => (name || '').includes(w));
+        const selfIsAccessory = isAccessoryForCompare(selectedProduct.name);
+        const passesAccessory = (item) => selfIsAccessory || !isAccessoryForCompare(item?.name);
 
         // --- 口コミ・SNSレビューの最新データをDBから取得 ---
         const fetchReviewsFromDb = async () => {
