@@ -31,8 +31,13 @@ export default function AffiliateClickTracker() {
       const shop = resolveShop(a.href);
       if (!shop) return;
       if (typeof window.gtag !== 'function') return;
+      // どのCTA（比較リスト最上段/リスト/検索リンク等）が押されたかを識別する。
+      // data-cta-position が付いた祖先要素を優先し、無ければ 'unknown'。
+      const posEl = a.closest?.('[data-cta-position]');
+      const ctaPosition = posEl?.getAttribute('data-cta-position') || 'unknown';
       window.gtag('event', 'affiliate_click', {
         shop,
+        cta_position: ctaPosition,
         link_url: a.href.slice(0, 400), // GA4 パラメータ上限対策
         page_path: window.location.pathname,
       });
