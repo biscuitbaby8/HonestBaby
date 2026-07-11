@@ -140,6 +140,22 @@ export default async function ProductPage({ params }) {
     .sort((a, b) => Number(a.lowestPrice) - Number(b.lowestPrice));
   const reviews = (product.honestReviews || []).slice(0, 5);
 
+  // CTA用のショップ短縮名（「楽天で見る」等、押した先が明確な文言にする）
+  const shopShort = (name) => {
+    const n = String(name || '');
+    if (n.includes('楽天')) return '楽天';
+    if (/yahoo|ヤフー/i.test(n)) return 'Yahoo!';
+    if (/amazon/i.test(n)) return 'Amazon';
+    return n.length > 5 ? n.slice(0, 5) : n || 'ショップ';
+  };
+  // 楽天/Yahoo/Amazon を横断した実際の最安値（「🏆最安」バッジの判定に使う）
+  const amazonPrice = amazonItem ? Number(amazonItem.price) : 0;
+  const candidatePrices = [
+    ...shops.map((s) => Number(s.lowestPrice)).filter((p) => p > 0),
+    ...(amazonPrice > 0 ? [amazonPrice] : []),
+  ];
+  const lowestAll = candidatePrices.length ? Math.min(...candidatePrices) : 0;
+
   // レビュー件数は実数のみ採用（捏造を避ける）。評価と件数の両方がある時だけ aggregateRating を出す。
   const reviewCount = Number(product.reviewsCount) || reviews.length || 0;
   const hasRating = product.rating > 0 && reviewCount > 0;
@@ -278,29 +294,31 @@ export default async function ProductPage({ params }) {
                   const periodSellers = (s.sellers || [])
                     .filter((sl) => sl.period && Number(sl.price) > 0)
                     .sort((a, b) => Number(a.price) - Number(b.price));
-                  return (
-                    <li key={i} className="bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 min-w-0">
+                  const isCheapest = Number(s.lowestPrice) > 0 && Number(s.lowestPrice) === lowestAll;
+                  const b = getShopBadge(activeSale, todayDeals, s.name || '');
+                  // 行の中身（バッジ・価格・CTA）。行全体をタップ領域にするため <a> でラップする
+                  const inner = (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                          {isCheapest && (
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap bg-[#7B8E76] text-white">🏆 最安</span>
+                          )}
                           <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
-                          {(() => {
-                            const b = getShopBadge(activeSale, todayDeals, s.name || '');
-                            if (!b) return null;
-                            return (
-                              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap border ${
-                                b.kind === 'sale' ? 'bg-white border-[#E8894A] text-[#E8894A]' : 'bg-[#FFF9E6] border-[#F2E3AE] text-[#B8933D]'
-                              }`}>
-                                {b.label}
-                              </span>
-                            );
-                          })()}
+                          {b && (
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap border ${
+                              b.kind === 'sale' ? 'bg-white border-[#E8894A] text-[#E8894A]' : 'bg-[#FFF9E6] border-[#F2E3AE] text-[#B8933D]'
+                            }`}>
+                              {b.label}
+                            </span>
+                          )}
                         </span>
-                        <span className="flex items-center gap-3">
+                        <span className="flex items-center gap-2.5 shrink-0">
                           <span className="text-sm font-black text-[#7B8E76]">¥{Number(s.lowestPrice).toLocaleString()}</span>
                           {s.url && (
-                            <a href={toVCUrl(s.url)} target="_blank" rel="noopener noreferrer sponsored" className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full">
-                              見る
-                            </a>
+                            <span className={`text-[11px] font-black text-white px-3 py-1.5 rounded-full whitespace-nowrap ${isCheapest ? 'bg-[#7B8E76]' : 'bg-[#F2ABAC]'}`}>
+                              {shopShort(s.name)}で見る
+                            </span>
                           )}
                         </span>
                       </div>
@@ -314,35 +332,68 @@ export default async function ProductPage({ params }) {
                           ))}
                         </ul>
                       )}
+                    </>
+                  );
+                  const rowClass = `block rounded-2xl px-4 py-3 border transition-colors ${
+                    isCheapest ? 'bg-[#F3F7F1] border-[#7B8E76] shadow-sm' : 'bg-[#FBF9F7] border-[#F4EFEB] active:bg-[#F4EFEB]'
+                  }`;
+                  return (
+                    <li key={i}>
+                      {s.url ? (
+                        <a
+                          href={toVCUrl(s.url)}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          data-cta-position={isCheapest ? 'product-shoplist-top' : 'product-shoplist'}
+                          className={rowClass}
+                        >
+                          {inner}
+                        </a>
+                      ) : (
+                        <div className={rowClass}>{inner}</div>
+                      )}
                     </li>
                   );
                 })}
                 {/* Amazon: Creators APIで実価格が取れれば直リンク、未開通時はタグ付き検索リンク */}
-                <li className="bg-[#FBF9F7] rounded-2xl px-4 py-3 border border-[#F4EFEB]">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-xs font-bold text-[#5A4C4C]">Amazon.co.jp</span>
-                      {activeSale?.shop === 'amazon' && (
-                        <span className="bg-white border border-[#E8894A] text-[9px] text-[#E8894A] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
-                          {saleBadgeLabel(activeSale)}
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex items-center gap-3">
-                      {amazonItem && (
-                        <span className="text-sm font-black text-[#7B8E76]">¥{amazonItem.price.toLocaleString()}</span>
-                      )}
+                {(() => {
+                  const amazonCheapest = amazonPrice > 0 && amazonPrice === lowestAll;
+                  return (
+                    <li>
                       <a
                         href={amazonItem ? withAmazonTag(amazonItem.url) : getAmazonUrl(cleanProductName(product.name, 40))}
                         target="_blank"
                         rel="noopener noreferrer sponsored"
-                        className="text-[11px] font-black text-white bg-[#F2ABAC] px-3 py-1.5 rounded-full"
+                        data-cta-position={amazonItem ? (amazonCheapest ? 'product-shoplist-top' : 'product-shoplist') : 'product-shoplist-amazon-search'}
+                        className={`block rounded-2xl px-4 py-3 border transition-colors ${
+                          amazonCheapest ? 'bg-[#F3F7F1] border-[#7B8E76] shadow-sm' : 'bg-[#FBF9F7] border-[#F4EFEB] active:bg-[#F4EFEB]'
+                        }`}
                       >
-                        {amazonItem ? '見る' : activeSale?.shop === 'amazon' ? 'セール価格をチェック🔥' : '最安値をチェック'}
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                            {amazonCheapest && (
+                              <span className="text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap bg-[#7B8E76] text-white">🏆 最安</span>
+                            )}
+                            <span className="text-xs font-bold text-[#5A4C4C]">Amazon.co.jp</span>
+                            {activeSale?.shop === 'amazon' && (
+                              <span className="bg-white border border-[#E8894A] text-[9px] text-[#E8894A] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
+                                {saleBadgeLabel(activeSale)}
+                              </span>
+                            )}
+                          </span>
+                          <span className="flex items-center gap-2.5 shrink-0">
+                            {amazonItem && (
+                              <span className="text-sm font-black text-[#7B8E76]">¥{amazonItem.price.toLocaleString()}</span>
+                            )}
+                            <span className={`text-[11px] font-black text-white px-3 py-1.5 rounded-full whitespace-nowrap ${amazonCheapest ? 'bg-[#7B8E76]' : 'bg-[#F2ABAC]'}`}>
+                              {amazonItem ? 'Amazonで見る' : activeSale?.shop === 'amazon' ? 'セール価格をチェック🔥' : 'Amazonで最安値をチェック'}
+                            </span>
+                          </span>
+                        </div>
                       </a>
-                    </span>
-                  </div>
-                </li>
+                    </li>
+                  );
+                })()}
               </ul>
             </div>
 
