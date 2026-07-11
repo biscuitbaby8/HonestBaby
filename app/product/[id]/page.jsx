@@ -296,62 +296,63 @@ export default async function ProductPage({ params }) {
                     .sort((a, b) => Number(a.price) - Number(b.price));
                   const isCheapest = Number(s.lowestPrice) > 0 && Number(s.lowestPrice) === lowestAll;
                   const b = getShopBadge(activeSale, todayDeals, s.name || '');
-                  // 行の中身（バッジ・価格・CTA）。行全体をタップ領域にするため <a> でラップする
-                  const inner = (
-                    <>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                          {isCheapest && (
-                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap bg-[#7B8E76] text-white">🏆 最安</span>
-                          )}
-                          <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
-                          {b && (
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap border ${
-                              b.kind === 'sale' ? 'bg-white border-[#E8894A] text-[#E8894A]' : 'bg-[#FFF9E6] border-[#F2E3AE] text-[#B8933D]'
-                            }`}>
-                              {b.label}
-                            </span>
-                          )}
-                        </span>
-                        <span className="flex items-center gap-2.5 shrink-0">
-                          <span className="text-sm font-black text-[#7B8E76]">¥{Number(s.lowestPrice).toLocaleString()}</span>
-                          {s.url && (
-                            <span className={`text-[11px] font-black text-white px-3 py-1.5 rounded-full whitespace-nowrap ${isCheapest ? 'bg-[#7B8E76]' : 'bg-[#F2ABAC]'}`}>
-                              {shopShort(s.name)}で見る
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      {periodSellers.length > 1 && (
-                        <ul className="mt-2 pt-2 border-t border-[#EFE7E0] space-y-1">
-                          {periodSellers.map((sl, j) => (
-                            <li key={j} className="flex items-center justify-between text-[11px]">
-                              <span className="text-[#8E8282] font-bold">{sl.period}</span>
-                              <span className="text-[#5A4C4C] font-black">¥{Number(sl.price).toLocaleString()}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </>
+                  // メイン行（バッジ・価格・CTA）。この行だけをリンク化する。
+                  // 期間別価格は下に別要素で出す（<a> 内に <ul> を入れる不正ネストを避ける）
+                  const mainLine = (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                        {isCheapest && (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap bg-[#7B8E76] text-white">🏆 最安</span>
+                        )}
+                        <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
+                        {b && (
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap border ${
+                            b.kind === 'sale' ? 'bg-white border-[#E8894A] text-[#E8894A]' : 'bg-[#FFF9E6] border-[#F2E3AE] text-[#B8933D]'
+                          }`}>
+                            {b.label}
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-sm font-black text-[#7B8E76]">¥{Number(s.lowestPrice).toLocaleString()}</span>
+                        {s.url && (
+                          <span className={`text-[11px] font-black text-white px-3 py-1.5 rounded-full whitespace-nowrap ${isCheapest ? 'bg-[#7B8E76]' : 'bg-[#F2ABAC]'}`}>
+                            {shopShort(s.name)}で見る
+                          </span>
+                        )}
+                      </span>
+                    </div>
                   );
-                  const rowClass = `block rounded-2xl px-4 py-3 border transition-colors ${
+                  const rowClass = `rounded-2xl px-4 py-3 border transition-colors ${
                     isCheapest ? 'bg-[#F3F7F1] border-[#7B8E76] shadow-sm' : 'bg-[#FBF9F7] border-[#F4EFEB] active:bg-[#F4EFEB]'
                   }`;
                   return (
                     <li key={i}>
-                      {s.url ? (
-                        <a
-                          href={toVCUrl(s.url)}
-                          target="_blank"
-                          rel="noopener noreferrer sponsored"
-                          data-cta-position={isCheapest ? 'product-shoplist-top' : 'product-shoplist'}
-                          className={rowClass}
-                        >
-                          {inner}
-                        </a>
-                      ) : (
-                        <div className={rowClass}>{inner}</div>
-                      )}
+                      <div className={rowClass}>
+                        {s.url ? (
+                          <a
+                            href={toVCUrl(s.url)}
+                            target="_blank"
+                            rel="noopener noreferrer sponsored"
+                            data-cta-position={isCheapest ? 'product-shoplist-top' : 'product-shoplist'}
+                            className="block"
+                          >
+                            {mainLine}
+                          </a>
+                        ) : (
+                          mainLine
+                        )}
+                        {periodSellers.length > 1 && (
+                          <ul className="mt-2 pt-2 border-t border-[#EFE7E0] space-y-1">
+                            {periodSellers.map((sl, j) => (
+                              <li key={j} className="flex items-center justify-between text-[11px]">
+                                <span className="text-[#8E8282] font-bold">{sl.period}</span>
+                                <span className="text-[#5A4C4C] font-black">¥{Number(sl.price).toLocaleString()}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     </li>
                   );
                 })}
