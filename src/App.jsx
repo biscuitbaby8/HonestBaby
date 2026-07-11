@@ -4984,10 +4984,14 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       if (b.lowestPrice === 0) return -1;
                       return (a.lowestPrice || a.price) - (b.lowestPrice || b.price);
                     });
-                })().map((shop, idx) => (
-                  <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
-                    <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`}
-                      onClick={() => shop.sellers?.length > 0 ? setExpandedMall(expandedMall === shop._displayName ? null : shop._displayName) : window.open(shop.url, '_blank')}>
+                })().map((shop, idx) => {
+                  // 出品が2件以上ある行だけアコーディオン展開（公式/最安/高評価の比較）。
+                  // 出品が1件以下（1店舗/Amazon）の行は、行全体をリンク化して1タップで直接遷移する。
+                  const canExpand = (shop.sellers?.length || 0) > 1;
+                  const directUrl = toVCUrl(shop.url || shop.sellers?.[0]?.url || '#');
+                  // ヘッダー行の中身（ショップ名・バッジ・価格・アイコン）。展開/直接遷移で共用。
+                  const header = (
+                    <>
                       <div className="flex-1 pr-4">
                         <div className="flex items-center flex-wrap gap-2 mb-1.5">
                           <div className="w-5 h-5 rounded-md flex items-center justify-center overflow-hidden border border-[#F4EFEB] bg-white">
@@ -5048,10 +5052,24 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           )}
                         </div>
                         <div className="text-[#A5A19E] bg-white p-1 rounded-full shadow-sm">
-                          {shop.sellers?.length > 0 ? (expandedMall === shop._displayName ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />) : <ExternalLink className="w-4 h-4 opacity-30" />}
+                          {canExpand ? (expandedMall === shop._displayName ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />) : <ExternalLink className="w-4 h-4" />}
                         </div>
                       </div>
-                    </div>
+                    </>
+                  );
+                  return (
+                    <div key={idx} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm transition-all ${shop.type === 'official' ? 'border-[#F2ABAC] shadow-[#F2ABAC]/10' : 'border-[#F4EFEB]'}`}>
+                      {canExpand ? (
+                        <div className={`p-6 flex items-center justify-between cursor-pointer ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`}
+                          onClick={() => setExpandedMall(expandedMall === shop._displayName ? null : shop._displayName)}>
+                          {header}
+                        </div>
+                      ) : (
+                        <a href={directUrl} target="_blank" rel="noopener noreferrer sponsored" data-cta-position="app-shoplist"
+                          className={`p-6 flex items-center justify-between cursor-pointer no-underline text-inherit ${shop.type === 'official' ? 'bg-[#FFF5F5]' : 'active:bg-[#F9F6F3]'}`}>
+                          {header}
+                        </a>
+                      )}
 
                     {/* 出品者アコーディオン（公式/最安値/高評価 をラベル付きで表示） */}
                     {expandedMall === shop._displayName && shop.sellers?.length > 0 && (
@@ -5096,7 +5114,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                                 </div>
                                 <div className="flex flex-col items-end gap-2 border-l border-[#F4EFEB] pl-4">
                                   <span className="text-sm font-black text-[#7B8E76]">¥{seller.price.toLocaleString()}</span>
-                                  <a href={toVCUrl(seller.url) || '#'} target="_blank" rel="noopener noreferrer" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
+                                  <a href={toVCUrl(seller.url) || '#'} target="_blank" rel="noopener noreferrer sponsored" data-cta-position="app-shoplist-seller" className={`text-white px-5 py-2.5 rounded-full text-[10px] font-black shadow-sm whitespace-nowrap active:scale-95 transition-transform ${shop.type === 'official' ? 'bg-[#F2ABAC]' : 'bg-[#7B8E76]'}`}>
                                     ショップへ
                                   </a>
                                 </div>
@@ -5105,8 +5123,9 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           })}
                       </div>
                     )}
-              </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </section>
 
