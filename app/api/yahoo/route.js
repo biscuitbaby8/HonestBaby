@@ -20,7 +20,13 @@ export async function GET(request) {
   }
 
   // noFilter=1 のときはジャンル/価格フィルタを外す（クロスプラットフォーム比較用）
-  const filterParams = noFilter === '1' ? '' : '&category_id=13457&price_from=500';
+  // noGenre=1 のときはカテゴリ制限だけ外し価格下限は維持（ジャンル絞りで0件だった時の再検索用）
+  const noGenre = searchParams.get('noGenre');
+  const filterParams = noFilter === '1'
+    ? ''
+    : noGenre === '1'
+      ? '&price_from=500'
+      : '&category_id=13457&price_from=500';
   const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${clientId}&query=${encodeURIComponent(query || '')}&results=30${filterParams}`;
 
   // Yahoo Shopping URL に ValueCommerce アフィリエイトパラメータを付与
