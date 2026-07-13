@@ -2,6 +2,7 @@
 // 依存ライブラリなしのインラインSVG折れ線。純粋コンポーネントのため
 // SSR商品ページ・SPA商品モーダルの両方で使える（GuideContentと同パターン）。
 // props.history: [{ shop_name, price, recorded_on }]（recorded_on昇順でなくてもよい）
+import { TrendingUp } from 'lucide-react';
 
 const SHOP_STYLES = {
   '楽天市場': { color: '#BF3F3F', label: '楽天' },
@@ -41,8 +42,8 @@ export default function PriceHistoryChart({ history }) {
   return (
     <section className="bg-white rounded-[2rem] border border-[#F4EFEB] p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <h3 className="font-black text-[#5A4C4C] text-sm flex items-center gap-2">
-          <span className="text-base">📈</span> 価格推移（過去90日）
+        <h3 className="font-black text-[#5A4C4C] text-sm flex items-center gap-1.5">
+          <TrendingUp className="w-4 h-4 text-[#7B8E76]" strokeWidth={2.5} /> 価格推移（過去90日）
         </h3>
         {isBottom && (
           <span className="bg-[#7B8E76] text-white text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">

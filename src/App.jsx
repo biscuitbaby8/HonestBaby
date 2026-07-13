@@ -9,7 +9,8 @@ import {
   Package, Layers, ChevronDown, ChevronUp, Calculator,
   Store, Gift, ChevronLeft, ShieldCheck, Baby, BellRing, Edit3,
   FileText, Shield, Info, Edit2, Camera, Mail,
-  LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat
+  LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat,
+  ShoppingBag, Calendar
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
 import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, getHighResImage, categorizeByName } from './lib/products';
@@ -3461,7 +3462,7 @@ ${userText}
             const ev = todayEvents[0];
             return (
               <div className="bg-[#FFF3E8] border border-[#FFD9B5] rounded-[1.75rem] p-4 relative overflow-hidden shadow-sm flex flex-col justify-between min-h-[8.5rem]">
-                <span className="text-2xl w-fit">🛒</span>
+                <ShoppingBag className="w-6 h-6 text-[#E07A30]" strokeWidth={2.5} />
                 <div>
                   <p className="text-[9px] font-black text-[#E07A30] uppercase tracking-wider mb-1">Yahoo!お得情報</p>
                   <p className="text-sm font-black text-[#5A4C4C] leading-tight truncate">{ev.name}</p>
@@ -3540,7 +3541,7 @@ ${userText}
                   <p className="text-base font-black text-[#5A4C4C]">{ev.name}</p>
                   <p className="text-xs text-[#A5A19E] font-bold mt-0.5">ポイント{ev.bonus}還元</p>
                 </div>
-                <span className="text-3xl">🛒</span>
+                <ShoppingBag className="w-8 h-8 text-[#E07A30]" strokeWidth={2.5} />
               </div>
             );
           })()}
@@ -3612,7 +3613,9 @@ ${userText}
               <div className="flex-1 text-left">
                 <p className="text-[9px] font-black uppercase tracking-widest text-[#F2ABAC] mb-0.5">Anniversary</p>
                 <p className="text-sm font-black text-[#5A4C4C] leading-tight">
-                  {now_ ? `今月は${babyInfo.name || 'お子さま'}の${milestone.label}🎉` : `もうすぐ${milestone.label}。ギフトを探しませんか？`}
+                  {now_ ? (
+                    <span className="inline-flex items-center gap-1">今月は{babyInfo.name || 'お子さま'}の{milestone.label}<Sparkles className="w-3.5 h-3.5 text-[#F2ABAC] shrink-0" strokeWidth={2.5} /></span>
+                  ) : `もうすぐ${milestone.label}。ギフトを探しませんか？`}
                 </p>
               </div>
               <ChevronRight className="w-4 h-4 text-[#F2ABAC] flex-shrink-0" />
@@ -4929,11 +4932,11 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
               const cols = [];
               if (hasRakuten) {
                 const events = getRakutenSaleEvents(new Date(), 3);
-                if (events.length) cols.push({ key: 'rakuten', icon: '🛍️', label: '楽天市場', accent: '#BF3F3F', softBg: '#FDEDED', softBorder: '#F7C9C9', events });
+                if (events.length) cols.push({ key: 'rakuten', icon: Store, label: '楽天市場', accent: '#BF3F3F', softBg: '#FDEDED', softBorder: '#F7C9C9', events });
               }
               if (hasYahoo) {
                 const events = getYahooSaleEvents(new Date(), 3);
-                if (events.length) cols.push({ key: 'yahoo', icon: '🛒', label: 'Yahoo!', accent: '#E07A30', softBg: '#FFF3E8', softBorder: '#FFD9B5', events });
+                if (events.length) cols.push({ key: 'yahoo', icon: ShoppingBag, label: 'Yahoo!', accent: '#E07A30', softBg: '#FFF3E8', softBorder: '#FFD9B5', events });
               }
               if (!cols.length) return null;
 
@@ -4941,15 +4944,15 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
 
               return (
                 <section className="mb-8 bg-white border border-[#F4EFEB] rounded-[2rem] p-5 shadow-sm">
-                  <h3 className="font-black text-[#5A4C4C] text-sm flex items-center gap-2 mb-3">
-                    <span className="text-base">📅</span> ポイントアップの日
+                  <h3 className="font-black text-[#5A4C4C] text-sm flex items-center gap-1.5 mb-3">
+                    <Calendar className="w-4 h-4 text-[#7B8E76]" strokeWidth={2.5} /> ポイントアップの日
                     <span className="text-[9px] text-[#A5A19E] font-bold ml-auto">この日に買うとお得</span>
                   </h3>
                   <div className={`grid gap-3 ${cols.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                     {cols.map((col) => (
                       <div key={col.key} className="rounded-2xl border p-3" style={{ borderColor: col.softBorder }}>
                         <p className="text-[11px] font-black mb-2 flex items-center gap-1" style={{ color: col.accent }}>
-                          <span>{col.icon}</span>{col.label}
+                          <col.icon className="w-3.5 h-3.5" strokeWidth={2.5} />{col.label}
                         </p>
                         <ul className="space-y-1.5">
                           {col.events.map((ev, i) => (
