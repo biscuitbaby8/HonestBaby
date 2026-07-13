@@ -10,7 +10,7 @@ import {
   Store, Gift, ChevronLeft, ShieldCheck, Baby, BellRing, Edit3,
   FileText, Shield, Info, Edit2, Camera, Mail,
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat,
-  ShoppingBag, Calendar
+  ShoppingBag, Calendar, Trophy
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
 import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, getHighResImage, categorizeByName } from './lib/products';
@@ -5090,7 +5090,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                   };
                   // 購入品の比較にはレンタル出品（延長プラン等）を出さない。商品自体がレンタルなら表示する。
                   const hideRental = selectedProduct.category !== 'レンタル';
-                  return Array.from(shopByKey.values())
+                  const mapped = Array.from(shopByKey.values())
                     .map(s => {
                       const sellerName = s.name || s.shop_name || '';
                       const platformLabel = PLATFORM_LABEL[s.source];
@@ -5101,13 +5101,23 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                         _sellerLabel: platformLabel && platformLabel !== sellerName ? sellerName : null,
                       };
                     })
-                    .filter(s => !hideRental || !s._isRental)
-                    .sort((a, b) => {
-                      if (a._isRental !== b._isRental) return a._isRental ? 1 : -1;
-                      if (a.lowestPrice === 0) return 1;
-                      if (b.lowestPrice === 0) return -1;
-                      return (a.lowestPrice || a.price) - (b.lowestPrice || b.price);
-                    });
+                    .filter(s => !hideRental || !s._isRental);
+                  // 比較対象（価格ありの非レンタル）が全て内容量を持つ時だけ、単価(¥/枚)で
+                  // 並べ替えて「実質最安」を上に出す。1つでも数量不明なら絶対価格順（安全側）。
+                  const priced = mapped.filter(s => s.lowestPrice > 0 && !s._isRental);
+                  const useUnit = priced.length > 1 && priced.every(s => s._qty && s._qty.count > 1);
+                  const unitOf = (s) => (s._qty && s._qty.count > 0 ? s.lowestPrice / s._qty.count : Infinity);
+                  const sorted = mapped.sort((a, b) => {
+                    if (a._isRental !== b._isRental) return a._isRental ? 1 : -1;
+                    if (a.lowestPrice === 0) return 1;
+                    if (b.lowestPrice === 0) return -1;
+                    return useUnit ? unitOf(a) - unitOf(b) : (a.lowestPrice || a.price) - (b.lowestPrice || b.price);
+                  });
+                  if (useUnit) {
+                    const top = sorted.find(s => s.lowestPrice > 0 && !s._isRental);
+                    if (top) top._bestUnit = true; // 実質最安（1枚あたり）の印
+                  }
+                  return sorted;
                 })().map((shop, idx) => {
                   // 出品が2件以上ある行だけアコーディオン展開（公式/最安/高評価の比較）。
                   // 出品が1件以下（1店舗/Amazon）の行は、行全体をリンク化して1タップで直接遷移する。
@@ -5170,8 +5180,15 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                             {shop.lowestPrice > 0 ? `¥${shop.lowestPrice.toLocaleString()}` : '最安値をチェック'}
                           </span>
                           {shop._qty && shop._qty.count > 1 && shop.lowestPrice > 0 && !shop._isRental && (
-                            <span className="text-[10px] font-black text-[#F2ABAC] mt-0.5 whitespace-nowrap">
-                              {shop._qty.count}{shop._qty.unit} ・ 1{shop._qty.unit}あたり ¥{(shop.lowestPrice / shop._qty.count).toFixed(1)}
+                            <span className="flex items-center gap-1 mt-0.5 whitespace-nowrap">
+                              {shop._bestUnit && (
+                                <span className="inline-flex items-center gap-0.5 text-[8px] font-black px-1.5 py-0.5 rounded-full bg-[#7B8E76] text-white">
+                                  <Trophy className="w-2 h-2" strokeWidth={2.5} />1{shop._qty.unit}あたり最安
+                                </span>
+                              )}
+                              <span className="text-[10px] font-black text-[#F2ABAC]">
+                                {shop._qty.count}{shop._qty.unit} ・ 1{shop._qty.unit}あたり ¥{(shop.lowestPrice / shop._qty.count).toFixed(1)}
+                              </span>
                             </span>
                           )}
                         </div>
