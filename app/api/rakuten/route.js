@@ -119,7 +119,15 @@ export async function GET(request) {
 
   // 一般検索: ベビー用品ジャンル(566382)に限定 + 価格フィルタ
   // noFilter=1 (クロスプラットフォーム価格比較用): フィルタなし
-  const filterParams = noFilter === '1' ? '' : '&genreId=566382&minPrice=500';
+  // noGenre=1 (ジャンル絞りで0件だった時の再検索用): ジャンル制限だけ外し価格下限は維持
+  //  → グーン トイ・ストーリー柄のおむつ等、ジャンル登録の都合で 566382 の
+  //     絞り込みから漏れる商品を拾えるようにする。
+  const noGenre = searchParams.get('noGenre');
+  const filterParams = noFilter === '1'
+    ? ''
+    : noGenre === '1'
+      ? '&minPrice=500'
+      : '&genreId=566382&minPrice=500';
   const shopCodeParam = shopCode ? `&shopCode=${encodeURIComponent(shopCode)}` : '';
   const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1${filterParams}${shopCodeParam}&affiliateId=${affiliateId || ''}`;
 

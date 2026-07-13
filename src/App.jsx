@@ -2115,39 +2115,43 @@ const App = () => {
     setSearchResults([]);
 
     try {
-      // 1. 楽天・Yahoo両方から並列取得
-      const [rakutenResult, yahooResult] = await Promise.allSettled([
-        fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}`).then(r => r.json()),
-        fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}`).then(r => r.json())
-      ]);
-
-      const rakutenItems = rakutenResult.status === 'fulfilled'
-        ? (rakutenResult.value.products || []).map(item => ({
-          code: item.id, // 安定コード（rakuten-{itemCode}）→ DB取り込み・自サイトURLに使う
-          name: item.name,
-          price: item.price,
-          url: item.url,
-          image: item.image || '',
-          source: 'rakuten'
-        }))
-        : [];
-
-      const yahooItems = yahooResult.status === 'fulfilled'
-        ? (yahooResult.value.products || []).map(item => ({
-          code: item.id, // 安定コード（yahoo-{code}）
-          name: item.name,
-          price: item.price,
-          url: item.url,
-          image: item.image || '',
-          source: 'yahoo'
-        }))
-        : [];
-
-      const raw = [...rakutenItems, ...yahooItems];
       // 付属品・交換部品は検索結果から除外（本体を探しているのに「交換用マットのみ」等が
       // 並ぶのを防ぐ）。ただしユーザーが付属品自体を検索している場合は除外しない。
       const keywordIsAccessory = isAccessoryName(keyword);
-      const allItems = keywordIsAccessory ? raw : raw.filter(it => !isAccessoryName(it.name));
+
+      // 楽天・Yahoo両方から並列取得して整形する。extraParam でジャンル絞りの有無を切替。
+      const runSearch = async (extraParam) => {
+        const [rakutenResult, yahooResult] = await Promise.allSettled([
+          fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}${extraParam}`).then(r => r.json()),
+          fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}${extraParam}`).then(r => r.json())
+        ]);
+
+        const rakutenItems = rakutenResult.status === 'fulfilled'
+          ? (rakutenResult.value.products || []).map(item => ({
+            code: item.id, // 安定コード（rakuten-{itemCode}）→ DB取り込み・自サイトURLに使う
+            name: item.name, price: item.price, url: item.url, image: item.image || '', source: 'rakuten'
+          }))
+          : [];
+
+        const yahooItems = yahooResult.status === 'fulfilled'
+          ? (yahooResult.value.products || []).map(item => ({
+            code: item.id, // 安定コード（yahoo-{code}）
+            name: item.name, price: item.price, url: item.url, image: item.image || '', source: 'yahoo'
+          }))
+          : [];
+
+        const raw = [...rakutenItems, ...yahooItems];
+        const allItems = keywordIsAccessory ? raw : raw.filter(it => !isAccessoryName(it.name));
+        return { raw, allItems };
+      };
+
+      // まずベビー用品ジャンルに絞って検索。0件ならジャンル制限を外して再検索する
+      // （グーン トイ・ストーリー柄のおむつ等、ジャンル登録の都合で絞り込みから
+      //  漏れて「確実にあるのに出てこない」商品を救済する）。
+      let { raw, allItems } = await runSearch('');
+      if (allItems.length === 0) {
+        ({ raw, allItems } = await runSearch('&noGenre=1'));
+      }
 
       if (allItems.length === 0) {
         setSearchError("検索結果が見つかりませんでした。別のキーワードをお試しください。");
