@@ -502,6 +502,23 @@ const buildBrandVariantQueries = (keyword) => {
   return [...queries].slice(0, 2);
 };
 
+// 商品名から内容量（枚数）を解析する。「10枚入×24パック」等の掛け算も展開する。
+// 数量が違う出品（例: おしりふき 単品 vs 24パック）を単価(¥/枚)で正しく比較するために使う。
+// 解析できなければ null を返し、安全側で単価表示を出さない。
+const parseQuantity = (name) => {
+  const n = (name || '').replace(/[，,]/g, '');
+  // 「A枚入×Bパック」「A枚×B個」など（枚が先）
+  let m = n.match(/(\d+)\s*枚[^\d×xX＊*]{0,6}?[×xX＊*]\s*(\d+)/);
+  if (m) return { count: parseInt(m[1], 10) * parseInt(m[2], 10), unit: '枚' };
+  // 「Bパック×A枚」「B個×A枚」など（パック/個が先）
+  m = n.match(/(\d+)\s*(?:パック|個|袋|セット|箱)[^\d×xX＊*]{0,6}?[×xX＊*]\s*(\d+)\s*枚/);
+  if (m) return { count: parseInt(m[1], 10) * parseInt(m[2], 10), unit: '枚' };
+  // 単純な「A枚」
+  m = n.match(/(\d+)\s*枚/);
+  if (m) return { count: parseInt(m[1], 10), unit: '枚' };
+  return null;
+};
+
 // 取り込みAPIが保存する rakuten_item_code の正規化（rakuten- 接頭辞を除去して
 // 同期データと揃える。yahoo- は維持）。サーバー側の正規化と一致させること。
 const siteCode = (code) =>
@@ -1735,6 +1752,7 @@ const App = () => {
             const idx = newShops.findIndex(s => s.source === 'rakuten');
             const shopData = {
               name: shopName, type: 'mall', lowestPrice: best.price, source: 'rakuten',
+              _itemName: best.name, _qty: parseQuantity(best.name),
               sellers: [{ name: shopName, price: best.price, shipping: 0, points: 0, url: best.url, note: '' }]
             };
             if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
@@ -1749,6 +1767,7 @@ const App = () => {
             const idx = newShops.findIndex(s => s.source === 'yahoo');
             const shopData = {
               name: shopName, type: 'mall', lowestPrice: best.price, source: 'yahoo',
+              _itemName: best.name, _qty: parseQuantity(best.name),
               sellers: [{ name: shopName, price: best.price, shipping: 0, points: 0, url: best.url, note: '' }]
             };
             if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
@@ -1777,6 +1796,7 @@ const App = () => {
           const shopData = {
             name, type: 'mall', lowestPrice: best.price, source,
             url: officialUrl,
+            _itemName: best.name, _qty: parseQuantity(best.name),
             sellers: [{ name, price: best.price, shipping: 0, points: 0, url: officialUrl, note: '' }]
           };
           if (idx >= 0) newShops[idx] = shopData; else newShops.push(shopData);
@@ -4987,9 +5007,9 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
             <section className="mb-12">
               <div className="flex items-center justify-between mb-6 px-1">
                 <h3 className="font-black text-[#5A4C4C] text-xl flex items-center gap-2"><TrendingUp className="w-5 h-5 text-[#7B8E76]" /> ショップ比較</h3>
-                {selectedProduct.unitCount && (
+                {crossPlatformShops.some(s => s._qty && s._qty.count > 1) && (
                   <div className="flex items-center gap-1 bg-[#F9F6F3] px-3 py-1.5 rounded-full text-[10px] font-black text-[#8E8282]">
-                    <Calculator className="w-3 h-3" /> 1{selectedProduct.unitName}あたり比較
+                    <Calculator className="w-3 h-3" /> 内容量・単価つき
                   </div>
                 )}
               </div>
@@ -5054,6 +5074,8 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                       type: 'mall',
                       // Creators APIで実価格が取れていれば直リンク+価格表示、未開通時は検索リンク
                       lowestPrice: amazonLive?.price || 0,
+                      _itemName: amazonLive?.name || null,
+                      _qty: amazonLive?.name ? parseQuantity(amazonLive.name) : null,
                       url: amazonLive?.url
                         ? withAmazonTag(amazonLive.url)
                         : getAmazonUrl(selectedProduct.name.split(/[\s　]+/).slice(0, 4).join(' ')),
@@ -5147,9 +5169,9 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
                           <span className="text-2xl font-black text-[#7B8E76]">
                             {shop.lowestPrice > 0 ? `¥${shop.lowestPrice.toLocaleString()}` : '最安値をチェック'}
                           </span>
-                          {selectedProduct.unitCount > 0 && shop.lowestPrice > 0 && !shop._isRental && (
-                            <span className="text-[10px] font-black text-[#F2ABAC] mt-0.5">
-                              1{selectedProduct.unitName}あたり ¥{(shop.lowestPrice / selectedProduct.unitCount).toFixed(1)}
+                          {shop._qty && shop._qty.count > 1 && shop.lowestPrice > 0 && !shop._isRental && (
+                            <span className="text-[10px] font-black text-[#F2ABAC] mt-0.5 whitespace-nowrap">
+                              {shop._qty.count}{shop._qty.unit} ・ 1{shop._qty.unit}あたり ¥{(shop.lowestPrice / shop._qty.count).toFixed(1)}
                             </span>
                           )}
                         </div>
