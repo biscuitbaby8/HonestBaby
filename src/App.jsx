@@ -2165,6 +2165,13 @@ const App = () => {
       // 並ぶのを防ぐ）。ただしユーザーが付属品自体を検索している場合は除外しない。
       const keywordIsAccessory = isAccessoryName(keyword);
 
+      // 中古・リユース・ジャンク品を除外。出品者がタイトルに人気検索語を詰め込んだ
+      // 中古ぬいぐるみ等（例:「【中古】ぬいぐるみ … ベビーモニターぬいぐるみ」）が
+      // 検索結果に混ざるのを防ぐ。ユーザーが明示的に中古を探している時は除外しない。
+      const USED_WORDS = ['中古', 'リユース', 'ジャンク'];
+      const keywordWantsUsed = USED_WORDS.some(w => keyword.includes(w));
+      const isUsedListing = (name) => USED_WORDS.some(w => (name || '').includes(w));
+
       // 表記ゆれ（中黒・長音・波ダッシュ・全半角・記号）＋ブランド別表記（グーン≡GOO.N）を
       // 吸収して関連性を判定する。ジャンル無し検索時に「トイストーリーの枕」等の無関係品
       // （＝検索語の一部しか含まない商品）が混ざるのを防ぐ。単語検索は絞りすぎない。
@@ -2200,7 +2207,9 @@ const App = () => {
           : [];
 
         const raw = [...rakutenItems, ...yahooItems];
-        const base = keywordIsAccessory ? raw : raw.filter(it => !isAccessoryName(it.name));
+        // 中古品を除外（ユーザーが中古を明示検索した時は除外しない）
+        const afterUsed = keywordWantsUsed ? raw : raw.filter(it => !isUsedListing(it.name));
+        const base = keywordIsAccessory ? afterUsed : afterUsed.filter(it => !isAccessoryName(it.name));
         // 関連性フィルタで無関係品（検索語の一部しか含まない商品）を除外
         const allItems = base.filter(it => relevant(it.name));
         return { raw, allItems };
