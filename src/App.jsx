@@ -455,6 +455,52 @@ const isAccessoryName = (name) => {
   return ACCESSORY_WORDS.some((w) => n.includes(w));
 };
 
+// おむつ等の主要ブランドの表記ゆれ（日本語/英語/波ダッシュ）を吸収する同義語グループ。
+// 各グループの先頭を代表形とし、検索語・商品名を正規化後に代表形へ寄せることで
+// 「グーン」と「GOO.N」を同一視し、片方の表記でしか出品されていない商品の
+// 取りこぼしを防ぐ。グループ内は代表(日本語)→英語→波ダッシュ の順に並べる。
+const BRAND_SYNONYM_GROUPS = [
+  ['グーン', 'GOON', 'GOO.N', 'グ〜ン'],
+  ['ムーニー', 'moony'],
+  ['ムーニーマン', 'moonyman'],
+  ['メリーズ', 'merries'],
+  ['パンパース', 'pampers'],
+  ['マミーポコ', 'mamypoko'],
+  ['ゲンキ', 'genki'],
+  ['ネピア', 'nepia'],
+];
+// 表記ゆれ吸収の共通正規化（NFKC・中黒・長音・波ダッシュ・全半角・記号を除去）
+const normJa = (s) => (s || '').normalize('NFKC').toLowerCase().replace(/[\s・･ーｰ〜～\-–—_'’"、。,.！!？?／/｜|]/g, '');
+// 正規化済み文字列中のブランド別表記を代表形へ置換するための [別表記, 代表形] 対
+const BRAND_CANON_PAIRS = BRAND_SYNONYM_GROUPS.flatMap((group) => {
+  const canon = normJa(group[0]);
+  return group.map((v) => [normJa(v), canon]).filter(([v, c]) => v && v !== c);
+});
+const canonicalizeBrands = (normStr) => {
+  let s = normStr;
+  for (const [variant, canon] of BRAND_CANON_PAIRS) s = s.split(variant).join(canon);
+  return s;
+};
+// キーワード中のブランド語を別表記に差し替えた検索クエリ候補を作る（最大2件）。
+// 例: 「グーン トイストーリー」→「GOON トイストーリー」「GOO.N トイストーリー」
+const buildBrandVariantQueries = (keyword) => {
+  const tokens = (keyword || '').split(/[\s　]+/).filter(Boolean);
+  const queries = new Set();
+  tokens.forEach((tok, i) => {
+    const nt = normJa(tok);
+    for (const group of BRAND_SYNONYM_GROUPS) {
+      if (!group.some((v) => normJa(v) === nt)) continue;
+      for (const alt of group) {
+        if (normJa(alt) === nt) continue;
+        const arr = [...tokens];
+        arr[i] = alt;
+        queries.add(arr.join(' '));
+      }
+    }
+  });
+  return [...queries].slice(0, 2);
+};
+
 // 取り込みAPIが保存する rakuten_item_code の正規化（rakuten- 接頭辞を除去して
 // 同期データと揃える。yahoo- は維持）。サーバー側の正規化と一致させること。
 const siteCode = (code) =>
@@ -2119,25 +2165,24 @@ const App = () => {
       // 並ぶのを防ぐ）。ただしユーザーが付属品自体を検索している場合は除外しない。
       const keywordIsAccessory = isAccessoryName(keyword);
 
-      // 表記ゆれ（中黒・長音・波ダッシュ・全半角・記号）を吸収する正規化。
-      // 「トイ・ストーリー」と「トイストーリー」、「グ〜ン」と「グーン」を同一視する。
-      const norm = (s) => (s || '').normalize('NFKC').toLowerCase().replace(/[\s・･ーｰ〜～\-–—_'’"、。,.！!？?／/｜|]/g, '');
-      // 複数語検索のとき、商品名に検索語がきちんと含まれるかで関連性を判定する。
-      // ジャンル制限を外して検索した際に「トイストーリーの枕」等の無関係品
+      // 表記ゆれ（中黒・長音・波ダッシュ・全半角・記号）＋ブランド別表記（グーン≡GOO.N）を
+      // 吸収して関連性を判定する。ジャンル無し検索時に「トイストーリーの枕」等の無関係品
       // （＝検索語の一部しか含まない商品）が混ざるのを防ぐ。単語検索は絞りすぎない。
-      const qTokens = keyword.split(/[\s　]+/).map(norm).filter(w => w.length >= 2);
+      const canonKey = (s) => canonicalizeBrands(normJa(s));
+      const qTokens = keyword.split(/[\s　]+/).map(canonKey).filter(w => w.length >= 2);
       const relevant = (name) => {
         if (qTokens.length <= 1) return true;
-        const n = norm(name);
+        const n = canonKey(name);
         const hits = qTokens.filter(t => n.includes(t)).length;
         return hits >= Math.ceil(qTokens.length * 0.75);
       };
 
-      // 楽天・Yahoo両方から並列取得して整形する。extraParam でジャンル絞りの有無を切替。
-      const runSearch = async (extraParam) => {
+      // 楽天・Yahoo両方から並列取得して整形する。extraParam でジャンル絞りの有無を、
+      // q で検索語（ブランド別表記での追加検索）を切り替える。
+      const runSearch = async (extraParam, q = keyword) => {
         const [rakutenResult, yahooResult] = await Promise.allSettled([
-          fetch(`/api/rakuten?query=${encodeURIComponent(keyword)}${extraParam}`).then(r => r.json()),
-          fetch(`/api/yahoo?query=${encodeURIComponent(keyword)}${extraParam}`).then(r => r.json())
+          fetch(`/api/rakuten?query=${encodeURIComponent(q)}${extraParam}`).then(r => r.json()),
+          fetch(`/api/yahoo?query=${encodeURIComponent(q)}${extraParam}`).then(r => r.json())
         ]);
 
         const rakutenItems = rakutenResult.status === 'fulfilled'
@@ -2168,6 +2213,21 @@ const App = () => {
       let { raw, allItems } = await runSearch(multiWord ? '&noGenre=1' : '');
       if (allItems.length === 0 && !multiWord) {
         ({ raw, allItems } = await runSearch('&noGenre=1'));
+      }
+
+      // 結果が少ない時だけ、ブランドの別表記（グーン→GOON/GOO.N 等）でも追加検索して
+      // 取りこぼしを救済する（速度への影響を抑えるため、少ない時のみ・最大2クエリを並列）。
+      if (allItems.length < 5) {
+        const variantQueries = buildBrandVariantQueries(keyword);
+        if (variantQueries.length > 0) {
+          const seenRaw = new Set(raw.map((p) => p.url));
+          const seenAll = new Set(allItems.map((p) => p.url));
+          const extra = await Promise.all(variantQueries.map((q) => runSearch('&noGenre=1', q)));
+          for (const r of extra) {
+            for (const p of r.raw) if (p.url && !seenRaw.has(p.url)) { seenRaw.add(p.url); raw.push(p); }
+            for (const p of r.allItems) if (p.url && !seenAll.has(p.url)) { seenAll.add(p.url); allItems.push(p); }
+          }
+        }
       }
 
       if (allItems.length === 0) {
