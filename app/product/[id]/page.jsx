@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Trophy, Flame, Lightbulb } from 'lucide-react';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
 import { toVCUrl, getAmazonUrl, withAmazonTag } from '@/src/lib/affiliate';
@@ -302,7 +303,7 @@ export default async function ProductPage({ params }) {
                     <div className="flex items-center justify-between gap-3">
                       <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
                         {isCheapest && (
-                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap bg-[#7B8E76] text-white">🏆 最安</span>
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap bg-[#7B8E76] text-white"><Trophy className="w-2.5 h-2.5" strokeWidth={2.5} />最安</span>
                         )}
                         <span className="text-xs font-bold text-[#5A4C4C]">{s.name}</span>
                         {b && (
@@ -373,7 +374,7 @@ export default async function ProductPage({ params }) {
                         <div className="flex items-center justify-between gap-3">
                           <span className="flex items-center gap-1.5 min-w-0 flex-wrap">
                             {amazonCheapest && (
-                              <span className="text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap bg-[#7B8E76] text-white">🏆 最安</span>
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap bg-[#7B8E76] text-white"><Trophy className="w-2.5 h-2.5" strokeWidth={2.5} />最安</span>
                             )}
                             <span className="text-xs font-bold text-[#5A4C4C]">Amazon.co.jp</span>
                             {activeSale?.shop === 'amazon' && (
@@ -386,8 +387,8 @@ export default async function ProductPage({ params }) {
                             {amazonItem && (
                               <span className="text-sm font-black text-[#7B8E76]">¥{amazonItem.price.toLocaleString()}</span>
                             )}
-                            <span className={`text-[11px] font-black text-white px-3 py-1.5 rounded-full whitespace-nowrap ${amazonCheapest ? 'bg-[#7B8E76]' : 'bg-[#F2ABAC]'}`}>
-                              {amazonItem ? 'Amazonで見る' : activeSale?.shop === 'amazon' ? 'セール価格をチェック🔥' : 'Amazonで最安値をチェック'}
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-black text-white px-3 py-1.5 rounded-full whitespace-nowrap ${amazonCheapest ? 'bg-[#7B8E76]' : 'bg-[#F2ABAC]'}`}>
+                              {amazonItem ? 'Amazonで見る' : activeSale?.shop === 'amazon' ? (<>セール価格をチェック<Flame className="w-3 h-3" strokeWidth={2.5} /></>) : 'Amazonで最安値をチェック'}
                             </span>
                           </span>
                         </div>
@@ -404,8 +405,8 @@ export default async function ProductPage({ params }) {
         {priceHistory.length > 0 && (
           <div className="mt-8">
             <PriceHistoryChart history={priceHistory} />
-            <p className="text-[10px] text-[#A5A19E] font-bold mt-2 px-1">
-              💡 底値を待つなら、アプリの価格アラート（目標価格になったら通知）が便利です
+            <p className="text-[10px] text-[#A5A19E] font-bold mt-2 px-1 flex items-center gap-1">
+              <Lightbulb className="w-3 h-3 shrink-0 text-[#D4AF37]" strokeWidth={2.5} />底値を待つなら、アプリの価格アラート（目標価格になったら通知）が便利です
             </p>
           </div>
         )}
