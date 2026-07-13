@@ -2119,6 +2119,20 @@ const App = () => {
       // 並ぶのを防ぐ）。ただしユーザーが付属品自体を検索している場合は除外しない。
       const keywordIsAccessory = isAccessoryName(keyword);
 
+      // 表記ゆれ（中黒・長音・波ダッシュ・全半角・記号）を吸収する正規化。
+      // 「トイ・ストーリー」と「トイストーリー」、「グ〜ン」と「グーン」を同一視する。
+      const norm = (s) => (s || '').normalize('NFKC').toLowerCase().replace(/[\s・･ーｰ〜～\-–—_'’"、。,.！!？?／/｜|]/g, '');
+      // 複数語検索のとき、商品名に検索語がきちんと含まれるかで関連性を判定する。
+      // ジャンル制限を外して検索した際に「トイストーリーの枕」等の無関係品
+      // （＝検索語の一部しか含まない商品）が混ざるのを防ぐ。単語検索は絞りすぎない。
+      const qTokens = keyword.split(/[\s　]+/).map(norm).filter(w => w.length >= 2);
+      const relevant = (name) => {
+        if (qTokens.length <= 1) return true;
+        const n = norm(name);
+        const hits = qTokens.filter(t => n.includes(t)).length;
+        return hits >= Math.ceil(qTokens.length * 0.75);
+      };
+
       // 楽天・Yahoo両方から並列取得して整形する。extraParam でジャンル絞りの有無を切替。
       const runSearch = async (extraParam) => {
         const [rakutenResult, yahooResult] = await Promise.allSettled([
@@ -2141,7 +2155,9 @@ const App = () => {
           : [];
 
         const raw = [...rakutenItems, ...yahooItems];
-        const allItems = keywordIsAccessory ? raw : raw.filter(it => !isAccessoryName(it.name));
+        const base = keywordIsAccessory ? raw : raw.filter(it => !isAccessoryName(it.name));
+        // 関連性フィルタで無関係品（検索語の一部しか含まない商品）を除外
+        const allItems = base.filter(it => relevant(it.name));
         return { raw, allItems };
       };
 
