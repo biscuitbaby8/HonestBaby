@@ -2161,11 +2161,12 @@ const App = () => {
         return { raw, allItems };
       };
 
-      // まずベビー用品ジャンルに絞って検索。0件ならジャンル制限を外して再検索する
-      // （グーン トイ・ストーリー柄のおむつ等、ジャンル登録の都合で絞り込みから
-      //  漏れて「確実にあるのに出てこない」商品を救済する）。
-      let { raw, allItems } = await runSearch('');
-      if (allItems.length === 0) {
+      // 複数語検索は関連性フィルタが精度を担保するので、最初からジャンル無しで
+      // 1往復だけ検索する（二重フェッチを避けて高速化＋ジャンル漏れも救済）。
+      // 単語検索はジャンル絞りで精度を出し、0件のときだけジャンル無しで再検索する。
+      const multiWord = qTokens.length >= 2;
+      let { raw, allItems } = await runSearch(multiWord ? '&noGenre=1' : '');
+      if (allItems.length === 0 && !multiWord) {
         ({ raw, allItems } = await runSearch('&noGenre=1'));
       }
 
@@ -2198,32 +2199,55 @@ const App = () => {
         }]
       }));
 
-      // 2. Gemini AI で厳選（キーがなければ生データをそのまま使う）
-      let formatted;
+      // 整形済みリスト → 重複統合 → カテゴリ付与（生データ/AI結果で共用）
+      const matchedCat = CATEGORY_TREE.find(cat =>
+        cat.name !== "すべて" && (
+          keyword.includes(cat.name) ||
+          (cat.keyword && keyword.includes(cat.keyword)) ||
+          cat.subs?.some(s => keyword.includes(typeof s === 'string' ? s : s.name))
+        )
+      );
+      const resolvedCategory = matchedCat?.name || keyword;
+      // カテゴリは「商品名」から判定するのが精度の肝。判定不能なら検索語ベースにフォールバック。
+      const finalize = (list) =>
+        dedupeAndMergeShops(list).map(p => ({ ...p, category: categorizeByName(p.name) || resolvedCategory }));
 
+      // 1. まず生データを即表示して待ち時間をなくす（AI厳選は後追いで差し替える）
+      const rawCategorized = finalize(formatRawItems(allItems));
+      setSearchResults(rawCategorized);
+      setIsSearchLoading(false);
+
+      // 2. Gemini AI 厳選をバックグラウンド実行。成功したら差し替え、
+      //    失敗/8秒タイムアウト時は生データ表示のまま（体感速度を優先）。
+      let finalResults = rawCategorized;
       try {
         // マイベビー情報をコンテキストとして注入（月齢に合った商品の厳選・分析に活用）
         const babyContext = babyInfo && babyAgeLabel
           ? `【お子さま情報】${babyInfo.name ? `名前: ${babyInfo.name} / ` : ''}月齢: ${babyAgeLabel}${babyInfo.gender ? ` / 性別: ${babyInfo.gender}` : ''}\nこの月齢・状況に合った商品を優先し、AI分析にも月齢適合度を反映してください。\n\n`
           : '';
 
-        const aiPrompt = `${babyContext}あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで「最高の3〜5件」に厳選してJSON形式で出力してください。
+        const aiPrompt = `${babyContext}あなたはベビー用品のプロコンサルタントです。以下の楽天・Yahoo!ショッピングの検索結果（JSON）を読み込み、以下のルールで厳選してJSON形式で出力してください。
 ルール：
-1. 重複（同じ商品の別店舗）は1つにまとめる。
+1. 同じ商品の別店舗は1つにまとめる。ただしサイズ違い・柄違いは別商品として残す。
 2. 「車輪だけ」「カバーだけ」などの付属品は除外し「本体」のみ残す。
-3. 商品名を分かりやすく整える。
-4. AI分析として「どんな人におすすめか」を1文で作成。
+3. 検索意図に合う商品を最大8件まで残す（無関係な商品は含めない）。
+4. 商品名を分かりやすく整える。
+5. AI分析として「どんな人におすすめか」を1文で作成。
 
 出力形式 (JSONのみ、他の文字を含めない):
 [{"name": "...", "price": 0, "url": "...", "image": "...", "source": "rakuten", "aiAnalysis": "...", "brand": "..."}]
 
 検索結果データ: ${JSON.stringify(allItems.slice(0, 20))}`;
 
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
         const aiRes = await fetch('/api/gemini', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: aiPrompt })
+          body: JSON.stringify({ prompt: aiPrompt }),
+          signal: ctrl.signal,
         });
+        clearTimeout(timer);
 
         const aiData = await aiRes.json();
         const aiText = aiData.text || "";
@@ -2231,7 +2255,7 @@ const App = () => {
         const cleanedProducts = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 
         if (cleanedProducts.length > 0) {
-          formatted = cleanedProducts.map((p, i) => {
+          const aiFormatted = cleanedProducts.map((p, i) => {
             const meta = metaByUrl.get(p.url) || {};
             const source = meta.source || p.source || 'rakuten';
             return {
@@ -2254,28 +2278,14 @@ const App = () => {
               }]
             };
           });
-        } else {
-          // Gemini が空を返したら生データにフォールバック
-          formatted = formatRawItems(allItems);
+          finalResults = finalize(aiFormatted);
+          setSearchResults(finalResults);
         }
       } catch {
-        // Gemini 失敗でも生データにフォールバック
-        formatted = formatRawItems(allItems);
+        // Gemini 失敗/タイムアウトでも生データ表示のまま
       }
 
-      const deduped = dedupeAndMergeShops(formatted);
-      const matchedCat = CATEGORY_TREE.find(cat =>
-        cat.name !== "すべて" && (
-          keyword.includes(cat.name) ||
-          (cat.keyword && keyword.includes(cat.keyword)) ||
-          cat.subs?.some(s => keyword.includes(typeof s === 'string' ? s : s.name))
-        )
-      );
-      const resolvedCategory = matchedCat?.name || keyword;
-      // カテゴリは「商品名」から判定するのが精度の肝。判定不能なら検索語ベースにフォールバック。
-      const categorized = deduped.map(p => ({ ...p, category: categorizeByName(p.name) || resolvedCategory }));
-      setSearchResults(categorized);
-      autoSaveSearchResultsToDb(categorized, keyword);
+      autoSaveSearchResultsToDb(finalResults, keyword);
     } catch (err) {
       console.error("Remote Search Error:", err);
       setSearchError(err.message);
