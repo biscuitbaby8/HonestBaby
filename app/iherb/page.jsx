@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct } from '@/src/lib/products';
+import { addIherbAffiliate } from '@/src/lib/affiliate';
 import SiteHeader from '@/src/components/SiteHeader';
 import ProductCardLink from '@/src/components/ProductCardLink';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
@@ -10,8 +12,8 @@ const SITE_URL = 'https://honestbaby-care.com';
 export const revalidate = 3600;
 
 export function generateMetadata() {
-  const title = 'iHerbで買えるベビー・マタニティ用品まとめ';
-  const desc = 'iHerbで購入できるベビーオイル・マタニティサプリ・スキンケアをまとめて紹介。海外の人気ナチュラルケア用品を口コミと価格でチェック。';
+  const title = 'iHerbで買えるベビー・マタニティ用品ガイド';
+  const desc = 'iHerbで購入できるベビー用ビタミンD・葉酸/プレナタルサプリ・オーガニックスキンケアを、選び方の解説つきでまとめて紹介。海外の人気ナチュラルケア用品をチェック。';
   const url = `${SITE_URL}/iherb`;
   return {
     title,
@@ -21,6 +23,44 @@ export function generateMetadata() {
     twitter: { card: 'summary_large_image', title, description: desc },
   };
 }
+
+// iHerb 検索/カテゴリURL。addIherbAffiliate が承認後（IHERB_CAMREF_ID設定後）に
+// 自動でPartnerizeトラッキングURLへ変換する（未承認の間は通常リンク）。
+const iherbSearch = (kw) => addIherbAffiliate(`https://www.iherb.com/search?kw=${encodeURIComponent(kw)}`);
+const IHERB_BABY_CATEGORY = 'https://www.iherb.com/c/baby';
+
+const TOPICS = [
+  {
+    title: 'ベビー用ビタミンD3ドロップ',
+    desc: '完全母乳の赤ちゃんは不足しがちと言われるビタミンD。海外では無味・液体タイプが定番で、1日1滴タイプなど選択肢が豊富です。',
+    href: iherbSearch('baby vitamin d3 drops'),
+  },
+  {
+    title: '妊娠期の葉酸・プレナタルサプリ',
+    desc: '葉酸・鉄・DHAをまとめて摂れるプレナタル。海外ブランドはメチル葉酸（活性型）など処方の選択肢が広いのが特長です。',
+    href: iherbSearch('prenatal folate'),
+  },
+  {
+    title: 'オーガニック ベビーローション・オイル',
+    desc: '無香料・シンプル処方の保湿ケア。乾燥しやすい季節の全身ケアや、ベビーマッサージ用のオイルが見つかります。',
+    href: iherbSearch('baby lotion organic'),
+  },
+  {
+    title: 'ナチュラル ベビーソープ・シャンプー',
+    desc: '涙にしみにくい低刺激タイプ。天然由来成分にこだわった海外ブランドのボディソープ・シャンプーが揃います。',
+    href: iherbSearch('baby wash shampoo natural'),
+  },
+  {
+    title: '授乳期のDHA・オメガ3',
+    desc: 'ママ向けのDHA/EPAサプリ。産後の栄養補給として海外では広く選ばれています。',
+    href: iherbSearch('postnatal dha omega 3'),
+  },
+  {
+    title: 'iHerbのベビー用品カテゴリを見る',
+    desc: 'ベビー＆キッズ向けのスキンケア・サプリ・食品などをまとめたiHerbの公式カテゴリ。品揃え全体をチェックできます。',
+    href: addIherbAffiliate(IHERB_BABY_CATEGORY),
+  },
+];
 
 export default async function IherbPage() {
   let products = [];
@@ -37,19 +77,9 @@ export default async function IherbPage() {
         .map(formatDbProduct);
     }
   } catch {
-    // Supabase接続失敗時は空リストで表示
+    // Supabase接続失敗時は編集コンテンツのみ表示
   }
 
-  const itemListLd = {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    name: 'iHerbで買えるベビー・マタニティ用品',
-    itemListElement: products.slice(0, 30).map((p, i) => ({
-      '@type': 'ListItem',
-      position: i + 1,
-      url: `${SITE_URL}/product/${p.id}`,
-    })),
-  };
   const breadcrumbLd = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -62,30 +92,77 @@ export default async function IherbPage() {
   return (
     <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
       <SiteHeader />
-      <main className="px-4 pt-6 pb-32 lg:max-w-7xl lg:mx-auto lg:px-10 lg:pt-8">
+      <main className="px-4 pt-6 pb-32 lg:max-w-5xl lg:mx-auto lg:px-10 lg:pt-8">
         <nav className="text-[11px] text-[#A5A19E] font-bold mb-4">
           <Link href="/" className="hover:text-[#7B8E76]">ホーム</Link>
           <span className="mx-1.5">›</span>
           <span className="text-[#5A4C4C]">iHerb特集</span>
         </nav>
 
-        <h1 className="text-xl font-black mb-1 mt-4">iHerbで買えるベビー・マタニティ用品</h1>
-        <p className="text-xs text-[#8E8282] font-bold mb-4 leading-relaxed">
-          iHerbで購入できるベビーオイル・マタニティサプリ・ナチュラルスキンケアをまとめてチェック。
+        <h1 className="text-2xl font-black mb-2 mt-4 leading-snug">iHerbで買えるベビー・マタニティ用品ガイド</h1>
+        <p className="text-sm text-[#8E8282] font-bold mb-6 leading-relaxed">
+          iHerb（アイハーブ）は、海外のナチュラル・オーガニック用品を日本語・日本円で購入できる通販サイトです。
+          日本では手に入りにくいベビー用ビタミンD、妊娠・授乳期のサプリ、シンプル処方のスキンケアが揃うのが魅力。
+          このページでは、HonestBabyが特にベビー・マタニティにおすすめのカテゴリを、選び方の解説つきで紹介します。
         </p>
 
-        {products.length === 0 ? (
-          <p className="text-xs text-[#A5A19E] font-bold py-10 text-center">近日公開予定です。</p>
-        ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {products.map((p) => (
-              <ProductCardLink key={p.id} product={p} />
-            ))}
-          </div>
+        {/* なぜベビー・マタニティでiHerbか */}
+        <section className="bg-white rounded-[1.5rem] border border-[#F4EFEB] p-5 mb-8 shadow-sm">
+          <h2 className="text-sm font-black mb-3">ベビー・マタニティにiHerbが選ばれる理由</h2>
+          <ul className="space-y-2 text-xs text-[#8E8282] font-bold leading-relaxed">
+            <li>・海外で定番のビタミンD3ドロップや活性型葉酸など、日本で選択肢が少ない商品が見つかる</li>
+            <li>・無香料・シンプル処方のオーガニックスキンケアが豊富</li>
+            <li>・日本語表示・日本円決済に対応し、まとめ買いで送料効率も良い</li>
+          </ul>
+        </section>
+
+        {/* おすすめカテゴリ（iHerbへのリンク） */}
+        <h2 className="text-lg font-black mb-4">おすすめカテゴリ</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          {TOPICS.map((t) => (
+            <a
+              key={t.title}
+              href={t.href}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              data-cta-position="iherb-landing"
+              className="block bg-white rounded-[1.5rem] border border-[#F4EFEB] p-5 shadow-sm active:bg-[#FBF9F7] transition-colors"
+            >
+              <h3 className="text-sm font-black mb-1.5 text-[#5A4C4C]">{t.title}</h3>
+              <p className="text-xs text-[#8E8282] font-bold leading-relaxed mb-3">{t.desc}</p>
+              <span className="inline-flex items-center gap-1 text-[11px] font-black text-white bg-[#7B8E76] px-3 py-1.5 rounded-full">
+                iHerbで見る<ExternalLink className="w-3 h-3" strokeWidth={2.5} />
+              </span>
+            </a>
+          ))}
+        </div>
+
+        {/* DBにiHerb商品があれば商品カードも表示 */}
+        {products.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-lg font-black mb-4">iHerbで買える商品</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {products.map((p) => (
+                <ProductCardLink key={p.id} product={p} />
+              ))}
+            </div>
+          </section>
         )}
+
+        {/* アフィリエイト開示・注意書き */}
+        <section className="bg-[#FBF9F7] rounded-[1.5rem] border border-[#F4EFEB] p-5 text-[11px] text-[#A5A19E] font-bold leading-relaxed space-y-2">
+          <p>
+            ※ 本ページのiHerbへのリンクにはアフィリエイトリンク（Partnerize経由）が含まれます。
+            リンク経由でご購入いただいた場合、当サイトが紹介料を受け取ることがあります。商品価格に影響はありません。
+          </p>
+          <p>
+            ※ サプリメント・スキンケアは海外製品を含みます。月齢・体質・アレルギー表示をご確認のうえ、
+            心配な場合はかかりつけの医師・薬剤師にご相談ください。本ページは医療上の助言を目的としたものではありません。
+          </p>
+        </section>
       </main>
 
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([itemListLd, breadcrumbLd]) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       <SpaBottomNav />
     </div>
   );
