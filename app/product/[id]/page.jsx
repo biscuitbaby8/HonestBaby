@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { Trophy, Flame, Lightbulb } from 'lucide-react';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
@@ -81,7 +81,9 @@ export async function generateMetadata({ params }) {
   const shortName = cleanProductName(product.name);
   const title = `${shortName} の最安値・価格比較`;
   const desc = `${shortName}の最安値・価格比較。${product.rating > 0 ? `評価${product.rating}★。` : ''}楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`;
-  const url = `${SITE_URL}/product/${encodeURIComponent(product.id)}`;
+  // 重複商品は代表IDをcanonicalに（ページ自体もリダイレクトするが保険）
+  const canonicalId = product.canonical_id && product.canonical_id !== product.id ? product.canonical_id : product.id;
+  const url = `${SITE_URL}/product/${encodeURIComponent(canonicalId)}`;
   return {
     title,
     description: desc,
@@ -101,6 +103,12 @@ export default async function ProductPage({ params }) {
   const { id } = await params;
   const product = await fetchProduct(id);
   if (!product) notFound();
+
+  // 重複商品（別IDで同一内容）は代表ページへ恒久リダイレクトし、正規URLへ統合する
+  // （Search Console「重複・Googleが別の正規ページを選択」の解消）。
+  if (product.canonical_id && product.canonical_id !== product.id) {
+    permanentRedirect(`/product/${product.canonical_id}`);
+  }
 
   const [related, activeSale, priceHistory, amazonResult] = await Promise.all([
     fetchRelated(product.category, product.id),
