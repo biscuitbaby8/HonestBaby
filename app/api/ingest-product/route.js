@@ -82,7 +82,7 @@ export async function POST(request) {
       const reviews_count = Math.max(0, parseInt(it?.reviews_count) || 0);
       const ai_analysis = it?.ai_analysis ? str(it.ai_analysis, 600) : null;
 
-      // 既存商品を探す（コード優先→名前）。重複作成を避ける。
+      // 既存商品を探す（コード → 完全名 → 正規化名キー の順）。重複作成を避ける。
       let productId = null;
       if (code) {
         const { data } = await supabase
@@ -93,6 +93,22 @@ export async function POST(request) {
         const { data } = await supabase
           .from('products').select('id').eq('name', name).limit(1).maybeSingle();
         productId = data?.id || null;
+      }
+      if (!productId) {
+        // 別ショップの微妙に異なる名前でも、正規化名キーが一致すれば同一商品として扱う
+        // （重複ページの量産を防ぐ）。key はアプリの productNameKey と同一定義。
+        const key = name.replace(/[\s　]/g, '').toLowerCase().slice(0, 30);
+        if (key) {
+          const { data } = await supabase
+            .from('products').select('id').eq('name_key', key).limit(1);
+          productId = data?.[0]?.id || null;
+        }
+      }
+      // 見つかった商品が重複の非代表なら、代表に寄せて価格を集約する（新たな重複を作らない）
+      if (productId) {
+        const { data } = await supabase
+          .from('products').select('canonical_id').eq('id', productId).limit(1);
+        if (data?.[0]?.canonical_id) productId = data[0].canonical_id;
       }
 
       if (!productId) {

@@ -52,6 +52,7 @@ export default async function sitemap() {
       .from('products')
       .select('id, last_synced_at')
       .or('is_blocked.is.null,is_blocked.eq.false')
+      .is('canonical_id', null) // 重複の非代表ページはsitemapに載せない（代表のみ）
       .order('popularity_rank');
 
     productEntries = (products || []).map((p) => ({
