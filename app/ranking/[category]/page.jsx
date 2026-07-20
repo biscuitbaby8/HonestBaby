@@ -10,6 +10,8 @@ import {
 } from '@/src/lib/products';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
+import GuideContent from '@/src/components/GuideContent';
+import { CATEGORY_GUIDES, buildFaqLd } from '@/src/lib/categoryGuides';
 
 const SITE_URL = 'https://honestbaby-care.com';
 const CATEGORY_NAMES = CATEGORY_TREE.map((c) => c.name).filter((n) => n !== 'すべて');
@@ -96,6 +98,7 @@ export default async function RankingPage({ params }) {
         { '@type': 'ListItem', position: 3, name: 'ランキング', item: url },
       ],
     },
+    ...(buildFaqLd(CATEGORY_GUIDES[cat]?.faq) ? [buildFaqLd(CATEGORY_GUIDES[cat]?.faq)] : []),
   ];
 
   // 上位3位はメダル色で強調
@@ -115,7 +118,16 @@ export default async function RankingPage({ params }) {
         </nav>
 
         <h1 className="text-xl font-black mb-1 mt-4">{meta.title}</h1>
-        <p className="text-xs text-[#8E8282] font-bold mb-6 leading-relaxed">{meta.desc}</p>
+        <p className="text-xs text-[#8E8282] font-bold mb-4 leading-relaxed">{meta.desc}</p>
+
+        {/* 選定基準（SEO本文・E-E-A-T） */}
+        <div className="bg-[#FBF9F7] border border-[#F4EFEB] rounded-2xl px-4 py-3 mb-6">
+          <p className="text-[11px] text-[#8E8282] font-bold leading-relaxed">
+            このランキングは、楽天市場・Yahoo!ショッピングの売れ筋・レビュー評価・レビュー件数をもとに
+            HonestBabyが独自に集計し、毎日更新しています。価格は各モールの最新の最安値を表示。
+            忖度なしで、実際に選ばれている商品を上位に掲載しています。
+          </p>
+        </div>
 
         {products.length === 0 ? (
           <p className="text-xs text-[#A5A19E] font-bold py-10 text-center">ランキング集計中です。</p>
@@ -161,6 +173,13 @@ export default async function RankingPage({ params }) {
               );
             })}
           </ol>
+        )}
+
+        {/* 選び方ガイド（本文の厚み・FAQ。カテゴリページと共用） */}
+        {CATEGORY_GUIDES[cat] && (
+          <section className="mt-10 bg-white rounded-[2rem] border border-[#F4EFEB] p-6">
+            <GuideContent guide={CATEGORY_GUIDES[cat]} />
+          </section>
         )}
 
         {/* 他カテゴリのランキングへ（内部リンク） */}
