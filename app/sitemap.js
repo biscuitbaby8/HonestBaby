@@ -48,19 +48,28 @@ export default async function sitemap() {
 
   let productEntries = [];
   try {
-    const { data: products } = await supabaseServer
-      .from('products')
-      .select('id, last_synced_at')
-      .or('is_blocked.is.null,is_blocked.eq.false')
-      .is('canonical_id', null) // 重複の非代表ページはsitemapに載せない（代表のみ）
-      .order('popularity_rank');
-
-    productEntries = (products || []).map((p) => ({
-      url: `${SITE_URL}/product/${p.id}`,
-      lastModified: p.last_synced_at ? new Date(p.last_synced_at) : new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    }));
+    // Supabaseは1リクエスト最大1000行のため、range()でページングして全代表商品を取得する
+    // （従来は先頭1000件で頭打ちになり、残りの商品ページがsitemapから漏れていた）。
+    const pageSize = 1000;
+    for (let from = 0; from < 60000; from += pageSize) {
+      const { data } = await supabaseServer
+        .from('products')
+        .select('id, last_synced_at')
+        .or('is_blocked.is.null,is_blocked.eq.false')
+        .is('canonical_id', null) // 重複の非代表ページはsitemapに載せない（代表のみ）
+        .order('popularity_rank')
+        .range(from, from + pageSize - 1);
+      if (!data || data.length === 0) break;
+      for (const p of data) {
+        productEntries.push({
+          url: `${SITE_URL}/product/${p.id}`,
+          lastModified: p.last_synced_at ? new Date(p.last_synced_at) : new Date(),
+          changeFrequency: 'weekly',
+          priority: 0.8,
+        });
+      }
+      if (data.length < pageSize) break;
+    }
   } catch {
     // Supabase 未設定時はビルドを止めない
   }
