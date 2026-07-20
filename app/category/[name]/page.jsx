@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
 import { CATEGORY_TREE, CAT_META, formatDbProduct } from '@/src/lib/products';
-import { CATEGORY_GUIDES } from '@/src/lib/categoryGuides';
+import { CATEGORY_GUIDES, buildFaqLd } from '@/src/lib/categoryGuides';
 import GuideModalButton from '@/src/components/GuideModalButton';
 import SiteHeader from '@/src/components/SiteHeader';
 import CategoryClient from '@/src/components/CategoryClient';
@@ -92,7 +92,9 @@ export default async function CategoryPage({ params }) {
       },
     ],
   };
-  const jsonLd = [collectionLd, breadcrumbLd];
+  // ページ下部のCategoryGuideで表示しているFAQを構造化データ化（FAQリッチリザルト対策）
+  const faqLd = buildFaqLd(CATEGORY_GUIDES[cat]?.faq);
+  const jsonLd = [collectionLd, breadcrumbLd, ...(faqLd ? [faqLd] : [])];
 
   return (
     <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">

@@ -158,3 +158,19 @@ export const CATEGORY_GUIDES = {
     ],
   },
 };
+
+// カテゴリのFAQから FAQPage 構造化データ(JSON-LD)を生成する。
+// 検索結果にFAQリッチリザルトが出やすくなり、低順位でもクリックを取りやすくなる。
+// 注意: FAQPageはページ上に同じQ&Aが可視で存在することが条件（当サイトはGuideContentで表示済み）。
+export const buildFaqLd = (faq) =>
+  faq && faq.length
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faq.map((f) => ({
+          '@type': 'Question',
+          name: f.q,
+          acceptedAnswer: { '@type': 'Answer', text: f.a },
+        })),
+      }
+    : null;
