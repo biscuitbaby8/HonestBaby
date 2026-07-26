@@ -64,7 +64,7 @@ const CATEGORIES = [
     { sub: "B型",       keywords: ["ベビーカー B型 軽量"], yahooKeyword: "ベビーカー B型" },
     { sub: "AB型",      keywords: ["ベビーカー AB型"], yahooKeyword: "ベビーカー AB型" },
     { sub: "バギー",    keywords: ["ベビーカー バギー 軽量"], yahooKeyword: "ベビーカー バギー" },
-    { sub: "周辺グッズ", keywords: ["ベビーカー レインカバー", "ベビーカー フック"], yahooKeyword: "ベビーカー アクセサリー" },
+    { sub: "周辺グッズ", keywords: ["ベビーカー レインカバー", "ベビーカー フック", "ベビーカー バッグ 収納", "ベビーカー アンダーバッグ", "ベビーカー オーガナイザー", "ベビーカー ドリンクホルダー", "ベビーカー フットマフ"], yahooKeyword: "ベビーカー アクセサリー" },
   ]},
   { name: "抱っこ紐", genreId: "209214", keyword: "抱っこ紐 新生児", subs: [
     { sub: "縦抱き",     keywords: ["抱っこ紐 縦抱き"], yahooKeyword: "抱っこ紐 縦抱き" },
@@ -519,6 +519,7 @@ function extractSubCategory(category, itemName) {
       { match: /ドリンクホルダー|カップホルダー|スマホホルダー|スマートフォンホルダー/, sub: "周辺グッズ" },
       { match: /フットマフ|ハンドルカバー|バンパーバー|サンキャノピー|サンシェード/, sub: "周辺グッズ" },
       { match: /フック|収納ポーチ|サイドバッグ|アームバー/, sub: "周辺グッズ" },
+      { match: /アンダーバッグ|ベビーカーバッグ|バギーバッグ|ベビーカー用バッグ|オーガナイザー|トラベルバッグ/, sub: "周辺グッズ" },
       { match: /よだれカバー|防寒ケープ|ベビーカーシート|シートカバー/, sub: "周辺グッズ" },
       { match: /AB型|ＡＢ型/, sub: "AB型" },
       { match: /[AＡ]型/, sub: "A型" },

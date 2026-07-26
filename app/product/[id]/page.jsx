@@ -104,6 +104,9 @@ export default async function ProductPage({ params }) {
   const product = await fetchProduct(id);
   if (!product) notFound();
 
+  // 非表示(is_blocked)にした商品は検索結果・直リンクからも見えないよう404にする
+  if (product.is_blocked) notFound();
+
   // 重複商品（別IDで同一内容）は代表ページへ恒久リダイレクトし、正規URLへ統合する
   // （Search Console「重複・Googleが別の正規ページを選択」の解消）。
   if (product.canonical_id && product.canonical_id !== product.id) {
