@@ -610,6 +610,16 @@ const App = () => {
   const [blockedProducts, setBlockedProducts] = useState([]);
   const [isLoadingBlocked, setIsLoadingBlocked] = useState(false);
 
+  // モーダルの「背景クリックで閉じる」を安全に行うヘルパー。
+  // onClick単体だと、テキスト選択のドラッグをモーダル内で開始して枠外でマウスを
+  // 離した場合もクリックのtargetが背景要素になり、誤って閉じてしまう。
+  // mousedownも背景上で起きていた時だけ閉じることで、ドラッグ選択がはみ出ても
+  // 閉じないようにする。
+  const backdropClose = (close) => ({
+    onMouseDown: (e) => { e.currentTarget._downOnBackdrop = e.target === e.currentTarget; },
+    onClick: (e) => { if (e.target === e.currentTarget && e.currentTarget._downOnBackdrop) close(); },
+  });
+
   // 記事管理モーダル
   const [showArticleAdmin, setShowArticleAdmin] = useState(false);
   const [articleAdminPassword, setArticleAdminPassword] = useState('');
@@ -4499,7 +4509,7 @@ ${userText}
 
       {/* ＝＝＝＝＝ 管理者: セール管理モーダル ＝＝＝＝＝ */}
       {showSaleAdmin && (
-        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end sm:items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) setShowSaleAdmin(false); }}>
+        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end sm:items-center justify-center" {...backdropClose(() => setShowSaleAdmin(false))}>
           <div className="bg-[#FFFDFB] w-full max-w-lg rounded-t-[2rem] sm:rounded-[2rem] max-h-[92svh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-[#FFFDFB] px-6 pt-5 pb-4 flex items-center justify-between border-b border-[#F4EFEB] z-10">
               <span className="font-black text-[#5A4C4C]">🛍 セール管理</span>
@@ -4590,8 +4600,8 @@ ${userText}
 
       {/* ＝＝＝＝＝ 管理者: 記事管理モーダル ＝＝＝＝＝ */}
       {showArticleAdmin && (
-        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end sm:items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) setShowArticleAdmin(false); }}>
-          <div className="bg-[#FFFDFB] w-full max-w-lg rounded-t-[2rem] sm:rounded-[2rem] max-h-[92svh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[210] bg-black/50 flex items-end sm:items-center justify-center" {...backdropClose(() => setShowArticleAdmin(false))}>
+          <div className="bg-[#FFFDFB] w-full max-w-lg sm:max-w-3xl lg:max-w-5xl rounded-t-[2rem] sm:rounded-[2rem] max-h-[92svh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-[#FFFDFB] px-6 pt-5 pb-4 flex items-center justify-between border-b border-[#F4EFEB]">
               <span className="font-black text-[#5A4C4C]">📝 記事管理</span>
               <button onClick={() => setShowArticleAdmin(false)} className="w-8 h-8 bg-[#F9F6F3] rounded-full flex items-center justify-center"><X className="w-4 h-4 text-[#A5A19E]" /></button>
@@ -4717,7 +4727,7 @@ ${userText}
                       onChange={e => setArticleForm(prev => ({ ...prev, content: e.target.value }))}
                       placeholder="## 見出し&#10;&#10;本文をMarkdownで入力..."
                       rows={12}
-                      className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76] resize-none font-mono"
+                      className="w-full border border-[#F4EFEB] rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#7B8E76] resize-y font-mono lg:min-h-[28rem]"
                     />
                   </div>
                   <div className="flex gap-3">
@@ -4774,7 +4784,7 @@ ${userText}
 
       {/* ＝＝＝＝＝ 商品詳細モーダル ＝＝＝＝＝ */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-[60] bg-[#FFFDFB] flex flex-col animate-in slide-in-from-bottom duration-300 lg:bg-black/50 lg:backdrop-blur-sm lg:items-center lg:justify-center" onClick={(e) => { if (e.target === e.currentTarget) closeProduct(); }}>
+        <div className="fixed inset-0 z-[60] bg-[#FFFDFB] flex flex-col animate-in slide-in-from-bottom duration-300 lg:bg-black/50 lg:backdrop-blur-sm lg:items-center lg:justify-center" {...backdropClose(closeProduct)}>
           <div className="flex flex-col w-full h-full lg:max-w-4xl lg:max-h-[90vh] lg:rounded-3xl lg:overflow-hidden lg:shadow-2xl lg:bg-[#FFFDFB] lg:h-auto">
           <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between border-b border-[#F4EFEB]">
             <button onClick={closeProduct} className="p-2 -ml-2 bg-[#F9F6F3] rounded-full text-[#5A4C4C]"><ChevronLeft className="w-6 h-6" /></button>
@@ -5475,7 +5485,7 @@ AI分析: ${selectedProduct.aiAnalysis || ''}
 
       {/* ＝＝＝＝＝ 出産準備リスト診断モーダル ＝＝＝＝＝ */}
       {showDiagModal && (
-        <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowDiagModal(false); }}>
+        <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" {...backdropClose(() => setShowDiagModal(false))}>
           <div className="bg-[#FFFDFB] w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] max-h-[90svh] overflow-y-auto">
             <div className="sticky top-0 bg-[#FFFDFB] px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#F4EFEB]">
               <div className="flex items-center gap-2">
