@@ -55,6 +55,26 @@ async function fetchPriceHistory(productId) {
   }
 }
 
+// description 用に「このページに実際に並ぶショップ名」を求める。
+// Amazon は shops_prices ではなく描画時に Creators API から取得するため、
+// shops_prices だけを見ると実際より少ない店舗数になる（実測で約9割の商品に
+// Amazon が並ぶ）。価格履歴に記録済みのショップ名を併せて数える。
+async function fetchShopNames(productId, dbShopNames) {
+  const names = new Set(dbShopNames);
+  try {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { data } = await supabaseServer
+      .from('price_history')
+      .select('shop_name')
+      .eq('product_id', productId)
+      .gte('recorded_on', since);
+    for (const row of data || []) if (row.shop_name) names.add(row.shop_name);
+  } catch {
+    // 履歴が引けなければ shops_prices 由来の名前だけで組み立てる
+  }
+  return [...names];
+}
+
 // 同カテゴリの人気商品を関連商品として取得（内部リンク強化・回遊性向上）
 async function fetchRelated(category, excludeId) {
   if (!category) return [];
@@ -86,17 +106,21 @@ export async function generateMetadata({ params }) {
   // 「忖度なしのリアルレビューも掲載」と書いていたが、レビューが無い商品でも
   // 出てしまい、スニペットの内容とページの中身が食い違っていた。
   const pricedShops = (product.shops || []).filter((s) => Number(s.lowestPrice) > 0);
-  const shopCount = pricedShops.length;
+  const shopNames = await fetchShopNames(
+    product.id,
+    pricedShops.map((s) => s.name).filter(Boolean)
+  );
+  const shopCount = shopNames.length;
   const hasReviews =
     (product.honestReviews?.length || 0) + (product.snsReviews?.length || 0) > 0;
   const desc = [
     `${shortName}の最安値・価格比較。`,
     // 1店舗しか価格が無い商品で「楽天・Yahoo!を比較」と書くと実物と食い違うため、
-    // 実際に価格を持っているショップだけに言及する。
+    // 実際に価格が並ぶショップだけに言及する。
     shopCount > 1
-      ? `${pricedShops.map((s) => s.name).filter(Boolean).slice(0, 3).join('・')}など${shopCount}店舗の価格をまとめて比較。`
-      : shopCount === 1 && pricedShops[0].name
-        ? `${pricedShops[0].name}の価格をチェック。`
+      ? `${shopNames.slice(0, 3).join('・')}の価格を比較。`
+      : shopCount === 1
+        ? `${shopNames[0]}の価格をチェック。`
         : '',
     product.rating > 0
       ? `購入者評価${product.rating}★（${product.reviewsCount || 0}件）。`
