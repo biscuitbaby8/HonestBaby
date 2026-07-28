@@ -65,6 +65,8 @@ async function fetchRelated(category, excludeId) {
       .eq('category', category)
       .neq('id', excludeId)
       .or('is_blocked.is.null,is_blocked.eq.false')
+      // 重複商品（非代表）は 301 で代表ページへ飛ぶため、関連商品には出さない
+      .is('canonical_id', null)
       .order('popularity_rank', { ascending: true })
       .limit(6);
     return (data || []).map(formatDbProduct);

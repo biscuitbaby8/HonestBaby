@@ -67,6 +67,8 @@ export default async function RankingPage({ params }) {
       .select('*, shops:shops_prices(*)')
       .eq('category', cat)
       .or('is_blocked.is.null,is_blocked.eq.false')
+      // 重複商品（非代表）は 301 で代表ページへ飛ぶため、ランキングに出さない
+      .is('canonical_id', null)
       .order('popularity_rank', { ascending: true })
       .limit(RANK_LIMIT);
     products = (data || []).map(formatDbProduct);

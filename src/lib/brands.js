@@ -8,7 +8,10 @@ export async function fetchBrandCounts() {
       .from('products')
       .select('brand')
       .not('brand', 'is', null)
-      .or('is_blocked.is.null,is_blocked.eq.false');
+      .or('is_blocked.is.null,is_blocked.eq.false')
+      // 代表商品のみを数える。重複（非代表）を含めるとブランドページの
+      // 実際の掲載件数と食い違い、代表商品ゼロのブランドまで sitemap に載ってしまう。
+      .is('canonical_id', null);
 
     const counts = new Map();
     for (const row of data || []) {

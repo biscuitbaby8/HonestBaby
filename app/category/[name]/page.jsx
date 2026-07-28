@@ -54,8 +54,11 @@ export default async function CategoryPage({ params }) {
       .select('*, shops:shops_prices(*)')
       .eq('category', cat)
       .or('is_blocked.is.null,is_blocked.eq.false')
+      // 重複商品（非代表）は 301 で代表ページへ飛ぶため、内部リンクには出さない
+      .is('canonical_id', null)
       .order('popularity_rank', { ascending: true })
-      .limit(300);
+      // 代表商品が最多のカテゴリでも全件を内部リンクできる件数にする（孤立ページ防止）
+      .limit(400);
     if (!error && data) products = data.map(formatDbProduct);
   } catch {
     // Supabase接続失敗時は空リストで表示
