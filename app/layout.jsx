@@ -48,22 +48,17 @@ export const viewport = {
   viewportFit: 'cover',
 };
 
-// サイト全体の構造化データ（WebSite + Organization）。
-// ブランド検索・サイトリンク検索ボックス対応。
+// サイト全体の構造化データ（WebSite + Organization）。ブランド検索対応。
+// SearchAction（サイトリンク検索ボックス）は Google が 2024/11 に機能自体を
+// 廃止し、マークアップも不要になった。それどころか urlTemplate のプレースホルダを
+// 含む /?q={search_term_string} が実URLとしてクロールされ、Search Console の
+// 「クロール済み - インデックス未登録」に計上されていたため削除する。
 const siteJsonLd = [
   {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'HonestBaby',
     url: SITE_URL,
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: `${SITE_URL}/?q={search_term_string}`,
-      },
-      'query-input': 'required name=search_term_string',
-    },
   },
   {
     '@context': 'https://schema.org',

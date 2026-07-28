@@ -82,7 +82,21 @@ export async function generateMetadata({ params }) {
 
   const shortName = cleanProductName(product.name);
   const title = `${shortName} の最安値・価格比較`;
-  const desc = `${shortName}の最安値・価格比較。${product.rating > 0 ? `評価${product.rating}★。` : ''}楽天・Yahoo最安値をまとめてチェック。忖度なしのリアルレビューも掲載。`;
+  // description はページに実在する情報だけを書く。従来は全商品に固定で
+  // 「忖度なしのリアルレビューも掲載」と書いていたが、レビューが無い商品でも
+  // 出てしまい、スニペットの内容とページの中身が食い違っていた。
+  const shopCount = (product.shops || []).filter((s) => Number(s.lowestPrice) > 0).length;
+  const hasReviews =
+    (product.honestReviews?.length || 0) + (product.snsReviews?.length || 0) > 0;
+  const desc = [
+    `${shortName}の最安値・価格比較。`,
+    shopCount > 1 ? `楽天・Yahoo!など${shopCount}店舗の価格をまとめて比較。` : '楽天・Yahoo!の価格をチェック。',
+    product.rating > 0
+      ? `購入者評価${product.rating}★（${product.reviewsCount || 0}件）。`
+      : '',
+    '過去90日の価格推移から「今が買い時か」もわかります。',
+    hasReviews ? '忖度なしのリアルレビューも掲載。' : '',
+  ].join('');
   // 重複商品は代表IDをcanonicalに（ページ自体もリダイレクトするが保険）
   const canonicalId = product.canonical_id && product.canonical_id !== product.id ? product.canonical_id : product.id;
   const url = `${SITE_URL}/product/${encodeURIComponent(canonicalId)}`;
