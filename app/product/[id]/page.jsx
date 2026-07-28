@@ -85,12 +85,19 @@ export async function generateMetadata({ params }) {
   // description はページに実在する情報だけを書く。従来は全商品に固定で
   // 「忖度なしのリアルレビューも掲載」と書いていたが、レビューが無い商品でも
   // 出てしまい、スニペットの内容とページの中身が食い違っていた。
-  const shopCount = (product.shops || []).filter((s) => Number(s.lowestPrice) > 0).length;
+  const pricedShops = (product.shops || []).filter((s) => Number(s.lowestPrice) > 0);
+  const shopCount = pricedShops.length;
   const hasReviews =
     (product.honestReviews?.length || 0) + (product.snsReviews?.length || 0) > 0;
   const desc = [
     `${shortName}の最安値・価格比較。`,
-    shopCount > 1 ? `楽天・Yahoo!など${shopCount}店舗の価格をまとめて比較。` : '楽天・Yahoo!の価格をチェック。',
+    // 1店舗しか価格が無い商品で「楽天・Yahoo!を比較」と書くと実物と食い違うため、
+    // 実際に価格を持っているショップだけに言及する。
+    shopCount > 1
+      ? `${pricedShops.map((s) => s.name).filter(Boolean).slice(0, 3).join('・')}など${shopCount}店舗の価格をまとめて比較。`
+      : shopCount === 1 && pricedShops[0].name
+        ? `${pricedShops[0].name}の価格をチェック。`
+        : '',
     product.rating > 0
       ? `購入者評価${product.rating}★（${product.reviewsCount || 0}件）。`
       : '',
