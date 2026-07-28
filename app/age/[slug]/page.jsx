@@ -37,6 +37,8 @@ async function fetchAgeProducts(categories) {
       .select('*, shops:shops_prices(*)')
       .in('category', categories)
       .or('is_blocked.is.null,is_blocked.eq.false')
+      // 重複商品（非代表）は 301 で代表ページへ飛ぶため、内部リンクには出さない
+      .is('canonical_id', null)
       .order('popularity_rank', { ascending: true })
       .limit(12);
     return (data || []).map(formatDbProduct);

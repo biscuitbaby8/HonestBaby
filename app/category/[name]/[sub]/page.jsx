@@ -65,6 +65,8 @@ export default async function SubCategoryPage({ params }) {
       .eq('category', cat)
       .eq('sub_category', sub)
       .or('is_blocked.is.null,is_blocked.eq.false')
+      // 重複商品（非代表）は 301 で代表ページへ飛ぶため、内部リンクには出さない
+      .is('canonical_id', null)
       .order('popularity_rank', { ascending: true })
       .limit(300);
     if (!error && data) products = data.map(formatDbProduct);

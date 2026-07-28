@@ -47,7 +47,15 @@ const nextConfig = {
     remotePatterns: [{ protocol: 'https', hostname: '**' }],
   },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // OGP/Twitterカード用の動的画像ルートは「ページ」ではないため、
+      // 検索結果に載せない（Search Console の
+      // 「クロール済み - インデックス未登録」に画像URLが積み上がるのを防ぐ）。
+      // クロール自体は許可したままなので、SNSのカード表示には影響しない。
+      { source: '/opengraph-image', headers: [{ key: 'X-Robots-Tag', value: 'noindex' }] },
+      { source: '/twitter-image', headers: [{ key: 'X-Robots-Tag', value: 'noindex' }] },
+    ];
   },
 };
 

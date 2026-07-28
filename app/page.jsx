@@ -45,6 +45,8 @@ async function fetchTopProducts() {
       .from('products')
       .select('*, shops:shops_prices(*)')
       .or('is_blocked.is.null,is_blocked.eq.false')
+      // 重複商品（非代表）は 301 で代表ページへ飛ぶため、内部リンクには出さない
+      .is('canonical_id', null)
       .order('popularity_rank', { ascending: true })
       .limit(24);
     return (data || []).map(formatDbProduct);
