@@ -109,8 +109,9 @@ export const SALE_CALENDAR = [
   },
 ];
 
-// セール特集でAmazon検索リンクを並べる狙い目カテゴリ（消耗品・定番を優先）
-export const AMAZON_SALE_KEYWORDS = [
+// セール特集で検索リンクを並べる狙い目カテゴリ（消耗品・定番を優先）。
+// 開催中セールのショップ（楽天/Yahoo/Amazon）に応じたリンク先で使う。
+export const SALE_KEYWORDS = [
   { label: 'おむつ', keyword: 'おむつ', category: 'おむつ' },
   { label: 'おしりふき', keyword: 'おしりふき', category: 'おむつ' },
   { label: '粉ミルク・液体ミルク', keyword: '粉ミルク', category: 'ミルク・授乳' },

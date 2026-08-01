@@ -30,6 +30,18 @@ export const getAmazonUrl = (keyword) =>
 // Amazonのセール会場（タイムセール一覧）へのタグ付きリンク
 export const getAmazonDealsUrl = () => `https://www.amazon.co.jp/deals?tag=${AMAZON_TAG}`;
 
+// Yahoo!ショッピングの検索／トップ。ValueCommerce に shopping.yahoo.co.jp の
+// PID があるため toVCUrl を通すと成果計測される。
+export const getYahooSearchUrl = (keyword) =>
+  toVCUrl(`https://shopping.yahoo.co.jp/search?p=${encodeURIComponent(keyword)}`);
+export const getYahooTopUrl = () => toVCUrl('https://shopping.yahoo.co.jp/');
+
+// 楽天市場の検索／トップ。楽天は商品ごとのアフィリエイトURLをAPIから受け取る
+// 方式のため、検索ページ用のアフィリエイト経路が無い。素のリンクで返す。
+export const getRakutenSearchUrl = (keyword) =>
+  `https://search.rakuten.co.jp/search/mall/${encodeURIComponent(keyword)}/`;
+export const getRakutenTopUrl = () => 'https://www.rakuten.co.jp/';
+
 // Amazon商品URLにアソシエイトタグが無ければ付与する
 // （Creators APIのdetailPageUrlにタグが含まれない場合の保険）
 export const withAmazonTag = (url) => {
