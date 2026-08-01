@@ -1,7 +1,20 @@
 import Link from 'next/link';
-import { saleStatusLabel, SALE_CALENDAR, AMAZON_SALE_KEYWORDS } from '@/src/lib/sales';
+import { saleStatusLabel, SALE_CALENDAR, SALE_KEYWORDS } from '@/src/lib/sales';
 import { fetchActiveSale } from '@/src/lib/salesServer';
-import { getAmazonUrl, getAmazonDealsUrl } from '@/src/lib/affiliate';
+import {
+  getAmazonUrl, getAmazonDealsUrl,
+  getYahooSearchUrl, getYahooTopUrl,
+  getRakutenSearchUrl, getRakutenTopUrl,
+} from '@/src/lib/affiliate';
+
+// 開催中セールのショップに合わせた導線。以前はAmazon固定だったため、
+// 楽天やYahoo!のセール開催中でも「Amazonのセール会場を見る」を出しており、
+// 開催中のショップと違う店に送客していた。
+const SALE_SHOP_LINKS = {
+  amazon: { label: 'Amazon', venue: getAmazonDealsUrl, search: getAmazonUrl },
+  yahoo: { label: 'Yahoo!ショッピング', venue: getYahooTopUrl, search: getYahooSearchUrl },
+  rakuten: { label: '楽天市場', venue: getRakutenTopUrl, search: getRakutenSearchUrl },
+};
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 
@@ -26,6 +39,8 @@ export const metadata = {
 
 export default async function SalePage() {
   const sale = await fetchActiveSale();
+  // 未知のshop値でも導線が壊れないようAmazonにフォールバック
+  const saleShop = (sale && SALE_SHOP_LINKS[sale.shop]) || SALE_SHOP_LINKS.amazon;
 
   const jsonLd = [
     {
@@ -71,20 +86,20 @@ export default async function SalePage() {
             <p className="text-[11px] font-bold text-[#B07A4A] mb-4">{sale.periodLabel}</p>
 
             <a
-              href={getAmazonDealsUrl()}
+              href={saleShop.venue()}
               target="_blank"
               rel="noopener noreferrer sponsored"
               className="block text-center text-sm font-black text-white bg-[#E8894A] px-6 py-3.5 rounded-full active:scale-95 transition-transform mb-5"
             >
-              Amazonのセール会場を見る →
+              {saleShop.label}のセール会場を見る →
             </a>
 
             <p className="text-xs font-black text-[#5A4C4C] mb-2">狙い目カテゴリから探す</p>
             <div className="flex flex-wrap gap-2">
-              {AMAZON_SALE_KEYWORDS.map((k) => (
+              {SALE_KEYWORDS.map((k) => (
                 <a
                   key={k.label}
-                  href={getAmazonUrl(k.keyword)}
+                  href={saleShop.search(k.keyword)}
                   target="_blank"
                   rel="noopener noreferrer sponsored"
                   className="inline-block px-3.5 py-2 rounded-full text-[11px] font-bold bg-white/80 text-[#5A4C4C] border border-[#F5D5B8] hover:bg-white"
