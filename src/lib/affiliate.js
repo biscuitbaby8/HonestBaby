@@ -36,11 +36,10 @@ export const getYahooSearchUrl = (keyword) =>
   toVCUrl(`https://shopping.yahoo.co.jp/search?p=${encodeURIComponent(keyword)}`);
 export const getYahooTopUrl = () => toVCUrl('https://shopping.yahoo.co.jp/');
 
-// 楽天市場の検索／トップ。楽天は商品ごとのアフィリエイトURLをAPIから受け取る
-// 方式のため、検索ページ用のアフィリエイト経路が無い。素のリンクで返す。
-export const getRakutenSearchUrl = (keyword) =>
-  `https://search.rakuten.co.jp/search/mall/${encodeURIComponent(keyword)}/`;
-export const getRakutenTopUrl = () => 'https://www.rakuten.co.jp/';
+// 楽天の検索ページへ直接リンクするヘルパーは意図的に持たない。
+// 楽天は商品ごとのアフィリエイトURLをAPIから受け取る方式で、検索ページ用の
+// アフィリエイト経路が無いため、外部へ直リンクすると成果が付かないまま
+// 送客することになる。楽天へは商品ページ経由（APIのアフィリエイトURL）で流す。
 
 // Amazon商品URLにアソシエイトタグが無ければ付与する
 // （Creators APIのdetailPageUrlにタグが含まれない場合の保険）

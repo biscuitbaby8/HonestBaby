@@ -4,19 +4,51 @@ import { fetchActiveSale } from '@/src/lib/salesServer';
 import {
   getAmazonUrl, getAmazonDealsUrl,
   getYahooSearchUrl, getYahooTopUrl,
-  getRakutenSearchUrl, getRakutenTopUrl,
 } from '@/src/lib/affiliate';
-
-// 開催中セールのショップに合わせた導線。以前はAmazon固定だったため、
-// 楽天やYahoo!のセール開催中でも「Amazonのセール会場を見る」を出しており、
-// 開催中のショップと違う店に送客していた。
-const SALE_SHOP_LINKS = {
-  amazon: { label: 'Amazon', venue: getAmazonDealsUrl, search: getAmazonUrl },
-  yahoo: { label: 'Yahoo!ショッピング', venue: getYahooTopUrl, search: getYahooSearchUrl },
-  rakuten: { label: '楽天市場', venue: getRakutenTopUrl, search: getRakutenSearchUrl },
-};
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
+
+// 外部リンク(<a>)と内部リンク(<Link>)で見た目を揃えるための共通クラス
+const ctaClass =
+  'block text-center text-sm font-black text-white bg-[#E8894A] px-6 py-3.5 rounded-full active:scale-95 transition-transform mb-5';
+const chipClass =
+  'inline-block px-3.5 py-2 rounded-full text-[11px] font-bold bg-white/80 text-[#5A4C4C] border border-[#F5D5B8] hover:bg-white';
+
+// 自サイトのカテゴリURL（サブカテゴリ指定があればそちらへ）
+const categoryPath = (k) =>
+  `/category/${encodeURIComponent(k.category)}` +
+  (k.sub ? `/${encodeURIComponent(k.sub)}` : '');
+
+// 開催中セールのショップに合わせた導線。
+// Amazon / Yahoo! はアフィリエイトが有効なのでモールへ直リンクする。
+// 楽天だけは検索ページ用のアフィリエイト経路が無く（商品ごとのアフィリエイトURLを
+// APIから受け取る方式で、hb.afl の hgc セグメントは商品単位に楽天が生成するため
+// こちらで組み立てられない）、素のリンクで外部へ流すと収益にならない。
+// そのため楽天セール時は自サイトのカテゴリページへ送る。カテゴリ内の商品リンクは
+// 楽天アフィリエイト済みなので、比較を挟みつつ収益も維持できる。
+const SALE_SHOP_LINKS = {
+  amazon: {
+    label: 'Amazon',
+    external: true,
+    cta: 'Amazonのセール会場を見る →',
+    venue: () => getAmazonDealsUrl(),
+    link: (k) => getAmazonUrl(k.keyword),
+  },
+  yahoo: {
+    label: 'Yahoo!ショッピング',
+    external: true,
+    cta: 'Yahoo!ショッピングのセール会場を見る →',
+    venue: () => getYahooTopUrl(),
+    link: (k) => getYahooSearchUrl(k.keyword),
+  },
+  rakuten: {
+    label: '楽天市場',
+    external: false,
+    cta: 'HonestBabyで価格を比較する →',
+    venue: () => '/',
+    link: (k) => categoryPath(k),
+  },
+};
 
 const SITE_URL = 'https://honestbaby-care.com';
 
@@ -85,28 +117,41 @@ export default async function SalePage() {
             <h2 className="text-lg font-black mb-1">{sale.name}</h2>
             <p className="text-[11px] font-bold text-[#B07A4A] mb-4">{sale.periodLabel}</p>
 
-            <a
-              href={saleShop.venue()}
-              target="_blank"
-              rel="noopener noreferrer sponsored"
-              className="block text-center text-sm font-black text-white bg-[#E8894A] px-6 py-3.5 rounded-full active:scale-95 transition-transform mb-5"
-            >
-              {saleShop.label}のセール会場を見る →
-            </a>
+            {saleShop.external ? (
+              <a
+                href={saleShop.venue()}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className={ctaClass}
+              >
+                {saleShop.cta}
+              </a>
+            ) : (
+              // 内部リンクは next/link で。クローラーに辿らせたいので sponsored は付けない
+              <Link href={saleShop.venue()} className={ctaClass}>
+                {saleShop.cta}
+              </Link>
+            )}
 
             <p className="text-xs font-black text-[#5A4C4C] mb-2">狙い目カテゴリから探す</p>
             <div className="flex flex-wrap gap-2">
-              {SALE_KEYWORDS.map((k) => (
-                <a
-                  key={k.label}
-                  href={saleShop.search(k.keyword)}
-                  target="_blank"
-                  rel="noopener noreferrer sponsored"
-                  className="inline-block px-3.5 py-2 rounded-full text-[11px] font-bold bg-white/80 text-[#5A4C4C] border border-[#F5D5B8] hover:bg-white"
-                >
-                  {k.label}
-                </a>
-              ))}
+              {SALE_KEYWORDS.map((k) =>
+                saleShop.external ? (
+                  <a
+                    key={k.label}
+                    href={saleShop.link(k)}
+                    target="_blank"
+                    rel="noopener noreferrer sponsored"
+                    className={chipClass}
+                  >
+                    {k.label}
+                  </a>
+                ) : (
+                  <Link key={k.label} href={saleShop.link(k)} className={chipClass}>
+                    {k.label}
+                  </Link>
+                )
+              )}
             </div>
           </section>
         )}
