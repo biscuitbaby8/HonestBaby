@@ -42,6 +42,15 @@ export const saleMatchesShop = (sale, shopName = '', source = '') => {
   return false;
 };
 
+// 毎月1日の「ファーストデイ」が、大型キャンペーンと重なって
+// 実施されない月の例外（YYYY-MM-DD・JST）。判明した分だけ列挙する。
+// 2026-08-01: 爆買WEEK(7/31〜8/2)開催のためファーストデイなし。
+export const YAHOO_FIRST_DAY_SKIP = ['2026-08-01'];
+
+// JSTの YYYY-MM-DD を返す（Date.now() ベースの共通ヘルパー）
+const toJstYMD = (jstDate) =>
+  `${jstDate.getUTCFullYear()}-${String(jstDate.getUTCMonth() + 1).padStart(2, '0')}-${String(jstDate.getUTCDate()).padStart(2, '0')}`;
+
 // 固定ルールの「今日のお得な日」（JST基準・毎月更新不要）。
 // 該当ショップ行のバッジ表示に使う。ショップごとに還元率が高いものを1つ返す。
 export const getTodayDeals = (now = Date.now()) => {
@@ -54,7 +63,8 @@ export const getTodayDeals = (now = Date.now()) => {
   if (day === 18) deals.push({ shop: 'rakuten', label: '本日ご愛顧感謝デー' });
   else if (day % 5 === 0) deals.push({ shop: 'rakuten', label: '本日5と0のつく日' });
   // Yahoo!ショッピング
-  if (day === 1) deals.push({ shop: 'yahoo', label: '本日ファーストデイ' });
+  if (day === 1 && !YAHOO_FIRST_DAY_SKIP.includes(toJstYMD(jst)))
+    deals.push({ shop: 'yahoo', label: '本日ファーストデイ' });
   else if (day === 5 || day === 15 || day === 25) deals.push({ shop: 'yahoo', label: '本日5のつく日' });
   else if (day === 11 || day === 22) deals.push({ shop: 'yahoo', label: '本日ヤフショ感謝デー' });
   else if (dow === 0) deals.push({ shop: 'yahoo', label: '本日プレミアムな日曜日' });
@@ -84,7 +94,9 @@ export const SALE_CALENDAR = [
     shop: 'Yahoo!ショッピング',
     events: [
       { name: '5のつく日', timing: '毎月5・15・25日', tip: 'PayPayポイントアップの定番日' },
-      { name: '超PayPay祭', timing: '年数回（不定期）', tip: '付与率が大きく上がる期間。開催中はアプリのお得情報タブで告知' },
+      { name: 'ファーストデイ', timing: '毎月1日', tip: '月初のポイントアップ日。ただし大型キャンペーンと重なる月は実施されないこともある' },
+      { name: 'ヤフショ感謝デー', timing: '毎月11・22日', tip: 'ゾロ目の日のポイントアップ。5のつく日を逃したときの受け皿に' },
+      { name: '爆買WEEK・超PayPay祭', timing: '年数回（不定期）', tip: 'まとめ買いするほど付与率が上がる期間。開催中はアプリのお得情報タブで告知' },
     ],
   },
   {
@@ -92,7 +104,7 @@ export const SALE_CALENDAR = [
     events: [
       { name: 'プライムデー', timing: '毎年7月', tip: 'プライム会員限定の年最大セール。おむつ・おしりふき等の消耗品の定番買いだめ時期' },
       { name: 'ブラックフライデー', timing: '11月下旬', tip: '会員以外も対象。クリスマス前のおもちゃ購入に' },
-      { name: 'スマイルセール・初売り', timing: '1月ほか不定期', tip: '福袋・日用品まとめ買いに' },
+      { name: 'スマイルSALE', timing: '年5回程度（1月・3月・5月・8月末など）', tip: '会員以外も対象の定期セール。プライムデーとブラックフライデーの谷間を埋める買い時' },
     ],
   },
 ];

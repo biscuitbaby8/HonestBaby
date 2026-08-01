@@ -40,7 +40,7 @@ const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
 };
 import { supabase } from './lib/supabaseClient';
 import { toVCUrl, getAmazonUrl, withAmazonTag } from './lib/affiliate';
-import { pickActiveSale, normalizeSaleRow, saleStatusLabel, getTodayDeals, getShopBadge } from './lib/sales';
+import { pickActiveSale, normalizeSaleRow, saleStatusLabel, getTodayDeals, getShopBadge, YAHOO_FIRST_DAY_SKIP } from './lib/sales';
 import ReviewHelpfulButton from './components/ReviewHelpfulButton';
 import PriceHistoryChart from './components/PriceHistoryChart';
 
@@ -372,15 +372,11 @@ const getLowestPrice = (shops) => {
   return prices.length > 0 ? Math.min(...prices) : 0;
 };
 
-// Yahoo!ショッピング BONUS+優良ストア日（不定期のため毎月更新）
-const YAHOO_BONUS_PLUS_DATES = [
-  '2026-07-03',
-  '2026-07-06',
-  '2026-07-17',
-  '2026-07-20',
-  '2026-07-23',
-  '2026-07-29',
-];
+// Yahoo!ショッピング BONUS+優良ストア日（不定期のため毎月更新）。
+// Yahoo!が数日前にしか告知しないため、確定した日付だけをここに足す。
+// 未来日が1件も無い＝カレンダーにこの行が出ないだけで、他の表示には影響しない。
+// 2026年8月分は本稿執筆時点で未告知のため空。告知され次第 'YYYY-MM-DD' を追加する。
+const YAHOO_BONUS_PLUS_DATES = [];
 
 const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -397,7 +393,7 @@ const getYahooSaleEvents = (fromDate, count = 5) => {
     const dow = d.getDay();
 
     const events = [];
-    if (day === 1) events.push({ name: 'ファーストデイ', bonus: '+4%', color: 'orange' });
+    if (day === 1 && !YAHOO_FIRST_DAY_SKIP.includes(ymd)) events.push({ name: 'ファーストデイ', bonus: '+4%', color: 'orange' });
     if (day === 5 || day === 15 || day === 25) events.push({ name: '5のつく日', bonus: '+4%', color: 'orange' });
     if (day === 11 || day === 22) events.push({ name: 'ヤフショ感謝デー', bonus: '+4%', color: 'orange' });
     if (dow === 0) events.push({ name: 'プレミアムな日曜日', bonus: '+5%', color: 'yellow' });
