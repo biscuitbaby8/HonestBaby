@@ -109,11 +109,15 @@ export const SALE_CALENDAR = [
   },
 ];
 
-// セール特集で検索リンクを並べる狙い目カテゴリ（消耗品・定番を優先）。
-// 開催中セールのショップ（楽天/Yahoo/Amazon）に応じたリンク先で使う。
+// セール特集で並べる狙い目カテゴリ（消耗品・定番を優先）。
+// keyword: 各モールの検索に渡す語（Amazon/Yahoo!の外部リンク用）
+// category / sub: 自サイトのカテゴリページ（楽天セール時の内部リンク用）。
+//   楽天は検索ページ用のアフィリエイト経路が無いため、素のリンクで外部へ流さず
+//   自サイトのカテゴリへ送る。カテゴリ内の商品リンクは楽天アフィリエイト済み。
+// sub は同じ category に複数の項目がぶら下がるときだけ指定して重複リンクを避ける。
 export const SALE_KEYWORDS = [
   { label: 'おむつ', keyword: 'おむつ', category: 'おむつ' },
-  { label: 'おしりふき', keyword: 'おしりふき', category: 'おむつ' },
+  { label: 'おしりふき', keyword: 'おしりふき', category: 'おむつ', sub: 'おしりふき' },
   { label: '粉ミルク・液体ミルク', keyword: '粉ミルク', category: 'ミルク・授乳' },
   { label: '離乳食・ベビーフード', keyword: 'ベビーフード', category: '離乳食・食器' },
   { label: 'ベビー服', keyword: 'ベビー服', category: 'ウェア' },
