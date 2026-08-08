@@ -375,8 +375,15 @@ const getLowestPrice = (shops) => {
 // Yahoo!ショッピング BONUS+優良ストア日（不定期のため毎月更新）。
 // Yahoo!が数日前にしか告知しないため、確定した日付だけをここに足す。
 // 未来日が1件も無い＝カレンダーにこの行が出ないだけで、他の表示には影響しない。
-// 2026年8月分は本稿執筆時点で未告知のため空。告知され次第 'YYYY-MM-DD' を追加する。
-const YAHOO_BONUS_PLUS_DATES = [];
+// 2026年8月分：8, 12, 14, 18, 21, 31日に開催予定。
+const YAHOO_BONUS_PLUS_DATES = [
+  '2026-08-08',
+  '2026-08-12',
+  '2026-08-14',
+  '2026-08-18',
+  '2026-08-21',
+  '2026-08-31',
+];
 
 const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
