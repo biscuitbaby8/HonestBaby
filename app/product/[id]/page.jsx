@@ -39,6 +39,21 @@ async function fetchProduct(rawId) {
   }
 }
 
+// 指定IDの商品が公開状態か（重複リダイレクト先が生きているかの確認用）。
+// 判定できないときは false を返し、リダイレクトせず安全側（404）に倒す。
+async function isProductVisible(productId) {
+  try {
+    const { data } = await supabaseServer
+      .from('products')
+      .select('id, is_blocked')
+      .eq('id', productId)
+      .maybeSingle();
+    return !!data && !data.is_blocked;
+  } catch {
+    return false;
+  }
+}
+
 // 価格推移（過去90日）。日次cronが記録した最安値スナップショット。
 async function fetchPriceHistory(productId) {
   try {
@@ -151,14 +166,19 @@ export default async function ProductPage({ params }) {
   const product = await fetchProduct(id);
   if (!product) notFound();
 
-  // 非表示(is_blocked)にした商品は検索結果・直リンクからも見えないよう404にする
-  if (product.is_blocked) notFound();
-
   // 重複商品（別IDで同一内容）は代表ページへ恒久リダイレクトし、正規URLへ統合する
   // （Search Console「重複・Googleが別の正規ページを選択」の解消）。
+  // 非表示チェックより先に判定する: 重複を非表示にしても代表ページが生きていれば
+  // 内容は消えておらず代表へ移っただけなので、404ではなく301が正しい応答になる。
+  // 代表側も非表示/不在なら本当に無くなったページなので、下の404へ落とす。
   if (product.canonical_id && product.canonical_id !== product.id) {
-    permanentRedirect(`/product/${product.canonical_id}`);
+    if (await isProductVisible(product.canonical_id)) {
+      permanentRedirect(`/product/${product.canonical_id}`);
+    }
   }
+
+  // 非表示(is_blocked)にした商品は検索結果・直リンクからも見えないよう404にする
+  if (product.is_blocked) notFound();
 
   const [related, activeSale, priceHistory, amazonResult] = await Promise.all([
     fetchRelated(product.category, product.id),
