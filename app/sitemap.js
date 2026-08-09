@@ -1,5 +1,5 @@
 import { supabaseServer } from '@/src/lib/supabaseServer';
-import { CATEGORY_TREE } from '@/src/lib/products';
+import { CATEGORY_TREE, UNIT_PRICE_CATEGORIES } from '@/src/lib/products';
 import { fetchBrandCounts } from '@/src/lib/brands';
 import { AGE_GUIDES } from '@/src/lib/ageGuides';
 
@@ -33,6 +33,14 @@ export default async function sitemap() {
   // カテゴリ別ランキング（/ranking/[category]）
   const rankingEntries = categories.map((c) => ({
     url: `${SITE_URL}/ranking/${encodeURIComponent(c.name)}`,
+    changeFrequency: 'daily',
+    priority: 0.8,
+  }));
+
+  // 1枚あたり単価ページ（/unit-price/[category]）。内容量が「枚」で数えられる
+  // カテゴリのみ（src/lib/products.js の UNIT_PRICE_CATEGORIES）。
+  const unitPriceEntries = UNIT_PRICE_CATEGORIES.map((c) => ({
+    url: `${SITE_URL}/unit-price/${encodeURIComponent(c)}`,
     changeFrequency: 'daily',
     priority: 0.8,
   }));
@@ -102,6 +110,7 @@ export default async function sitemap() {
     ...categoryEntries,
     ...ageEntries,
     ...rankingEntries,
+    ...unitPriceEntries,
     ...subCategoryEntries,
     ...brandEntries,
     ...articleEntries,

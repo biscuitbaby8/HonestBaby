@@ -13,7 +13,7 @@ import {
   ShoppingBag, Calendar, Trophy
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
-import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, getHighResImage, categorizeByName } from './lib/products';
+import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, getHighResImage, categorizeByName, parseQuantity } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -503,23 +503,6 @@ const buildBrandVariantQueries = (keyword) => {
     }
   });
   return [...queries].slice(0, 2);
-};
-
-// 商品名から内容量（枚数）を解析する。「10枚入×24パック」等の掛け算も展開する。
-// 数量が違う出品（例: おしりふき 単品 vs 24パック）を単価(¥/枚)で正しく比較するために使う。
-// 解析できなければ null を返し、安全側で単価表示を出さない。
-const parseQuantity = (name) => {
-  const n = (name || '').replace(/[，,]/g, '');
-  // 「A枚入×Bパック」「A枚×B個」など（枚が先）
-  let m = n.match(/(\d+)\s*枚[^\d×xX＊*]{0,6}?[×xX＊*]\s*(\d+)/);
-  if (m) return { count: parseInt(m[1], 10) * parseInt(m[2], 10), unit: '枚' };
-  // 「Bパック×A枚」「B個×A枚」など（パック/個が先）
-  m = n.match(/(\d+)\s*(?:パック|個|袋|セット|箱)[^\d×xX＊*]{0,6}?[×xX＊*]\s*(\d+)\s*枚/);
-  if (m) return { count: parseInt(m[1], 10) * parseInt(m[2], 10), unit: '枚' };
-  // 単純な「A枚」
-  m = n.match(/(\d+)\s*枚/);
-  if (m) return { count: parseInt(m[1], 10), unit: '枚' };
-  return null;
 };
 
 // 取り込みAPIが保存する rakuten_item_code の正規化（rakuten- 接頭辞を除去して

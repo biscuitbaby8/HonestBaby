@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
-import { CATEGORY_TREE, CAT_META, formatDbProduct } from '@/src/lib/products';
+import { CATEGORY_TREE, CAT_META, formatDbProduct, UNIT_PRICE_CATEGORIES } from '@/src/lib/products';
 import { CATEGORY_GUIDES, buildFaqLd } from '@/src/lib/categoryGuides';
 import GuideModalButton from '@/src/components/GuideModalButton';
 import SiteHeader from '@/src/components/SiteHeader';
@@ -146,6 +146,15 @@ export default async function CategoryPage({ params }) {
           >
             人気ランキングTOP20 →
           </Link>
+          {/* 内容量が「枚」で数えられるカテゴリだけ、単価比較ページへ導線を出す */}
+          {UNIT_PRICE_CATEGORIES.includes(cat) && (
+            <Link
+              href={`/unit-price/${encodeURIComponent(cat)}`}
+              className="inline-flex items-center gap-1.5 bg-[#EFF4EE] border border-[#CFDDCC] text-[#5F7359] text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform"
+            >
+              1枚あたり単価で比較 →
+            </Link>
+          )}
         </div>
 
         {/* クライアント側: サブカテゴリ・ソート・商品グリッド */}
