@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
-import { markdownToHtml } from '@/src/lib/markdown';
+import { markdownToHtml, extractFaq } from '@/src/lib/markdown';
+import { buildFaqLd } from '@/src/lib/categoryGuides';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 
@@ -98,6 +99,11 @@ export default async function ArticlePage({ params }) {
       ],
     },
   ];
+
+  // 本文に「よくある質問」があればFAQPageも出力する（FAQリッチリザルト狙い）。
+  // カテゴリ/ランキングページと同じ buildFaqLd を再利用する。
+  const faqLd = buildFaqLd(extractFaq(article.content));
+  if (faqLd) jsonLd.push(faqLd);
 
   return (
     <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">

@@ -21,8 +21,53 @@ function inlineFormat(text) {
     );
 }
 
+// HTMLコメントを本文から除去する。エディタ用のメモ（未記入の体験談枠など）を
+// 記事に残せるようにするため。escapeHtmlより先に落とすので表示にも出ない。
+function stripComments(md) {
+  return String(md || '').replace(/<!--[\s\S]*?-->/g, '');
+}
+
+// Markdown本文から「よくある質問」セクションを取り出して [{q, a}] を返す。
+// 「## よくある質問」配下の「### 質問文」＋直後の本文、という既存記事の
+// 書き方をそのまま拾う。該当が無ければ空配列。
+// FAQPage構造化データ（buildFaqLd / src/lib/categoryGuides.js）の入力に使う。
+export function extractFaq(md) {
+  const lines = stripComments(md).split('\n');
+  const faq = [];
+  let inFaqSection = false;
+  let current = null;
+
+  const toPlainText = (s) =>
+    s
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // リンクはテキストだけ残す
+      .replace(/[*`]/g, '')
+      .trim();
+
+  for (const line of lines) {
+    if (/^##\s+/.test(line) && !/^###/.test(line)) {
+      if (current) { faq.push(current); current = null; }
+      inFaqSection = /よくある質問|Q&A|FAQ/i.test(line);
+      continue;
+    }
+    if (!inFaqSection) continue;
+
+    if (/^###\s+/.test(line)) {
+      if (current) faq.push(current);
+      current = { q: toPlainText(line.replace(/^###\s+/, '')), a: '' };
+      continue;
+    }
+    if (current && line.trim()) {
+      const text = toPlainText(line);
+      if (text) current.a = current.a ? `${current.a} ${text}` : text;
+    }
+  }
+  if (current) faq.push(current);
+
+  return faq.filter((f) => f.q && f.a);
+}
+
 export function markdownToHtml(md) {
-  const lines = String(md || '').split('\n');
+  const lines = stripComments(md).split('\n');
   const out = [];
   let inList = false;
   let tableLines = [];
