@@ -13,6 +13,8 @@ export default async function sitemap() {
     { url: `${SITE_URL}/article`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${SITE_URL}/brand`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${SITE_URL}/sale`, changeFrequency: 'daily', priority: 0.8 },
+    // 値下がり・底値情報（価格推移データから毎日自動更新）
+    { url: `${SITE_URL}/price`, changeFrequency: 'daily', priority: 0.8 },
     { url: `${SITE_URL}/iherb`, changeFrequency: 'weekly', priority: 0.7 },
   ];
 

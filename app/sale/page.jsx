@@ -193,6 +193,10 @@ export default async function SalePage() {
             <Link href="/category/ミルク・授乳" className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]">
               ミルク・授乳グッズを比較
             </Link>
+            {/* 価格推移データから作る値下がり情報へ（セールと買い時の文脈が同じ） */}
+            <Link href="/price" className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#EFF4EE] border border-[#CFDDCC] text-[#5F7359] hover:bg-[#E4EDE2]">
+              今週値下がりした商品を見る →
+            </Link>
           </div>
         </section>
 
