@@ -61,7 +61,7 @@ export function addIherbAffiliate(rawUrl) {
   try {
     const u = new URL(rawUrl);
     if (!/(^|\.)iherb\.com$/i.test(u.hostname)) return rawUrl;
-    return `https://prf.hn/click/camref:${encodeURIComponent(camref)}/destination:${encodeURIComponent(rawUrl)}`;
+    return `https://iherb.prf.hn/click/camref:${encodeURIComponent(camref)}/destination:${encodeURIComponent(rawUrl)}`;
   } catch {
     return rawUrl;
   }
