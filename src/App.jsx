@@ -3584,6 +3584,22 @@ ${userText}
           );
         })()}
 
+        {/* ─── iHerb特集バナー（海外の人気ベビーサプリ・オーガニックケアへの導線） ─── */}
+        <a
+          href="/iherb"
+          data-cta-position="home-banner"
+          className="w-full bg-[#EAF4F2] rounded-[1.75rem] p-4 mb-6 flex items-center gap-3 shadow-sm active:scale-[0.98] transition-transform border border-[#CDE6E0]"
+        >
+          <div className="bg-white p-2 rounded-full shadow-sm flex-shrink-0">
+            <Leaf className="w-4 h-4 text-[#4C9A87]" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-[9px] font-black uppercase tracking-widest text-[#4C9A87] mb-0.5">iHerb</p>
+            <p className="text-sm font-black text-[#5A4C4C] leading-tight">海外の人気ビタミンD・オーガニックケアをチェック</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#4C9A87] flex-shrink-0" />
+        </a>
+
         {/* ─── マイベビー月齢別おすすめカテゴリ ─── */}
         {babyInfo && babyAgeMonths != null && (() => {
           const stage = AGE_CATEGORY_MAP.find(s => babyAgeMonths >= s.minM && babyAgeMonths < s.maxM);

@@ -8,6 +8,14 @@ import SpaBottomNav from '@/src/components/SpaBottomNav';
 
 const SITE_URL = 'https://honestbaby-care.com';
 
+// タイトル/概要にこれらの語を含む記事だけ、iHerb特集への導線を出す
+// （葉酸・ビタミンD・授乳期サプリなど、iHerbの取り扱いと内容が直結する記事に限定）
+const IHERB_RELEVANT_KEYWORDS = ['葉酸', 'ビタミンD', 'ビタミンｄ', 'マタニティ', '妊娠', '授乳', 'プレナタル', 'オーガニック'];
+const isIherbRelevantArticle = (article) => {
+  const text = `${article.title || ''}${article.meta_description || ''}`;
+  return IHERB_RELEVANT_KEYWORDS.some((kw) => text.includes(kw));
+};
+
 // 記事はISRで配信（1時間）。新規slugはオンデマンドSSR。
 export const revalidate = 3600;
 
@@ -146,6 +154,17 @@ export default async function ArticlePage({ params }) {
         >
           HonestBaby で商品を比較・検索する →
         </Link>
+
+        {isIherbRelevantArticle(article) && (
+          <Link
+            href="/iherb"
+            data-cta-position="article-related"
+            className="flex items-center justify-between bg-[#EAF4F2] border border-[#CDE6E0] rounded-2xl px-5 py-4 mt-4"
+          >
+            <span className="text-xs font-black text-[#4C9A87]">関連: iHerbの海外サプリ・オーガニックケアも見る</span>
+            <span className="text-xs font-black text-[#4C9A87]">→</span>
+          </Link>
+        )}
 
         {others.length > 0 && (
           <section className="mt-10">

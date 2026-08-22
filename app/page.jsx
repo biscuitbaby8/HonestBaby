@@ -224,6 +224,15 @@ export default async function Page() {
               </Link>
             </section>
           )}
+
+          {/* iHerb特集（内部リンク） */}
+          <Link
+            href="/iherb"
+            className="flex items-center justify-between bg-[#EAF4F2] border border-[#CDE6E0] rounded-2xl px-5 py-4 mt-10"
+          >
+            <span className="text-sm font-black text-[#4C9A87]">iHerbで買える海外の人気ベビー・マタニティ用品</span>
+            <span className="text-xs font-black text-[#4C9A87]">→</span>
+          </Link>
         </main>
       </div>
     </HomeClient>

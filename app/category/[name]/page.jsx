@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/src/lib/supabaseServer';
-import { CATEGORY_TREE, CAT_META, formatDbProduct, UNIT_PRICE_CATEGORIES } from '@/src/lib/products';
+import { CATEGORY_TREE, CAT_META, formatDbProduct, UNIT_PRICE_CATEGORIES, IHERB_RELEVANT_CATEGORIES } from '@/src/lib/products';
 import { CATEGORY_GUIDES, buildFaqLd } from '@/src/lib/categoryGuides';
 import GuideModalButton from '@/src/components/GuideModalButton';
 import SiteHeader from '@/src/components/SiteHeader';
@@ -153,6 +153,16 @@ export default async function CategoryPage({ params }) {
               className="inline-flex items-center gap-1.5 bg-[#EFF4EE] border border-[#CFDDCC] text-[#5F7359] text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform"
             >
               1枚あたり単価で比較 →
+            </Link>
+          )}
+          {/* iHerbの取り扱いと内容が直結するカテゴリだけ、特集ページへ導線を出す */}
+          {IHERB_RELEVANT_CATEGORIES.includes(cat) && (
+            <Link
+              href="/iherb"
+              data-cta-position="category-shortcut"
+              className="inline-flex items-center gap-1.5 bg-[#EAF4F2] border border-[#CDE6E0] text-[#4C9A87] text-xs font-black px-4 py-2 rounded-full active:scale-95 transition-transform"
+            >
+              iHerbの海外サプリ・ケア用品も見る →
             </Link>
           )}
         </div>
