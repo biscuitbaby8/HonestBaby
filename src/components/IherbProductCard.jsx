@@ -1,16 +1,16 @@
-import { getProxiedImage, getLowestPrice, cleanProductName } from '../lib/products';
+import { ExternalLink } from 'lucide-react';
+import { getProxiedImage, cleanProductName } from '../lib/products';
 
-// ProductCardLink と同じ見た目だが、内部の /product/[id] を経由せず
-// iHerb（Partnerize経由のアフィリエイトURL）へ直接遷移する外部リンクカード。
+// iherb_products（/iherb専用の独立テーブル）の1件を、内部の /product/[id] を
+// 経由せず iHerb（Partnerize経由のアフィリエイトURL）へ直接遷移するカードとして描画する。
+// iHerbは検索/価格取得APIが無く価格を自動更新できないため、価格ズレを避ける目的で
+// 価格は表示せず「iHerbで見る」の導線のみにしている。
 export default function IherbProductCard({ product }) {
-  const iherbShop = product.shops?.find((s) => s.name === 'iHerb');
-  const href = iherbShop?.url;
-  if (!href) return null;
+  if (!product?.iherb_url) return null;
 
-  const price = getLowestPrice(product.shops);
   return (
     <a
-      href={href}
+      href={product.iherb_url}
       target="_blank"
       rel="noopener noreferrer sponsored"
       data-cta-position="iherb-product-grid"
@@ -18,7 +18,7 @@ export default function IherbProductCard({ product }) {
     >
       <div className="relative aspect-square bg-[#F9F6F3] p-4">
         <img
-          src={getProxiedImage(product.image, 'card')}
+          src={getProxiedImage(product.image_url, 'card')}
           className="w-full h-full object-cover rounded-[1.5rem]"
           alt={product.name}
           width={600}
@@ -32,7 +32,9 @@ export default function IherbProductCard({ product }) {
       </div>
       <div className="p-4 flex flex-col flex-1">
         <div className="flex items-center gap-1 mb-2">
-          <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest">{product.category}</span>
+          {product.category && (
+            <span className="text-[10px] text-[#A5A19E] font-bold uppercase tracking-widest">{product.category}</span>
+          )}
           {product.rating > 0 && (
             <div className="flex items-center gap-1 ml-auto bg-[#FFF9E6] px-2 py-0.5 rounded-full text-[#D4AF37]">
               <span className="text-[10px] font-black">★ {product.rating}</span>
@@ -41,11 +43,9 @@ export default function IherbProductCard({ product }) {
         </div>
         <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{cleanProductName(product.name, 60)}</h3>
         <div className="mt-auto">
-          <p className="text-xl font-black text-[#4C9A87] leading-none">
-            <span className="text-xs mr-0.5">¥</span>
-            {price > 0 ? price.toLocaleString() : '---'}
-            <span className="text-[10px] text-[#A5A19E] ml-1 font-normal">{price > 0 ? '〜' : ''}</span>
-          </p>
+          <span className="inline-flex items-center gap-1 text-[11px] font-black text-white bg-[#4C9A87] px-3 py-1.5 rounded-full">
+            iHerbで見る<ExternalLink className="w-3 h-3" strokeWidth={2.5} />
+          </span>
         </div>
       </div>
     </a>
