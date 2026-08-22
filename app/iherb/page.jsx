@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Droplet, Shield, Heart, Sparkles, Fish, Leaf, ExternalLink } from 'lucide-react';
 import { supabaseServer } from '@/src/lib/supabaseServer';
-import { formatDbProduct } from '@/src/lib/products';
 import { addIherbAffiliate } from '@/src/lib/affiliate';
 import SiteHeader from '@/src/components/SiteHeader';
 import IherbProductCard from '@/src/components/IherbProductCard';
@@ -93,16 +92,13 @@ export default async function IherbPage() {
   let products = [];
   try {
     const { data, error } = await supabaseServer
-      .from('shops_prices')
-      .select('product:products(*, shops:shops_prices(*))')
-      .eq('shop_name', 'iHerb')
-      .limit(300);
-    if (!error && data) {
-      products = data
-        .map((row) => row.product)
-        .filter((p) => p && (p.is_blocked === null || p.is_blocked === false))
-        .map(formatDbProduct);
-    }
+      .from('iherb_products')
+      .select('*')
+      .eq('is_blocked', false)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (!error && data) products = data;
   } catch {
     // Supabase接続失敗時は編集コンテンツのみ表示
   }

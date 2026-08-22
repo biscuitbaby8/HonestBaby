@@ -1,12 +1,16 @@
 import { supabaseServer as supabase } from '@/src/lib/supabaseServer';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { CATEGORIES } from '@/src/lib/products';
 import { addIherbAffiliate } from '@/src/lib/affiliate';
 
 // =============================================
 // iHerb商品の手動投入API（管理者専用）
 // iHerbには楽天/Yahooのような検索APIが無いため、選定した商品を
-// パスワード保護のこのAPI経由でproducts/shops_pricesに登録する。
+// パスワード保護のこのAPI経由で iherb_products に登録する。
+// products/shops_pricesとは独立したテーブル
+// （通常のカテゴリ一覧・商品詳細・サイトマップに混ざらないための分離。
+// 詳細は supabase/migrations/025_iherb_products.sql 参照）。
+// 価格は検索/価格取得APIが無く自動更新できないため保持しない
+// （/iherbページはリンク先のiHerbで確認してもらう設計）。
 // =============================================
 
 export const runtime = 'nodejs';
@@ -55,61 +59,29 @@ export async function POST(request) {
   for (const it of list) {
     try {
       const name = str(it?.name, 200).trim();
-      const category = str(it?.category, 40);
-      const iherb_url = str(it?.iherb_url, 1000);
-      if (!name || !CATEGORIES.includes(category) || !isAllowedIherbUrl(iherb_url)) continue;
+      const rawUrl = str(it?.iherb_url, 1000);
+      if (!name || !isAllowedIherbUrl(rawUrl)) continue;
 
-      const sub_category = str(it?.sub_category, 60) || '本体';
+      const category = str(it?.category, 40);
       const brand = str(it?.brand, 80) || 'iHerb';
       const image_url = str(it?.image_url, 600) || null;
-      const price = Math.max(0, parseInt(it?.price) || 0);
       const rating = Math.max(0, Math.min(5, Number(it?.rating) || 0));
       const reviews_count = Math.max(0, parseInt(it?.reviews_count) || 0);
-      const code = `iherb-${str(it?.code, 100).trim() || name}`;
+      const iherb_url = addIherbAffiliate(rawUrl);
+
+      const row = { name, category, brand, iherb_url, image_url, rating, reviews_count };
 
       const { data: existing } = await supabase
-        .from('products').select('id').eq('rakuten_item_code', code).limit(1).maybeSingle();
-      let productId = existing?.id || null;
+        .from('iherb_products').select('id').eq('iherb_url', iherb_url).limit(1).maybeSingle();
 
-      if (!productId) {
-        const { data, error } = await supabase
-          .from('products')
-          .insert({
-            name, category, sub_category, brand, image_url,
-            rating, reviews_count,
-            rakuten_item_code: code,
-            is_market_wide: true,
-            last_synced_at: new Date().toISOString(),
-          })
-          .select('id')
-          .single();
-        if (error || !data) continue;
-        productId = data.id;
+      if (existing?.id) {
+        await supabase.from('iherb_products').update(row).eq('id', existing.id);
+        ingested.push({ id: existing.id, name, category });
       } else {
-        await supabase
-          .from('products')
-          .update({ name, category, sub_category, brand, image_url, rating, reviews_count, last_synced_at: new Date().toISOString() })
-          .eq('id', productId);
+        const { data, error } = await supabase.from('iherb_products').insert(row).select('id').single();
+        if (error || !data) continue;
+        ingested.push({ id: data.id, name, category });
       }
-
-      const trackingUrl = addIherbAffiliate(iherb_url);
-      const sellers = [{ name: 'iHerb', price, url: trackingUrl, shipping: 0, points: 0 }];
-      await supabase
-        .from('shops_prices')
-        .upsert(
-          {
-            product_id: productId,
-            shop_name: 'iHerb',
-            shop_type: 'overseas',
-            lowest_price: price,
-            sellers,
-            source: 'manual',
-            last_updated: new Date().toISOString(),
-          },
-          { onConflict: 'product_id,shop_name' }
-        );
-
-      ingested.push({ id: productId, name, category });
     } catch {
       // 1件の失敗で全体を止めない
     }
