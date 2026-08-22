@@ -32,27 +32,32 @@ const IHERB_BABY_CATEGORY = 'https://www.iherb.com/c/baby';
 const TOPICS = [
   {
     title: 'ベビー用ビタミンD3ドロップ',
-    desc: '完全母乳の赤ちゃんは不足しがちと言われるビタミンD。海外では無味・液体タイプが定番で、1日1滴タイプなど選択肢が豊富です。',
+    desc: '完全母乳の赤ちゃんは不足しがちと言われるビタミンD。「Ddrops」「California Gold Nutrition」など無味・液体タイプが定番で、1日1滴タイプなど選択肢が豊富です。',
     href: iherbSearch('baby vitamin d3 drops'),
   },
   {
+    title: '乳酸菌+ビタミンD配合ドロップ',
+    desc: 'スウェーデン発「BioGaia（プロテクティス）」は乳酸菌L.ロイテリ菌とビタミンDを一度に摂れるドロップタイプ。iHerb日本の年間ランキングでもベビー部門上位の定番です。',
+    href: iherbSearch('biogaia protectis baby drops'),
+  },
+  {
     title: '妊娠期の葉酸・プレナタルサプリ',
-    desc: '葉酸・鉄・DHAをまとめて摂れるプレナタル。海外ブランドはメチル葉酸（活性型）など処方の選択肢が広いのが特長です。',
-    href: iherbSearch('prenatal folate'),
+    desc: '「Solgar」「Thorne」「Garden of Life」など、鉄・DHAをまとめて摂れるプレナタル。メチル葉酸（活性型）など処方の選択肢が広いのが海外ブランドの特長です。',
+    href: iherbSearch('prenatal methylfolate'),
   },
   {
     title: 'オーガニック ベビーローション・オイル',
-    desc: '無香料・シンプル処方の保湿ケア。乾燥しやすい季節の全身ケアや、ベビーマッサージ用のオイルが見つかります。',
+    desc: '「Weleda」「Babo Botanicals」など無香料・シンプル処方の保湿ケア。乾燥しやすい季節の全身ケアや、ベビーマッサージ用のオイルが見つかります。',
     href: iherbSearch('baby lotion organic'),
   },
   {
     title: 'ナチュラル ベビーソープ・シャンプー',
-    desc: '涙にしみにくい低刺激タイプ。天然由来成分にこだわった海外ブランドのボディソープ・シャンプーが揃います。',
+    desc: '「Aveeno Baby」「Alaffia」など涙にしみにくい低刺激タイプ。天然由来成分にこだわった海外ブランドのボディソープ・シャンプーが揃います。',
     href: iherbSearch('baby wash shampoo natural'),
   },
   {
     title: '授乳期のDHA・オメガ3',
-    desc: 'ママ向けのDHA/EPAサプリ。産後の栄養補給として海外では広く選ばれています。',
+    desc: '「Nordic Naturals」はミス・ユニバース・ジャパンの公式栄養コンサルタントも愛飲するブランド。産後の栄養補給としてママ向けのDHA/EPAサプリが海外では広く選ばれています。',
     href: iherbSearch('postnatal dha omega 3'),
   },
   {

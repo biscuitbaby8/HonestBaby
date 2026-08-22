@@ -114,6 +114,10 @@ export const parseQuantity = (name) => {
 // 「おむつ117件・トイレ用品23件」に対し他カテゴリは1桁のため対象外。
 export const UNIT_PRICE_CATEGORIES = ['おむつ', 'トイレ用品'];
 
+// iHerb特集（/iherb）と内容が直結するカテゴリだけに導線を絞る。
+// マタニティ=葉酸/プレナタルサプリ、お風呂用品=保湿クリーム、ミルク・授乳=授乳期DHA。
+export const IHERB_RELEVANT_CATEGORIES = ['マタニティ', 'お風呂用品', 'ミルク・授乳'];
+
 export const cleanProductName = (name, maxLen = 50) => {
   let n = String(name || '');
   // 【】[]（）()＜＞<>《》〈〉 の販促ブロックを除去（中身が販促語のときだけ）
