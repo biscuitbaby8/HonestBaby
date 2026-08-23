@@ -17,7 +17,11 @@
     { "path": "/api/cron/sync-products?batch=15", "schedule": "0 21 * * *" },
     { "path": "/api/cron/sync-products?batch=16", "schedule": "30 22 * * *" },
     { "path": "/api/cron/baby-milestone-push", "schedule": "0 23 * * *" },
-    { "path": "/api/cron/weekly-push", "schedule": "0 20 * * 0" }
+    { "path": "/api/cron/weekly-push", "schedule": "0 20 * * 0" },
+    { "path": "/api/cron/refresh-stale?limit=80", "schedule": "15 2 * * *" },
+    { "path": "/api/cron/refresh-stale?limit=80", "schedule": "15 8 * * *" },
+    { "path": "/api/cron/refresh-stale?limit=80", "schedule": "15 14 * * *" },
+    { "path": "/api/cron/refresh-stale?limit=80", "schedule": "45 20 * * *" }
   ],
   "redirects": [
     {
