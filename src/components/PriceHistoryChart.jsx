@@ -36,8 +36,16 @@ export default function PriceHistoryChart({ history }) {
   const maxPrice = prices.length ? Math.max(...prices) : 0;
   const latestByShop = [...seriesByShop.values()].map((arr) => arr[arr.length - 1].price);
   const currentLowest = latestByShop.length ? Math.min(...latestByShop) : 0;
-  // 底値圏: 現在の最安が記録上の最安の2%以内（2日以上の記録があるときのみ判定）
-  const isBottom = uniqueDays >= 2 && currentLowest > 0 && currentLowest <= minPrice * 1.02;
+
+  // 記録の鮮度。同期対象から外れた商品は履歴が数週間前で止まることがあり、
+  // その古い値を「現在価格」として扱うと「今が底値圏！」が嘘になる。
+  const latestT = allPoints.length ? Math.max(...allPoints.map((p) => p.t)) : 0;
+  const daysSinceLatest = latestT ? Math.floor((Date.now() - latestT) / 86400000) : null;
+  const isStale = daysSinceLatest != null && daysSinceLatest > 7;
+
+  // 底値圏: 現在の最安が記録上の最安の2%以内（2日以上の記録があり、かつ
+  // 記録が新しいときのみ。古い記録では「今」を語らない）
+  const isBottom = uniqueDays >= 2 && currentLowest > 0 && currentLowest <= minPrice * 1.02 && !isStale;
 
   return (
     <section className="bg-white rounded-[2rem] border border-[#F4EFEB] p-5 shadow-sm">
@@ -79,6 +87,11 @@ export default function PriceHistoryChart({ history }) {
               最高 ¥{maxPrice.toLocaleString()}
             </span>
           </div>
+          {isStale && (
+            <p className="text-[10px] font-bold text-[#A5A19E] mt-1.5 leading-relaxed">
+              ※ 最後に価格を記録できたのは{daysSinceLatest}日前です。現在の価格は各ショップでご確認ください。
+            </p>
+          )}
         </>
       )}
     </section>
