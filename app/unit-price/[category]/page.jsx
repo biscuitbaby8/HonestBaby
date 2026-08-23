@@ -5,13 +5,12 @@ import {
   UNIT_PRICE_CATEGORIES,
   formatDbProduct,
   getLowestPrice,
-  getProxiedImage,
-  cleanProductName,
   parseQuantity,
 } from '@/src/lib/products';
 import { buildFaqLd } from '@/src/lib/categoryGuides';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
+import UnitPriceTabs from '@/src/components/UnitPriceTabs';
 
 const SITE_URL = 'https://honestbaby-care.com';
 
@@ -155,8 +154,6 @@ export default async function UnitPricePage({ params }) {
     buildFaqLd(faq),
   ].filter(Boolean);
 
-  const fmtUnit = (v) => (v >= 100 ? `¥${Math.round(v).toLocaleString()}` : `¥${v.toFixed(1)}`);
-
   return (
     <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
       <SiteHeader />
@@ -183,52 +180,7 @@ export default async function UnitPricePage({ params }) {
         {groups.length === 0 ? (
           <p className="text-xs text-[#A5A19E] font-bold py-10 text-center">単価を計算できる商品を集計中です。</p>
         ) : (
-          groups.map(([sub, list]) => (
-            <section key={sub} className="mb-10">
-              <h2 className="text-base font-black mb-1">{sub}の1枚あたり単価</h2>
-              <p className="text-[11px] text-[#A5A19E] font-bold mb-3">{list.length}件を安い順に表示</p>
-              <ol className="space-y-3">
-                {list.map((p, i) => (
-                  <li key={p.id}>
-                    <Link
-                      href={`/product/${encodeURIComponent(p.id)}`}
-                      className="flex items-center gap-3 bg-white rounded-2xl border border-[#F4EFEB] p-3 hover:shadow-sm active:scale-[0.99] transition-all"
-                    >
-                      <span
-                        className={`flex-shrink-0 w-8 h-8 rounded-full text-white text-xs font-black flex items-center justify-center ${
-                          i === 0 ? 'bg-[#7B8E76]' : 'bg-[#D4CDC7]'
-                        }`}
-                      >
-                        {i + 1}
-                      </span>
-                      <div className="flex-shrink-0 w-16 h-16 bg-[#F9F6F3] rounded-xl overflow-hidden">
-                        <img
-                          src={getProxiedImage(p.image, 'card')}
-                          alt={p.name}
-                          width={600}
-                          height={600}
-                          loading={i < 3 ? 'eager' : 'lazy'}
-                          decoding="async"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold leading-snug line-clamp-2">{cleanProductName(p.name, 60)}</p>
-                        <div className="flex items-baseline gap-2 mt-1 flex-wrap">
-                          <span className="text-sm font-black text-[#7B8E76]">
-                            {fmtUnit(p.unitPrice)} / {p.qty.unit}
-                          </span>
-                          <span className="text-[10px] font-bold text-[#A5A19E]">
-                            {p.qty.count}{p.qty.unit} ・ ¥{p.price.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          ))
+          <UnitPriceTabs groups={groups} />
         )}
 
         <section className="bg-white rounded-[2rem] border border-[#F4EFEB] p-6 mb-8">
