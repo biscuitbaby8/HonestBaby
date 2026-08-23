@@ -1685,6 +1685,21 @@ const App = () => {
         const USED_KEYWORDS = ['中古', 'リユース', '訳あり', 'アウトレット', '中古品', '再生品'];
         const isNewItem = (name) => !USED_KEYWORDS.some(w => (name || '').includes(w));
 
+        // 内容量（枚数）が読み取れる商品は、同じ内容量の出品だけを候補にする。
+        // 検索キーワードは再現率のため先頭数語しか使えず「200枚入り 2個セット」の
+        // 数量が落ちるため、以前は1個入り（=より安い）が最安として選ばれ、
+        // リンク先が別バリアントになっていた（2個セットなのに1個の商品へ飛ぶ）。
+        // 表記ゆれ（"200枚×2" と "200枚入り 2個セット"）は数値化して比較すれば吸収できる。
+        // 相手の内容量が読めない場合は同一と断定できないので候補から外す
+        // （誤ったリンクを出すより、そのショップを出さない方が安全）。
+        const selfQty = parseQuantity(selectedProduct.name);
+        const qtyMatches = (itemName) => {
+          if (!selfQty) return true;
+          const q = parseQuantity(itemName);
+          if (!q) return false;
+          return q.unit === selfQty.unit && q.count === selfQty.count;
+        };
+
         // レンタル業者の出品を除外（購入品の比較にレンタル価格/延長プランが混ざるのを防ぐ）。
         // この商品自体がレンタルカテゴリの場合は当然除外しない。
         const RENTAL_WORDS = ['レンタル', 'rental', 'レンタ', 'リース', '貸出', '貸し出し', 'サブスク'];
@@ -1740,7 +1755,7 @@ const App = () => {
         const newShops = [...cachedShops];
 
         if (rakutenData?.products) {
-          const items = rakutenData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item) && passesAccessory(item));
+          const items = rakutenData.products.filter(item => nameMatches(item.name) && qtyMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item) && passesAccessory(item));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || '楽天市場';
@@ -1756,7 +1771,7 @@ const App = () => {
         }
 
         if (yahooData?.products) {
-          const items = yahooData.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item) && passesAccessory(item));
+          const items = yahooData.products.filter(item => nameMatches(item.name) && qtyMatches(item.name) && priceInRange(item.price) && isNewItem(item.name) && passesRental(item) && passesAccessory(item));
           if (items.length > 0) {
             const best = items.sort((a, b) => a.price - b.price)[0];
             const shopName = best.brand || 'Yahoo!ショッピング';
@@ -1782,7 +1797,7 @@ const App = () => {
         for (const result of specialtyResults) {
           const { name, source, domain, data } = result;
           if (!data.products?.length) continue;
-          const items = data.products.filter(item => nameMatches(item.name) && priceInRange(item.price) && passesRental(item) && passesAccessory(item));
+          const items = data.products.filter(item => nameMatches(item.name) && qtyMatches(item.name) && priceInRange(item.price) && passesRental(item) && passesAccessory(item));
           if (items.length === 0) continue;
           const best = items.sort((a, b) => a.price - b.price)[0];
           const retailer = OFFICIAL_RETAILERS.find(r => r.domain === domain);
@@ -1902,11 +1917,12 @@ const App = () => {
     setRemoteError(null);
     setRemoteProducts([]);
 
+    // 内容量は products.js の parseQuantity に一本化する。
+    // 以前はここに簡易実装のコピーがあり（sync-products にも同じものがあった）、
+    // 「200枚入り 2個セット」を200枚と誤って保存していた。
     const parseDiaperCount = (name) => {
-      const packMatch = name.match(/(\d+)枚[×x＊*](\d+)/);
-      if (packMatch) return parseInt(packMatch[1]) * parseInt(packMatch[2]);
-      const m = name.match(/(\d+)枚/);
-      return m ? parseInt(m[1]) : null;
+      const q = parseQuantity(name);
+      return q ? q.count : null;
     };
 
     const mapItems = (items, cat) => items
@@ -4816,22 +4832,32 @@ ${userText}
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 mb-6 px-1">
-              <div className="bg-[#F9F6F3] rounded-[1.5rem] p-4 text-center">
-                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">最安値</p>
-                <p className="text-sm font-black text-[#5A4C4C]">
-                  {getLowestPrice(selectedProduct.shops) > 0 ? `¥${getLowestPrice(selectedProduct.shops).toLocaleString()}` : '---'}
-                </p>
-              </div>
-              <div className="bg-[#FFF9E6] rounded-[1.5rem] p-4 text-center">
-                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">評価</p>
-                <p className="text-sm font-black text-[#D4AF37]">★ {Number(selectedProduct.rating).toFixed(2)}</p>
-              </div>
-              <div className="bg-[#F0F4EF] rounded-[1.5rem] p-4 text-center">
-                <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">取扱店舗</p>
-                <p className="text-sm font-black text-[#7B8E76]">{(selectedProduct.shops || []).length}店</p>
-              </div>
-            </div>
+            {/* サマリーは下の「ショップ比較」と同じデータを参照する。
+                DBの shops をそのまま使うと、同期時に別バリアントが紛れ込んだ
+                古い行まで最安値に採用され、下のショップ比較の金額と食い違う
+                （例: ヘッダー¥1,035 / 比較欄の最安¥1,388）。 */}
+            {(() => {
+              const summaryShops = crossPlatformShops.length > 0 ? crossPlatformShops : (selectedProduct.shops || []);
+              const summaryLowest = getLowestPrice(summaryShops);
+              return (
+                <div className="grid grid-cols-3 gap-3 mb-6 px-1">
+                  <div className="bg-[#F9F6F3] rounded-[1.5rem] p-4 text-center">
+                    <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">最安値</p>
+                    <p className="text-sm font-black text-[#5A4C4C]">
+                      {summaryLowest > 0 ? `¥${summaryLowest.toLocaleString()}` : '---'}
+                    </p>
+                  </div>
+                  <div className="bg-[#FFF9E6] rounded-[1.5rem] p-4 text-center">
+                    <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">評価</p>
+                    <p className="text-sm font-black text-[#D4AF37]">★ {Number(selectedProduct.rating).toFixed(2)}</p>
+                  </div>
+                  <div className="bg-[#F0F4EF] rounded-[1.5rem] p-4 text-center">
+                    <p className="text-[9px] font-black text-[#A5A19E] mb-1 uppercase tracking-wider">取扱店舗</p>
+                    <p className="text-sm font-black text-[#7B8E76]">{summaryShops.length}店</p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ─── マイベビーの月齢適合コメント（ルールベース、AIではなく即時表示） ─── */}
             {(() => {

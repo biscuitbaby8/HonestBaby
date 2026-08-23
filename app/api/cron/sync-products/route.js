@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
+import { parseQuantity } from '@/src/lib/products';
 import { request as httpsRequest } from 'node:https';
 
 export const maxDuration = 60;
@@ -464,12 +465,13 @@ function extractBrand(itemName) {
   return '';
 }
 
-// おむつ枚数パーサー
+// おむつ枚数パーサー。
+// 以前はここに独自の簡易実装があり、products.js の parseQuantity と挙動が
+// 食い違っていた（全角×・「N個セット」表記を取りこぼす）。単価表示と
+// DBのunit_countがズレる原因になるため、共通実装に一本化する。
 function parseDiaperCount(name) {
-  const packMatch = name.match(/(\d+)枚[×x＊*](\d+)/);
-  if (packMatch) return parseInt(packMatch[1]) * parseInt(packMatch[2]);
-  const m = name.match(/(\d+)枚/);
-  return m ? parseInt(m[1]) : null;
+  const q = parseQuantity(name);
+  return q ? q.count : null;
 }
 
 // レンタル期間パーサー（同一商品が期間ごとに別アイテムコードで出品されるため、
@@ -785,6 +787,8 @@ async function fetchYahooPrice(keyword) {
         source: 'yahoo',
         rating: parseFloat(item.review?.rate) || 0,
         reviews_count: parseInt(item.review?.count) || 0,
+        // 呼び出し側で「本当に同じ商品か」を照合するために出品名を持ち回る
+        item_name: item.name || '',
       };
     });
   } catch {
@@ -1162,8 +1166,17 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
         const searchKeyword = product.name.split(/[\s　]+/).slice(0, 3).join(' ');
         const yahooResults = await fetchYahooPrice(searchKeyword);
 
-        if (yahooResults.length > 0) {
-          const yahooSellers = yahooResults.map(r => ({
+        // 検索キーワードは先頭3語しか使えず内容量が落ちるため、そのまま採用すると
+        // 「200枚入り2個セット」の枠に1個入りの出品が最安値として入り、価格も
+        // リンク先も別バリアントになる。内容量が読める商品は数量一致を必須にする。
+        const selfQty = parseQuantity(product.name);
+        const matchedYahoo = !selfQty ? yahooResults : yahooResults.filter((r) => {
+          const q = parseQuantity(r.item_name || '');
+          return q && q.unit === selfQty.unit && q.count === selfQty.count;
+        });
+
+        if (matchedYahoo.length > 0) {
+          const yahooSellers = matchedYahoo.map(r => ({
             shop_name: r.name || 'Yahoo!ショッピング',
             price: r.price,
             url: r.url,
