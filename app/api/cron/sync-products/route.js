@@ -354,6 +354,20 @@ const ACCESSORY_ONLY_KEYWORDS = [
 const isAccessoryOnlyListing = (name) =>
   !!name && ACCESSORY_ONLY_KEYWORDS.some((kw) => name.includes(kw));
 
+// 出品がどのモールのものかをURLで判定する。
+// 「商品の発見元」（楽天検索 / Yahoo補完）と「その出品が実際にどのモールか」は
+// 一致しない。deduplicateProducts が楽天とYahooの出品を1商品に統合するため、
+// 統合後の seller 配列には両モールが混在する。これを見ずに一括で「楽天市場」
+// として保存していたことが、Yahooの価格・URLが楽天として記録される原因だった
+// （価格推移グラフの「楽天」線が実際はYahooの値になる）。
+function sellerMall(seller) {
+  const u = String(seller?.url || '');
+  if (/yahoo\.co\.jp/i.test(u)) return 'yahoo';
+  if (/rakuten\.co\.jp|rakuten\.ne\.jp|r10\.to/i.test(u)) return 'rakuten';
+  // URLから判定できない場合のみ、取得元のアイテムコード接頭辞で判断する
+  return String(seller?.rakuten_item_code || '').startsWith('yahoo-') ? 'yahoo' : 'rakuten';
+}
+
 // Yahoo画像URLはAPIが返すサイズコード（/i/g/=ショップが実際に保持する画像）を
 // そのまま使う。以前は /i/j/ に書き換えていたが、/i/j/ は存在しないショップが多く
 // 商品画像が一切表示されない原因になっていた。万一 /i/j/ が紛れ込んでも確実に
@@ -1140,28 +1154,37 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
         productId = inserted[0].id;
       }
 
-      // --- 楽天ショップ情報をshops_pricesに保存（同一商品の複数seller を集約） ---
-      // レンタルは日次取得で期間バリアントが揃わないことがあるため、既存保存分とマージしてから役割を再計算する
-      const rankedRakuten = cat.name === 'レンタル'
-        ? mergeRentalSellers(await fetchExistingSellers(productId, '楽天市場'), allRakutenSellers)
-        : assignRoles(allRakutenSellers);
-      const rakutenPrices = rankedRakuten.filter(s => (s.price || 0) > 0).map(s => s.price);
-      const rakutenLowest = rakutenPrices.length > 0 ? Math.min(...rakutenPrices) : (shopInfo?.price || 0);
-      const rakutenHasOfficial = rankedRakuten.some(s => s.isOfficial);
+      // --- ショップ情報を shops_prices に保存 ---
+      // 発見元ではなく出品URLのモールで振り分ける（sellerMall のコメント参照）。
+      const rakutenSellers = allRakutenSellers.filter((s) => sellerMall(s) === 'rakuten');
+      const yahooSuppSellers = allRakutenSellers.filter((s) => sellerMall(s) === 'yahoo');
 
-      await supabase
-        .from('shops_prices')
-        .upsert([{
-          product_id: productId,
-          shop_name: '楽天市場',
-          shop_type: rakutenHasOfficial ? 'official' : 'mall',
-          lowest_price: rakutenLowest,
-          source: 'rakuten',
-          sellers: JSON.stringify(rankedRakuten.slice(0, 5).map(serializeSeller))
-        }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
-      await recordPriceHistory(productId, '楽天市場', rakutenLowest);
+      if (rakutenSellers.length > 0) {
+        // レンタルは日次取得で期間バリアントが揃わないことがあるため、既存保存分とマージしてから役割を再計算する
+        const rankedRakuten = cat.name === 'レンタル'
+          ? mergeRentalSellers(await fetchExistingSellers(productId, '楽天市場'), rakutenSellers)
+          : assignRoles(rakutenSellers);
+        const rakutenPrices = rankedRakuten.filter(s => (s.price || 0) > 0).map(s => s.price);
+        const rakutenLowest = rakutenPrices.length > 0 ? Math.min(...rakutenPrices) : 0;
+        const rakutenHasOfficial = rankedRakuten.some(s => s.isOfficial);
 
-      // --- Yahoo価格を取得（上位5件のみ詳細調査、複数 seller を集約） ---
+        if (rakutenLowest > 0) {
+          await supabase
+            .from('shops_prices')
+            .upsert([{
+              product_id: productId,
+              shop_name: '楽天市場',
+              shop_type: rakutenHasOfficial ? 'official' : 'mall',
+              lowest_price: rakutenLowest,
+              source: 'rakuten',
+              sellers: JSON.stringify(rankedRakuten.slice(0, 5).map(serializeSeller))
+            }], { onConflict: 'product_id,shop_name', ignoreDuplicates: false });
+          await recordPriceHistory(productId, '楽天市場', rakutenLowest);
+        }
+      }
+
+      // --- Yahoo価格。補完取得ぶんと、上位商品の詳細検索ぶんを1行にまとめて保存する ---
+      let yahooSellers = [...yahooSuppSellers];
       if (includeYahooPrice && i < 5) {
         const searchKeyword = product.name.split(/[\s　]+/).slice(0, 3).join(' ');
         const yahooResults = await fetchYahooPrice(searchKeyword);
@@ -1175,21 +1198,25 @@ async function syncCategory(cat, log, opts = {}, startDelay = 0) {
           return q && q.unit === selfQty.unit && q.count === selfQty.count;
         });
 
-        if (matchedYahoo.length > 0) {
-          const yahooSellers = matchedYahoo.map(r => ({
-            shop_name: r.name || 'Yahoo!ショッピング',
-            price: r.price,
-            url: r.url,
-            shipping: 0,
-            points: 0,
-            rating: r.rating || 0,
-            reviews_count: r.reviews_count || 0,
-          }));
-          const rankedYahoo = assignRoles(yahooSellers);
-          const yahooPrices = rankedYahoo.filter(s => (s.price || 0) > 0).map(s => s.price);
-          const yahooLowest = yahooPrices.length > 0 ? Math.min(...yahooPrices) : 0;
-          const yahooHasOfficial = rankedYahoo.some(s => s.isOfficial);
+        yahooSellers = [...yahooSellers, ...matchedYahoo.map(r => ({
+          shop_name: r.name || 'Yahoo!ショッピング',
+          price: r.price,
+          url: r.url,
+          shipping: 0,
+          points: 0,
+          rating: r.rating || 0,
+          reviews_count: r.reviews_count || 0,
+          item_name: r.item_name || '',
+        }))];
+      }
 
+      if (yahooSellers.length > 0) {
+        const rankedYahoo = assignRoles(yahooSellers);
+        const yahooPrices = rankedYahoo.filter(s => (s.price || 0) > 0).map(s => s.price);
+        const yahooLowest = yahooPrices.length > 0 ? Math.min(...yahooPrices) : 0;
+        const yahooHasOfficial = rankedYahoo.some(s => s.isOfficial);
+
+        if (yahooLowest > 0) {
           await supabase
             .from('shops_prices')
             .upsert([{
