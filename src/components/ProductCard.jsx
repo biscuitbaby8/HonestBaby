@@ -1,12 +1,38 @@
 'use client';
+import { useEffect, useRef } from 'react';
 import { Heart, Star, Award, ShieldCheck } from 'lucide-react';
 import { getProxiedImage, getLowestPrice } from '../lib/products';
+import { trackImpression, trackClick } from '../lib/tracking';
 
-const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock }) => (
+const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock, surface = 'home', position = null }) => {
+  // 実際に画面に入ったときだけ表示として数える。
+  // 描画された時点で数えると、下までスクロールしない人のぶんまで
+  // 分母に入り、CTRが実態より低く出る。
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackImpression(product.id, { surface, position });
+          io.disconnect();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [product.id, surface, position]);
+
+  return (
   <div
+    ref={ref}
     className="bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full relative active:scale-95 transition-all cursor-pointer border border-[#F4EFEB]"
     onClick={(e) => {
       if (e.target.closest('[data-no-open]')) return;
+      trackClick(product.id, { surface, position });
       onOpen(product);
     }}
   >
@@ -96,6 +122,7 @@ const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favo
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export default ProductCard;

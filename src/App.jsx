@@ -3836,8 +3836,9 @@ ${userText}
         <div className="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4 xl:grid-cols-5">
           {/* DB商品を優先表示（Cronバッチで毎晩自動更新） */}
           {/* 一覧が数千件になる場合があるため、一度に描画する件数を絞り「もっと見る」で追加表示する */}
-          {filtered.length > 0 && applySortOrder(filtered).slice(0, homeVisibleCount).map((p) => (
-            <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct} />
+          {filtered.length > 0 && applySortOrder(filtered).slice(0, homeVisibleCount).map((p, i) => (
+            <ProductCard key={p.id} product={p} onOpen={openProduct} onToggleFavorite={toggleFavorite} favoriteIds={favoriteSet} isAdminMode={isAdminMode} onBlock={blockProduct}
+              surface={selectedCategory === "すべて" ? 'home' : 'category'} position={i + 1} />
           ))}
 
           {/* DB商品がないカテゴリではリモート検索結果をフォールバック表示（ブロック済み除外） */}
