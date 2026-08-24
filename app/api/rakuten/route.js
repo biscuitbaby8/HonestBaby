@@ -1,5 +1,6 @@
 import { request as httpsRequest } from 'node:https';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { searchUrl, rankingUrl, withVersionFallback } from '@/src/lib/rakutenApi';
 
 // 新・楽天API(openapi.rakuten.co.jp)は Referer と Origin の両方が
 // アプリ登録時の「許可するWebサイト」と一致しないと
@@ -45,9 +46,9 @@ async function fetchBatchItems({ appId, accessKey, affiliateId, keyword, genreId
   const fetches = SORTS.flatMap(sort =>
     [1, 2, 3].map(async (page) => {
       const genreParam = (genreId && !skipGenreId) ? `&genreId=${genreId}` : '';
-      const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1${genreParam}&affiliateId=${affiliateId}`;
+      const params = `applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1${genreParam}&affiliateId=${affiliateId}`;
       try {
-        const { statusCode, text } = await nodeHttpsGet(url);
+        const { statusCode, text } = await withVersionFallback((v) => nodeHttpsGet(searchUrl(v, params)));
         if (statusCode !== 200) return [];
         const data = JSON.parse(text);
         return data.Items || [];
@@ -93,9 +94,9 @@ export async function GET(request) {
   // ジャンル別ランキング（市場網羅エンジンの最終フォールバック・AIチャットの商品提案で使用）
   if (mode === 'ranking') {
     const genreId = searchParams.get('genreId') || '100533';
-    const url = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
+    const params = `format=json&applicationId=${appId}&accessKey=${accessKey}&genreId=${genreId}&affiliateId=${affiliateId}`;
     try {
-      const { statusCode, text } = await nodeHttpsGet(url);
+      const { statusCode, text } = await withVersionFallback((v) => nodeHttpsGet(rankingUrl(v, params)));
       if (statusCode !== 200) return Response.json({ error: text }, { status: statusCode, headers });
       const data = JSON.parse(text);
       return Response.json({ Items: data.Items || [] }, { status: 200, headers });
@@ -129,10 +130,10 @@ export async function GET(request) {
       ? '&minPrice=500'
       : '&genreId=566382&minPrice=500';
   const shopCodeParam = shopCode ? `&shopCode=${encodeURIComponent(shopCode)}` : '';
-  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1${filterParams}${shopCodeParam}&affiliateId=${affiliateId || ''}`;
+  const params = `applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1${filterParams}${shopCodeParam}&affiliateId=${affiliateId || ''}`;
 
   try {
-    const { statusCode, text } = await nodeHttpsGet(url);
+    const { statusCode, text } = await withVersionFallback((v) => nodeHttpsGet(searchUrl(v, params)));
     if (statusCode !== 200) {
       return Response.json({ error: text }, { status: statusCode, headers });
     }

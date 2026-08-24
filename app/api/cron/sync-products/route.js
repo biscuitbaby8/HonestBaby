@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
 import { parseQuantity } from '@/src/lib/products';
+import { searchUrl, rankingUrl, withVersionFallback, currentVersion } from '@/src/lib/rakutenApi';
 import { request as httpsRequest } from 'node:https';
 
 export const maxDuration = 60;
@@ -676,18 +677,28 @@ function rakutenHeaders() {
   };
 }
 
-async function fetchWithRetry(url, maxRetries = 1) {
+// urlFor(version) を受け取り、バージョン候補を順に試す。
+// 楽天は旧バージョンを定期的に廃止し、そのたびに 400 + wrong_parameter を返す
+// （2026-08-17に20220601が廃止され、価格更新が2週間止まった）。
+// 廃止のたびに手で直さなくて済むよう、ここで自動的に新バージョンへ移る。
+async function fetchWithRetry(urlFor, maxRetries = 1) {
   for (let i = 0; i <= maxRetries; i++) {
-    const { statusCode, text } = await nodeHttpsGet(url, rakutenHeaders());
+    const res = await withVersionFallback((version) =>
+      nodeHttpsGet(urlFor(version), rakutenHeaders())
+    );
+    const { statusCode, text, version, triedVersions } = res;
 
     if (statusCode === 200) return JSON.parse(text);
-    if (statusCode === 403) throw new Error(`API Error 403: ${text.slice(0, 100)}`);
-    if (statusCode === 400) throw new Error(`API Error 400: ${text.slice(0, 100)}`);
     if (statusCode === 429 && i < maxRetries) {
       await new Promise(r => setTimeout(r, 1000));
       continue;
     }
-    throw new Error(`API Error ${statusCode}`);
+    // 全バージョンで400が返った場合は、バージョンではなく資格情報の問題。
+    // どちらなのかをログで区別できるようにメッセージに含める。
+    const versionNote = triedVersions.length > 1
+      ? `（v${triedVersions.join('/')}をすべて試行）`
+      : `（v${version}）`;
+    throw new Error(`API Error ${statusCode}${versionNote}: ${String(text).slice(0, 100)}`);
   }
 }
 
@@ -695,13 +706,13 @@ async function fetchRakutenSearch(keyword, genreId, page = 1) {
   // genreId が指定されたときだけジャンルで絞る。サブカテゴリ補完は genreId 無しで広く探す
   // （ニッチ商品が隣接ジャンルに居て取りこぼすため。sub_category は呼び出し側で確定する）。
   const genrePart = genreId ? `&genreId=${genreId}` : '';
-  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1${genrePart}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
-  return fetchWithRetry(url);
+  const params = `applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1${genrePart}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+  return fetchWithRetry((v) => searchUrl(v, params));
 }
 
 async function fetchRakutenRanking(genreId) {
-  const url = `https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601?format=json&applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
-  return fetchWithRetry(url);
+  const params = `format=json&applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&genreId=${genreId}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+  return fetchWithRetry((v) => rankingUrl(v, params));
 }
 
 // --- Yahoo商品データを正規化（共通化） ---
@@ -1557,11 +1568,15 @@ export async function GET(request) {
   // 楽天API疎通テスト（?debug=rakuten）: Supabase書き込みなしで
   // 検索APIを1回だけ叩き、生のステータス＋レスポンスを返す（高速・原因切り分け用）
   if (searchParams.get('debug') === 'rakuten') {
-    const dbgUrl = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent('紙おむつ')}&hits=3&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+    const dbgParams = `applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent('紙おむつ')}&hits=3&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
     try {
-      const { statusCode, text } = await nodeHttpsGet(dbgUrl, rakutenHeaders());
+      const { statusCode, text, version, triedVersions } = await withVersionFallback(
+        (v) => nodeHttpsGet(searchUrl(v, dbgParams), rakutenHeaders())
+      );
       return Response.json({
         statusCode,
+        apiVersion: version,
+        triedVersions,
         referer: RAKUTEN_REFERER,
         appIdSet: !!RAKUTEN_APP_ID,
         accessKeySet: !!RAKUTEN_ACCESS_KEY,

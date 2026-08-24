@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { searchUrl, withVersionFallback } from '@/src/lib/rakutenApi';
 import { request as httpsRequest } from 'node:https';
 
 // =============================================
@@ -69,12 +70,14 @@ async function recordPriceHistory(productId, shopName, price) {
 // 必ず確認してから採用する（保険）。
 async function refetchRakuten(itemCode) {
   if (!RAKUTEN_APP_ID) return null;
-  const url = `https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601`
-    + `?applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}`
+  const params = `applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}`
     + `&itemCode=${encodeURIComponent(itemCode)}&hits=1`
     + `&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
   try {
-    const { statusCode, text } = await nodeHttpsGet(url);
+    // 楽天は旧APIバージョンを定期的に廃止するため、候補を順に試す
+    const { statusCode, text } = await withVersionFallback(
+      (v) => nodeHttpsGet(searchUrl(v, params))
+    );
     if (statusCode !== 200) return null;
     const data = JSON.parse(text);
     const item = data?.Items?.[0]?.Item;
