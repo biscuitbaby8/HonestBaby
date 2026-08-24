@@ -47,6 +47,14 @@ async function fetchTopProducts() {
       .or('is_blocked.is.null,is_blocked.eq.false')
       // 重複商品（非代表）は 301 で代表ページへ飛ぶため、内部リンクには出さない
       .is('canonical_id', null)
+      // ギフトセット・レンタルは専用コーナーがあり、SPAのホームでも除外している。
+      // SSRだけに出すとユーザーが見る画面とクローラーが読むHTMLがずれる。
+      .not('category', 'in', '("ギフトセット","レンタル")')
+      // home_rank は /api/cron/rebuild-home-score が日次で更新する需要スコア順。
+      // 以前は popularity_rank（モールの検索順位）だけで並べていたため、
+      // クローラーが最初に読むHTMLの先頭に、レビューの少ない商品が並んでいた。
+      // 未計算（NULL）の商品は後ろへ回し、popularity_rank で補助的に並べる。
+      .order('home_rank', { ascending: true, nullsFirst: false })
       .order('popularity_rank', { ascending: true })
       .limit(24);
     return (data || []).map(formatDbProduct);

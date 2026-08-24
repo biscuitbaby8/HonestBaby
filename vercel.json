@@ -21,7 +21,8 @@
     { "path": "/api/cron/refresh-stale?limit=80", "schedule": "15 2 * * *" },
     { "path": "/api/cron/refresh-stale?limit=80", "schedule": "15 8 * * *" },
     { "path": "/api/cron/refresh-stale?limit=80", "schedule": "15 14 * * *" },
-    { "path": "/api/cron/refresh-stale?limit=80", "schedule": "45 20 * * *" }
+    { "path": "/api/cron/refresh-stale?limit=80", "schedule": "45 20 * * *" },
+    { "path": "/api/cron/rebuild-home-score", "schedule": "30 23 * * *" }
   ],
   "redirects": [
     {

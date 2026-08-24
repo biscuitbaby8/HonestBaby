@@ -311,6 +311,29 @@ const REVIEWS_SCALE = Math.log(50000);
 // 締めると候補が減る（数値だけ変えれば調整できる）。
 export const PICKUP_MIN_REVIEWS = 20;
 
+// カテゴリの普遍性（何割の家庭が必要とし、どれくらいの頻度で買うか）。
+// レビュー数と満足度だけで並べると「はぐくみ太郎 鶏レバーパウダー」
+// （★4.93 / レビュー13,469件）がホーム1位になる。数字は本物だが、
+// 離乳食の粉末サプリはホームの一等地に置く「みんなが必要なもの」ではない。
+// 消耗品（毎月買う）＞ 必需の耐久品（一度は買う）＞ 任意品 の順に重みを付ける。
+export const CATEGORY_DEMAND_WEIGHT = {
+  'おむつ':        1.30,  // ほぼ全世帯・毎月買う。サイトの主役
+  'ミルク・授乳':  1.20,
+  'ウェア':        1.10,  // サイズが変わるので繰り返し買う
+  '抱っこ紐':      1.10,  // ほぼ全世帯が一度は買う
+  'ベビーカー':    1.10,
+  '寝具・ベッド':  1.05,
+  'お風呂用品':    1.00,
+  'トイレ用品':    1.00,
+  '車用品':        1.00,
+  'マタニティ':    0.95,  // 期間が限られる（月齢パーソナライズで別途上げる）
+  '離乳食・食器':  0.90,  // 必要だが期間限定。サプリ系のニッチ商品も多い
+  '安全グッズ':    0.90,
+  'おもちゃ':      0.80,  // 無くても育児は成立する
+  '絵本':          0.75,
+};
+const DEFAULT_CATEGORY_WEIGHT = 0.9;
+
 const num = (v) => {
   const n = Number(v);
   return isFinite(n) ? n : 0;
@@ -337,7 +360,9 @@ export const demandScore = (p) => {
   const rank = num(p?.popularity_rank) || 999;
   const rankScore = 1 / (1 + rank / 30);             // rank30位で0.5
 
-  return 0.45 * satisfaction + 0.35 * volume + 0.20 * rankScore;
+  const base = 0.45 * satisfaction + 0.35 * volume + 0.20 * rankScore;
+  const weight = CATEGORY_DEMAND_WEIGHT[p?.category] ?? DEFAULT_CATEGORY_WEIGHT;
+  return base * weight;
 };
 
 // 出場資格（L0）。画像・価格・レビュー数の最低線。
@@ -355,13 +380,28 @@ export const passesPickupGate = (p) => {
 // ブランドのキー。brand が空の商品が多いため、
 // 空なら商品名の先頭2語で代用する（「はぐくみ太郎 鶏レバー」→「はぐくみ太郎 鶏レバー」）。
 // 完全ではないが、同一シリーズが上位を占領するのは防げる。
+// 先頭語が商品ジャンルを指す一般名詞のときは、それをブランド扱いすると
+// 無関係な商品まで1つに束ねて不当に抑制してしまうため、2語目まで見る。
+const GENERIC_HEAD_WORDS = new Set([
+  'ベビー', '赤ちゃん', '赤ちゃん用品', 'ベビー用品', 'キッズ', '子供', 'こども',
+  'おむつ', 'オムツ', 'おしりふき', 'ミルク', '哺乳瓶', '抱っこ紐', 'ベビーカー',
+  '離乳食', 'マタニティ', '出産祝い', '新生児', '日本製', '国産', '送料無料',
+  '名入れ', 'セット', '大容量', 'まとめ買い', '高評価',
+]);
+
 const brandKey = (p) => {
   const b = String(p?.brand || '').trim();
   if (b) return b.toLowerCase();
-  return String(p?.name || '')
+  const words = String(p?.name || '')
     .replace(/^[【\[(（][^】\])）]*[】\])）]\s*/, '')  // 先頭の【送料無料】等を落とす
-    .split(/[\s　]+/).slice(0, 2).join(' ')
-    .toLowerCase();
+    .split(/[\s　]+/)
+    .filter(Boolean);
+  if (words.length === 0) return String(p?.id || '');
+  const head = words[0];
+  // 「はぐくみ太郎 鶏レバー」と「はぐくみ太郎 鉄分きなこ」を同じブランドと
+  // みなせるよう、固有名詞らしい先頭語はそれ単体をキーにする。
+  if (head.length >= 3 && !GENERIC_HEAD_WORDS.has(head)) return head.toLowerCase();
+  return words.slice(0, 2).join(' ').toLowerCase();
 };
 
 // 並べ方（L3）: 同一カテゴリ・同一ブランドが上位を占領しないようにする。
@@ -398,8 +438,17 @@ export const diversify = (list, { categoryMax = 2, brandMax = 1, window = 12 } =
  *   isHome=false（カテゴリ選択中）のときは足切りも多様性も行わず、
  *   需要スコアの降順にするだけ。タブが空になるのを防ぐため。
  */
+// 並び替えに使う値。DB側で計算済みの home_score があればそれを使う。
+// home_score には価格由来の加点（値下がり・底値圏）が含まれており、
+// これはブラウザ側では価格履歴が無いため計算できない。
+// 未計算（cron未実行・新規商品）のときは demandScore にフォールバックする。
+const sortScore = (p) => {
+  const s = Number(p?.home_score);
+  return isFinite(s) ? s : demandScore(p);
+};
+
 export const rankForPickup = (products, { isHome = true } = {}) => {
-  const scored = [...(products || [])].sort((a, b) => demandScore(b) - demandScore(a));
+  const scored = [...(products || [])].sort((a, b) => sortScore(b) - sortScore(a));
   if (!isHome) return scored;
 
   // 足切りは「落とす」のではなく「後ろに回す」。実データでは3,348件中1,499件が
