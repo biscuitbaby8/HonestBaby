@@ -3368,7 +3368,12 @@ ${userText}
     // 需要スコア（満足度＋レビュー数＋モール人気順）で並べ、
     // 「すべて」のホームでは足切りとカテゴリ/ブランドの偏り解消も行う。
     // カテゴリ選択中は足切りを行わない（ニッチなサブカテゴリが空になるため）。
-    filtered = rankForPickup(filtered, { isHome: selectedCategory === "すべて" });
+    // 月齢を渡すと、その時期に必要なカテゴリが上位に来る（Phase 3）。
+    // プロフィール未登録なら null で、全員向けの並びのまま。
+    filtered = rankForPickup(filtered, {
+      isHome: selectedCategory === "すべて",
+      ageMonths: babyAgeMonths,
+    });
 
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
     const showRemote = remoteProducts.length > 0 || isRemoteLoading;
@@ -3772,9 +3777,18 @@ ${userText}
         })()}
 
         <div className="flex items-center justify-between mb-5 px-1 mt-4">
-          <h3 className="font-black text-[#5A4C4C] text-xl">
-            {selectedCategory === "すべて" ? "おすすめピックアップ" : `${selectedCategory}の検索結果`}
-          </h3>
+          <div className="min-w-0">
+            <h3 className="font-black text-[#5A4C4C] text-xl">
+              {selectedCategory === "すべて" ? "おすすめピックアップ" : `${selectedCategory}の検索結果`}
+            </h3>
+            {/* 並び順が月齢で変わっていることを明示する。理由が見えないと
+                「なぜこれが出るのか」が伝わらず、プロフィール登録の動機にもならない。 */}
+            {selectedCategory === "すべて" && babyAgeMonths != null && (
+              <p className="text-[10px] font-bold text-[#7B8E76] mt-0.5">
+                {babyInfo?.name || 'お子さま'}（{babyAgeLabel}）に合わせて並べています
+              </p>
+            )}
+          </div>
           {selectedCategory !== "すべて" && (
             <button
               onClick={() => { setSaveSearchLabel(selectedCategory); setShowSaveSearchModal(true); }}

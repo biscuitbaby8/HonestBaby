@@ -334,6 +334,39 @@ export const CATEGORY_DEMAND_WEIGHT = {
 };
 const DEFAULT_CATEGORY_WEIGHT = 0.9;
 
+// 付属品・周辺グッズはホームの一等地では本体に譲る。
+// 実データで「マザーズバッグ」がベビーカー枠の10位に入り、実際のベビーカーを
+// 押し下げていた。除外はしない（探している人はいる）が、順位は下げる。
+const ACCESSORY_PENALTY = 0.85;
+const ACCESSORY_SUBS = new Set(['周辺グッズ']);
+
+// 月齢による関心の変化（Phase 3）。
+// 行動ログが無くても効くパーソナライズ。負の月齢＝出産予定日が未来＝妊娠中。
+// 該当カテゴリのスコアを底上げするだけで、上位の顔ぶれが
+// 「その家庭にいま必要なもの」に変わる。
+const AGE_STAGES = [
+  { maxM: 0,   label: '妊娠中',   boost: { 'マタニティ': 1.6, '寝具・ベッド': 1.2, 'ウェア': 1.15, 'ミルク・授乳': 1.1 } },
+  { maxM: 4,   label: '0〜3ヶ月', boost: { 'おむつ': 1.3, 'ミルク・授乳': 1.3, 'お風呂用品': 1.25, '寝具・ベッド': 1.2, '抱っこ紐': 1.15 } },
+  { maxM: 7,   label: '4〜6ヶ月', boost: { 'おむつ': 1.25, '離乳食・食器': 1.35, 'おもちゃ': 1.2, '抱っこ紐': 1.15, 'ベビーカー': 1.1 } },
+  { maxM: 13,  label: '7〜12ヶ月', boost: { 'おむつ': 1.25, '離乳食・食器': 1.3, '安全グッズ': 1.3, 'おもちゃ': 1.2, '絵本': 1.15 } },
+  { maxM: 25,  label: '1歳〜',    boost: { 'おむつ': 1.2, 'トイレ用品': 1.25, 'おもちゃ': 1.2, '絵本': 1.2, 'ウェア': 1.15 } },
+  { maxM: 999, label: '2歳〜',    boost: { 'トイレ用品': 1.35, '絵本': 1.25, 'おもちゃ': 1.15, '車用品': 1.2, 'ウェア': 1.1 } },
+];
+
+// 月齢に応じたカテゴリ係数。ageMonths が null なら 1（全員向けの並び）。
+export const ageStageBoost = (category, ageMonths) => {
+  if (ageMonths == null || !isFinite(ageMonths)) return 1;
+  const stage = AGE_STAGES.find((s) => ageMonths < s.maxM) || AGE_STAGES[AGE_STAGES.length - 1];
+  return stage.boost[category] ?? 1;
+};
+
+// 現在の月齢がどの段階かを返す（UIの説明文用）
+export const ageStageLabel = (ageMonths) => {
+  if (ageMonths == null || !isFinite(ageMonths)) return null;
+  const stage = AGE_STAGES.find((s) => ageMonths < s.maxM) || AGE_STAGES[AGE_STAGES.length - 1];
+  return stage.label;
+};
+
 const num = (v) => {
   const n = Number(v);
   return isFinite(n) ? n : 0;
@@ -362,7 +395,8 @@ export const demandScore = (p) => {
 
   const base = 0.45 * satisfaction + 0.35 * volume + 0.20 * rankScore;
   const weight = CATEGORY_DEMAND_WEIGHT[p?.category] ?? DEFAULT_CATEGORY_WEIGHT;
-  return base * weight;
+  const accessory = ACCESSORY_SUBS.has(p?.subCategory ?? p?.sub_category) ? ACCESSORY_PENALTY : 1;
+  return base * weight * accessory;
 };
 
 // 出場資格（L0）。画像・価格・レビュー数の最低線。
@@ -442,13 +476,22 @@ export const diversify = (list, { categoryMax = 2, brandMax = 1, window = 12 } =
 // home_score には価格由来の加点（値下がり・底値圏）が含まれており、
 // これはブラウザ側では価格履歴が無いため計算できない。
 // 未計算（cron未実行・新規商品）のときは demandScore にフォールバックする。
-const sortScore = (p) => {
+const sortScore = (p, ageMonths) => {
   const s = Number(p?.home_score);
-  return isFinite(s) ? s : demandScore(p);
+  const base = isFinite(s) ? s : demandScore(p);
+  // 月齢のパーソナライズは端末側でだけ掛ける。DBに月齢別のスコアは持てないし、
+  // プロフィールをサーバーへ送らずに済む。
+  return base * ageStageBoost(p?.category, ageMonths);
 };
 
-export const rankForPickup = (products, { isHome = true } = {}) => {
-  const scored = [...(products || [])].sort((a, b) => sortScore(b) - sortScore(a));
+/**
+ * @param {{ isHome?:boolean, ageMonths?:number|null }} opts
+ *   ageMonths: 赤ちゃんの月齢。負の値は出産予定日が未来＝妊娠中を表す。
+ *   null なら全員向けの並びになる。
+ */
+export const rankForPickup = (products, { isHome = true, ageMonths = null } = {}) => {
+  const scored = [...(products || [])]
+    .sort((a, b) => sortScore(b, ageMonths) - sortScore(a, ageMonths));
   if (!isHome) return scored;
 
   // 足切りは「落とす」のではなく「後ろに回す」。実データでは3,348件中1,499件が
