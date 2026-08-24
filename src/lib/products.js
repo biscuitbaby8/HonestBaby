@@ -283,3 +283,131 @@ export const formatDbProduct = (p) => {
     }),
   };
 };
+
+// =============================================
+// ホームの「おすすめピックアップ」の並び順
+//
+// 以前は rating の降順だけで並べていた。しかし楽天/YahooのAPIは
+// レビューが少ない商品ほど極端な数字を返すため、★5.00は「優れている」
+// ではなく「まだ評価が固まっていない」の印になっている。
+// 実測では掲載3,839件のうち★5.00ちょうどが244件あり、ホーム上位は
+// その244件の中だけから、事実上根拠なく選ばれていた
+// （1位はレビュー3件のベビーゲート、3位はトマトペーストだった）。
+//
+// ここでは「たくさんの人が買って、そのうえで満足している」を数値化する。
+// 商品取得時の popularity_rank も捨てずにスコアへ混ぜる。
+// =============================================
+
+// レビュー50件以上の商品の実測平均。ベイズ平均の事前分布に使う。
+const RATING_PRIOR_MEAN = 4.55;
+// 事前分布の重み。全商品に「平均点のレビューがC件ある」とみなす。
+// C=200 だと、レビュー3件の★5.00は4.56まで下がり、
+// レビュー1万件の★4.9はほぼそのまま残る。
+const RATING_PRIOR_WEIGHT = 200;
+// レビュー数スコアの正規化に使う上限（実測の最大は48,828件）。
+const REVIEWS_SCALE = Math.log(50000);
+
+// ホームの一等地に置く最低条件。ここを緩めると質が落ち、
+// 締めると候補が減る（数値だけ変えれば調整できる）。
+export const PICKUP_MIN_REVIEWS = 20;
+
+const num = (v) => {
+  const n = Number(v);
+  return isFinite(n) ? n : 0;
+};
+
+const reviewsOf = (p) => num(p?.reviewsCount ?? p?.reviews_count);
+
+// ベイズ平均: レビューが少ないほど全体平均へ引き戻す
+export const bayesianRating = (p) => {
+  const n = reviewsOf(p);
+  const r = num(p?.rating);
+  if (r <= 0) return RATING_PRIOR_MEAN;
+  return (n * r + RATING_PRIOR_WEIGHT * RATING_PRIOR_MEAN) / (n + RATING_PRIOR_WEIGHT);
+};
+
+// 需要スコア（L1）。0〜1程度に収まるが、順序だけが意味を持つ。
+//   0.45 満足度（ベイズ平均）
+//   0.35 売れている量の代理（レビュー数の対数）
+//   0.20 モールでの人気順（popularity_rank）
+export const demandScore = (p) => {
+  const bayes = bayesianRating(p);
+  const satisfaction = (bayes - 4.3) / 0.7;          // 4.3〜5.0 を 0〜1 へ
+  const volume = Math.log(1 + reviewsOf(p)) / REVIEWS_SCALE;
+  const rank = num(p?.popularity_rank) || 999;
+  const rankScore = 1 / (1 + rank / 30);             // rank30位で0.5
+
+  return 0.45 * satisfaction + 0.35 * volume + 0.20 * rankScore;
+};
+
+// 出場資格（L0）。画像・価格・レビュー数の最低線。
+// 「すべて」のホームでのみ使う。カテゴリを選んでいるときに適用すると
+// ニッチなサブカテゴリが空になるため。
+export const passesPickupGate = (p) => {
+  if (!p) return false;
+  if (reviewsOf(p) < PICKUP_MIN_REVIEWS) return false;
+  if (num(p.rating) <= 0) return false;
+  if (!p.image && !p.image_url) return false;
+  if (getLowestPrice(p.shops) <= 0) return false;
+  return true;
+};
+
+// ブランドのキー。brand が空の商品が多いため、
+// 空なら商品名の先頭2語で代用する（「はぐくみ太郎 鶏レバー」→「はぐくみ太郎 鶏レバー」）。
+// 完全ではないが、同一シリーズが上位を占領するのは防げる。
+const brandKey = (p) => {
+  const b = String(p?.brand || '').trim();
+  if (b) return b.toLowerCase();
+  return String(p?.name || '')
+    .replace(/^[【\[(（][^】\])）]*[】\])）]\s*/, '')  // 先頭の【送料無料】等を落とす
+    .split(/[\s　]+/).slice(0, 2).join(' ')
+    .toLowerCase();
+};
+
+// 並べ方（L3）: 同一カテゴリ・同一ブランドが上位を占領しないようにする。
+// スコア順に走査し、枠が埋まっているものは後ろへ回す（捨てない）。
+export const diversify = (list, { categoryMax = 2, brandMax = 1, window = 12 } = {}) => {
+  const picked = [];
+  const deferred = [];
+  const catCount = new Map();
+  const brandCount = new Map();
+
+  for (const p of list) {
+    // window 件ごとに枠をリセットし、ページ全体で同じ偏りが出ないようにする
+    if (picked.length > 0 && picked.length % window === 0) {
+      catCount.clear();
+      brandCount.clear();
+    }
+    const c = p?.category || '-';
+    const b = brandKey(p);
+    if ((catCount.get(c) || 0) >= categoryMax || (brandCount.get(b) || 0) >= brandMax) {
+      deferred.push(p);
+      continue;
+    }
+    catCount.set(c, (catCount.get(c) || 0) + 1);
+    brandCount.set(b, (brandCount.get(b) || 0) + 1);
+    picked.push(p);
+  }
+  return [...picked, ...deferred];
+};
+
+/**
+ * ホームの並び順を決める。
+ * @param {Array} products 表示候補
+ * @param {{ isHome:boolean, minResults?:number }} opts
+ *   isHome=false（カテゴリ選択中）のときは足切りも多様性も行わず、
+ *   需要スコアの降順にするだけ。タブが空になるのを防ぐため。
+ */
+export const rankForPickup = (products, { isHome = true } = {}) => {
+  const scored = [...(products || [])].sort((a, b) => demandScore(b) - demandScore(a));
+  if (!isHome) return scored;
+
+  // 足切りは「落とす」のではなく「後ろに回す」。実データでは3,348件中1,499件が
+  // 足切り対象で、除外してしまうとその1,499件が「もっと見る」でも辿れなくなる。
+  // 上位の質だけを上げ、一覧としての網羅性は保つ。
+  const passed = [];
+  const rest = [];
+  for (const p of scored) (passesPickupGate(p) ? passed : rest).push(p);
+
+  return [...diversify(passed), ...rest];
+};

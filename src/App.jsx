@@ -13,7 +13,7 @@ import {
   ShoppingBag, Calendar, Trophy
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
-import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, getHighResImage, categorizeByName, parseQuantity } from './lib/products';
+import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, getHighResImage, categorizeByName, parseQuantity, rankForPickup, bayesianRating } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -3361,15 +3361,23 @@ ${userText}
           || !p.subSubCategory
           || p.subSubCategory === selectedSubSubCategory;
         return matchCat && matchSub && matchSubSub;
-      })
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      });
+
+    // 並び順（標準）。以前は rating の降順だけだったため、レビュー3件の★5.00が
+    // ホーム1位に立ち、トマトペーストのような商品が上位に並んでいた。
+    // 需要スコア（満足度＋レビュー数＋モール人気順）で並べ、
+    // 「すべて」のホームでは足切りとカテゴリ/ブランドの偏り解消も行う。
+    // カテゴリ選択中は足切りを行わない（ニッチなサブカテゴリが空になるため）。
+    filtered = rankForPickup(filtered, { isHome: selectedCategory === "すべて" });
 
     // カテゴリ選択中でDBにデータがない、またはリモート検索結果がある場合
     const showRemote = remoteProducts.length > 0 || isRemoteLoading;
 
     const applySortOrder = (arr) => {
+      // 「評価順」もベイズ平均で並べる。生の rating だとレビュー1〜3件の
+      // ★5.00が常に上に来てしまい、評価順として役に立たないため。
       if (sortOrder === "popular")
-        return [...arr].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        return [...arr].sort((a, b) => bayesianRating(b) - bayesianRating(a));
       if (sortOrder === "price_asc")
         return [...arr].sort((a, b) => (a.price || getLowestPrice(a.shops) || 0) - (b.price || getLowestPrice(b.shops) || 0));
       if (sortOrder === "price_desc")
