@@ -237,6 +237,11 @@ const CATEGORY_NG_KEYWORDS = {
     "アルバム", "フォトアルバム", "絵本", "色紙", "メッセージカード単品",
     "父の日", "還暦", "古希", "喜寿", "米寿", "長寿祝い", "屠蘇器",
   ],
+  // 絵本: 「猫向け絵本」「猫じゃらし付き」等、赤ちゃん向けでないペット玩具が
+  // 「絵本」検索で上位に来るため除外（実データで2件混入していた）
+  "絵本": [
+    "猫向け", "猫じゃらし", "ねこじゃらし", "犬向け", "ペット向け",
+  ],
   // ベビーカー: 「ベビーカーでも使える」等で関連語を含むだけの無関係商品を除外
   // （エアラブ/ベビーカーシート等の正規のベビーカー用冷却シートは具体語を避けて誤爆しないようにする）
   "ベビーカー": [
@@ -741,6 +746,24 @@ function normalizeYahooItem(item, category) {
   };
 }
 
+// 商品名がそのカテゴリに載せてよいものかを判定する（取得元によらない共通基準）。
+// 楽天側(normalizeRakutenItems)は以前からこの4段構えで絞っていたが、Yahoo側は
+// 全カテゴリ共通の NG_KEYWORDS しか見ておらず、カテゴリ別の除外(ペット用・
+// 大人介護用など)も関連性チェック(REQUIRED_KEYWORDS)も通っていなかった。
+// そのため「オムツ ペット いぬ ネコ」のような商品がおむつカテゴリに載っていた。
+// 楽天APIが不調な期間は取得が丸ごとYahoo側に寄るので影響が大きい。基準を揃える。
+function passesCategoryFilters(itemName, category) {
+  const name = (itemName || '').trim();
+  if (!name) return false;
+  if (JUNK_EXACT_NAMES.has(name)) return false;
+  if (NG_KEYWORDS.some((kw) => name.includes(kw))) return false;
+  const extraNG = CATEGORY_NG_KEYWORDS[category] || [];
+  if (extraNG.some((kw) => name.includes(kw))) return false;
+  const required = REQUIRED_KEYWORDS[category] || [];
+  if (required.length > 0 && !required.some((kw) => name.includes(kw))) return false;
+  return true;
+}
+
 // --- Yahoo常時補完取得（楽天と並行して市場網羅を高める。1ページ50件） ---
 async function fetchYahooSupplement(keyword, category) {
   if (!YAHOO_CLIENT_ID) return [];
@@ -750,7 +773,7 @@ async function fetchYahooSupplement(keyword, category) {
     if (!res.ok) return [];
     const data = await res.json();
     return (data.hits || [])
-      .filter(item => !NG_KEYWORDS.some(kw => (item.name || '').includes(kw)))
+      .filter(item => passesCategoryFilters(item.name, category))
       .map(item => normalizeYahooItem(item, category));
   } catch {
     return [];
@@ -773,7 +796,7 @@ async function fetchYahooSearchFallback(keyword, category) {
       await new Promise(r => setTimeout(r, 300));
     }
     return allHits
-      .filter(item => !NG_KEYWORDS.some(kw => item.name.includes(kw)))
+      .filter(item => passesCategoryFilters(item.name, category))
       .map(item => normalizeYahooItem(item, category));
   } catch {
     return [];
@@ -812,15 +835,10 @@ async function fetchYahooPrice(keyword) {
 
 // --- 楽天の検索結果を正規化 ---
 function normalizeRakutenItems(items, category) {
-  const requiredKws = REQUIRED_KEYWORDS[category] || [];
-  const extraNG = CATEGORY_NG_KEYWORDS[category] || [];
-
   return items
-    .filter(item => (item.Item.itemName || '').trim().length > 0)
-    .filter(item => !JUNK_EXACT_NAMES.has((item.Item.itemName || '').trim()))
-    .filter(item => !NG_KEYWORDS.some(kw => item.Item.itemName.includes(kw)))
-    .filter(item => extraNG.length === 0 || !extraNG.some(kw => item.Item.itemName.includes(kw)))
-    .filter(item => requiredKws.length === 0 || requiredKws.some(kw => item.Item.itemName.includes(kw)))
+    // 判定は passesCategoryFilters に一本化する（Yahoo側と同じ基準を使い、
+    // 片方だけ緩いという状態を作らないため）
+    .filter(item => passesCategoryFilters(item.Item.itemName, category))
     .map((item, idx) => {
       const rawName = item.Item.itemName;
       // レンタル: 期間トークンを商品名から抜く前に保持（同一商品の期間バリアントを1商品に統合するため）
@@ -1329,8 +1347,25 @@ async function runWithConcurrency(items, worker, { concurrency = 2, gapMs = 0, d
   return results;
 }
 
+// 検索キーワード由来のサブカテゴリと、商品名から推定したサブカテゴリを突き合わせる。
+//
+// 以前は subQueries の sub を無条件に強制していたため、「おしりふき」で検索して
+// 拾われた「BOS おむつが臭わない袋」が sub_category='おしりふき' で登録され、
+// おしりふきタブに防臭袋が並ぶ矛盾が起きていた（実データで3件確認）。
+// また ?backfill=1 は extractSubCategory で全件を上書きするため、
+// 「登録時の値」と「バックフィル後の値」が食い違う二重基準にもなっていた。
+//
+// 商品名がはっきり別のサブを指しているときだけ商品名側を採用し、
+// 判定が付かず総合フォールバックに落ちた場合は従来どおり検索キーワードの
+// sub を使う（サブタブが空のまま残らないようにするため）。
+const GENERIC_SUBS = new Set(['本体', 'ギフトセット総合', 'レンタル総合']);
+function resolveSubCategory(category, itemName, forcedSub) {
+  const detected = extractSubCategory(category, itemName);
+  if (detected && !GENERIC_SUBS.has(detected) && detected !== forcedSub) return detected;
+  return forcedSub;
+}
+
 // --- サブカテゴリ補完の共通処理: 楽天検索を優先し、失敗/空ならYahoo検索にフォールバック ---
-// sub_category は subQueries の sub を強制設定するため、カテゴリのサブタブに確実に商品が並ぶ。
 // 同時実行2・固定間隔・ソフト締切で60秒制限内に収める。新規商品には 1000番台の
 // popularity_rank を付与（広い検索の人気商品=1〜を上位に保ちつつ、サブ専用品も順序付きで表示）。
 async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQueries, emoji, deadline }) {
@@ -1365,7 +1400,7 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
         const product = {
           name: cleanName(nameForClean),
           category,
-          sub_category: q.sub,
+          sub_category: resolveSubCategory(category, rawName, q.sub),
           brand: extractBrand(rawName),
           image_url: rawImg.replace(/_ex=\d+x\d+/, '_ex=640x640'),
           rating: parseFloat(item.Item.reviewAverage) || 0,
@@ -1402,7 +1437,7 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
         const product = {
           name: it.name,
           category,
-          sub_category: q.sub,
+          sub_category: resolveSubCategory(category, it.name, q.sub),
           brand: it.brand,
           image_url: it.image_url,
           rating: it.rating,
@@ -1656,12 +1691,22 @@ export async function GET(request) {
     log.push(`⚠️ アラート確認失敗: ${e.message}`);
   }
 
+  // 楽天検索APIが失敗した場合は、Yahooで代替できていても「成功」とは報告しない。
+  // 常に200/success:trueを返していたため、楽天の価格が1週間止まっていたことに
+  // 誰も気づけなかった（Vercelのcronログ上は正常終了に見えていた）。
+  // 主要な取得元が落ちたら失敗として扱い、ログで赤く出るようにする。
+  const rakutenDown = log.some((l) => typeof l === 'string' && l.includes('楽天検索API失敗'));
+  if (rakutenDown) {
+    log.push('❌ 楽天検索APIが失敗しています。applicationId / accessKey の有効性を確認してください。');
+  }
+
   return Response.json({
-    success: true,
+    success: !rakutenDown,
+    rakutenDown,
     totalSaved,
     log,
     timestamp: new Date().toISOString()
-  }, { status: 200 });
+  }, { status: rakutenDown ? 500 : 200 });
 }
 
 // --- 価格アラートをチェックし、トリガーしたらPush通知を送る ---

@@ -34,17 +34,27 @@ export default function PriceHistoryChart({ history }) {
   const prices = allPoints.map((p) => p.price);
   const minPrice = prices.length ? Math.min(...prices) : 0;
   const maxPrice = prices.length ? Math.max(...prices) : 0;
-  const latestByShop = [...seriesByShop.values()].map((arr) => arr[arr.length - 1].price);
-  const currentLowest = latestByShop.length ? Math.min(...latestByShop) : 0;
-
-  // 記録の鮮度。同期対象から外れた商品は履歴が数週間前で止まることがあり、
-  // その古い値を「現在価格」として扱うと「今が底値圏！」が嘘になる。
-  const latestT = allPoints.length ? Math.max(...allPoints.map((p) => p.t)) : 0;
-  const daysSinceLatest = latestT ? Math.floor((Date.now() - latestT) / 86400000) : null;
-  const isStale = daysSinceLatest != null && daysSinceLatest > 7;
+  // 「現在の最安値」は鮮度をショップごとに見る。
+  // モールごとに記録が止まる時期は違う（例: 楽天APIが不調な期間はYahooだけ
+  // 更新が続く）。全体の最新日だけで鮮度を判定すると、片方が新しいという理由で
+  // もう片方の数週間前の値まで「現在価格」として扱ってしまい、
+  // 「今が底値圏！」が古い価格を根拠に出てしまう。
+  const FRESH_DAYS = 7;
+  const now = Date.now();
+  const freshPrices = [];
+  let latestT = 0;
+  for (const arr of seriesByShop.values()) {
+    const last = arr[arr.length - 1];
+    if (last.t > latestT) latestT = last.t;
+    if ((now - last.t) / 86400000 <= FRESH_DAYS) freshPrices.push(last.price);
+  }
+  // 鮮度内のショップが1つも無ければ「現在価格」は出さない（0＝非表示）
+  const currentLowest = freshPrices.length ? Math.min(...freshPrices) : 0;
+  const daysSinceLatest = latestT ? Math.floor((now - latestT) / 86400000) : null;
+  const isStale = freshPrices.length === 0;
 
   // 底値圏: 現在の最安が記録上の最安の2%以内（2日以上の記録があり、かつ
-  // 記録が新しいときのみ。古い記録では「今」を語らない）
+  // 新しい記録が存在するときのみ。古い記録では「今」を語らない）
   const isBottom = uniqueDays >= 2 && currentLowest > 0 && currentLowest <= minPrice * 1.02 && !isStale;
 
   return (
