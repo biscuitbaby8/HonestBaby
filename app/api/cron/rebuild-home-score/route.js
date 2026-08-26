@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { demandScore, passesPickupGate, diversify } from '@/src/lib/products';
+import { isProductIndexable } from '@/src/lib/seo';
 
 // =============================================
 // ホームの並び順スコアを日次で再計算する（Vercel Cron）
@@ -83,8 +84,13 @@ async function loadPriceSignals() {
     // 記録10日以上かつ変動幅5%以上に絞ると43件(0.9%)になり、指標として機能する。
     const atLow = days >= 10 && max90 >= min90 * 1.05 && latest.price <= min90 * 1.02;
 
-    const cur = signals.get(productId) || { dropped: false, atLow: false };
-    signals.set(productId, { dropped: cur.dropped || dropped, atLow: cur.atLow || atLow });
+    const cur = signals.get(productId) || { dropped: false, atLow: false, days: 0 };
+    signals.set(productId, {
+      dropped: cur.dropped || dropped,
+      atLow: cur.atLow || atLow,
+      // 複数ショップぶんの記録がある場合は最も長い方を採る
+      days: Math.max(cur.days, days),
+    });
   }
   return signals;
 }
@@ -129,6 +135,7 @@ export async function GET(request) {
     //    クライアント側の形（reviewsCount / image）に合わせてから渡す。
     let dropped = 0;
     let atLow = 0;
+    let indexableCount = 0;
     const scored = products.map((p) => {
       const shaped = {
         ...p,
@@ -143,10 +150,20 @@ export async function GET(request) {
       if (sig?.atLow) { score += BONUS_AT_LOW; atLow++; }
       // 足切りを通らない商品は必ず後ろへ回す（ホーム上位の質を守る）
       if (!passesPickupGate(shaped)) score -= 1;
+      // 検索エンジンに見せてよいページか（SEO改善 02）。
+      // ページ表示のたびに履歴を集計しないよう、ここで判定して列に持たせる。
+      const hasPrice = (p.shops || []).some((s) => Number(s.lowest_price) > 0);
+      const indexable = isProductIndexable(shaped, {
+        historyDays: sig?.days || 0,
+        hasPrice,
+      });
+      if (indexable) indexableCount++;
+
       // diversify はブランド判定に brand / name を使うのでそのまま渡す
-      return { id: p.id, name: p.name, brand: p.brand, category: p.category, score };
+      return { id: p.id, name: p.name, brand: p.brand, category: p.category, score, indexable };
     });
     log.push(`値下がり加点: ${dropped}件 / 底値圏加点: ${atLow}件`);
+    log.push(`検索エンジンに見せる商品ページ: ${indexableCount}/${products.length}件`);
 
     scored.sort((a, b) => b.score - a.score);
 
@@ -163,7 +180,11 @@ export async function GET(request) {
       const results = await Promise.all(
         chunk.map((s, j) =>
           supabase.from('products')
-            .update({ home_score: Number(s.score.toFixed(6)), home_rank: i + j + 1 })
+            .update({
+              home_score: Number(s.score.toFixed(6)),
+              home_rank: i + j + 1,
+              is_indexable: s.indexable,
+            })
             .eq('id', s.id)
         )
       );
@@ -177,6 +198,7 @@ export async function GET(request) {
       ok: true,
       total: ordered.length,
       updated,
+      indexable: indexableCount,
       top10: ordered.slice(0, 10).map((s, i) => ({
         rank: i + 1,
         category: s.category,

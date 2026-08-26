@@ -6,6 +6,7 @@ import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProduc
 import { toVCUrl, getAmazonUrl, withAmazonTag } from '@/src/lib/affiliate';
 import { searchAmazonItems, selectAmazonItem } from '@/lib/amazonApi';
 import { saleBadgeLabel, saleMatchesShop, getTodayDeals, getShopBadge } from '@/src/lib/sales';
+import { NOINDEX_ROBOTS } from '@/src/lib/seo';
 import { fetchActiveSale } from '@/src/lib/salesServer';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
@@ -146,9 +147,18 @@ export async function generateMetadata({ params }) {
   // 重複商品は代表IDをcanonicalに（ページ自体もリダイレクトするが保険）
   const canonicalId = product.canonical_id && product.canonical_id !== product.id ? product.canonical_id : product.id;
   const url = `${SITE_URL}/product/${encodeURIComponent(canonicalId)}`;
+  // 検索エンジンに見せる商品ページを絞る（SEO改善 02）。
+  // sitemap 3,986件のうち3,863件(97%)が商品ページで、実際に検索結果へ
+  // 表示されたのは55ページだけだった。薄い類似ページが大量にあると
+  // クロール予算が薄く広く配られ、勝てるページまで埋もれる。
+  // 基準は src/lib/seo.js、判定は毎晩 rebuild-home-score が行う。
+  // ユーザーの閲覧は妨げない。follow は残すので内部リンクの評価も流れる。
+  const robots = product.is_indexable ? undefined : NOINDEX_ROBOTS;
+
   return {
     title,
     description: desc,
+    ...(robots && { robots }),
     alternates: { canonical: url },
     openGraph: {
       title,

@@ -67,6 +67,12 @@ export default async function sitemap() {
         .select('id, last_synced_at')
         .or('is_blocked.is.null,is_blocked.eq.false')
         .is('canonical_id', null) // 重複の非代表ページはsitemapに載せない（代表のみ）
+        // 検索エンジンに見せる基準を満たす商品だけを載せる（SEO改善 02）。
+        // 以前は3,863件すべてを載せていたが、実際に検索結果へ表示されたのは
+        // サイト全体で55ページだけだった。薄い類似ページを大量に申告すると
+        // クロール予算が薄く広く配られ、勝てるページまで埋もれる。
+        // 判定は毎晩 rebuild-home-score が products.is_indexable に書き込む。
+        .eq('is_indexable', true)
         .order('popularity_rank')
         .range(from, from + pageSize - 1);
       if (!data || data.length === 0) break;
