@@ -198,12 +198,78 @@ export const getProxiedImage = (url, variant = 'card') => {
 };
 
 // shops 配列から最安値を取得（表示用、official正規化なしの軽量版）
+// ショップ行の価格を取り出す（formatDbProduct後/生データ両対応）
+const shopPriceOf = (s) => Number(s?.lowestPrice ?? s?.lowest_price ?? s?.price ?? 0);
+
+// 「楽天」表記なのにURLが楽天でない不正行（古いDBデータの取り違え）
+const isBadRakutenRow = (s) => {
+  const name = String(s?.name ?? s?.shop_name ?? '').toLowerCase();
+  const url = String(s?.url ?? '').toLowerCase();
+  return name.includes('楽天') && !!url && !url.includes('rakuten');
+};
+
+const medianOf = (nums) => {
+  const a = [...nums].sort((x, y) => x - y);
+  if (a.length === 0) return 0;
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+};
+
+// 同期時のキーワード検索が別商品(付属品・無関係な安値)を誤って紐付けることがあり、
+// 単純な最小値だと一覧カードが実体とかけ離れた安値を表示してしまう。
+// 表示前に (1)無効・不正行を除外 (2)中央値の40%未満の安値外れ値を除外 する。
+// これによりカード/詳細ヒーロー/ショップ比較欄の価格が常に一致する。
+const OUTLIER_MIN_RATIO = 0.4;
+export const sanitizeShops = (shops) => {
+  if (!Array.isArray(shops)) return [];
+  const valid = shops.filter((s) => {
+    const p = shopPriceOf(s);
+    return p > 0 && isFinite(p) && !isBadRakutenRow(s);
+  });
+  if (valid.length < 2) return valid;
+  const med = medianOf(valid.map(shopPriceOf));
+  if (!(med > 0)) return valid;
+  const kept = valid.filter((s) => shopPriceOf(s) >= med * OUTLIER_MIN_RATIO);
+  return kept.length > 0 ? kept : valid;
+};
+
 export const getLowestPrice = (shops) => {
-  if (!shops || shops.length === 0) return 0;
-  const prices = shops
-    .map((s) => Number(s.lowestPrice ?? s.lowest_price ?? s.price ?? 0))
+  const prices = sanitizeShops(shops)
+    .map(shopPriceOf)
     .filter((p) => p > 0 && isFinite(p));
   return prices.length > 0 ? Math.min(...prices) : 0;
+};
+
+// おむつのサイズ・サブサブ絞り込み用。products テーブルに sub_sub_category 列が
+// 無いため、商品名からサイズを判定する。1商品が複数サイズを内包する（例「M L BIG」）
+// ことが多いため、単一分類ではなく「含まれるサイズの配列」を返す包含マッチとする。
+export const DIAPER_SIZE_LABELS = ['新生児', 'S', 'M', 'L', 'BIG', 'BIGより大きい'];
+export const detectDiaperSizes = (name) => {
+  const n = String(name || '');
+  const out = [];
+  if (/新生児|お誕生|うまれたて|生まれてすぐ/.test(n)) out.push('新生児');
+  if (/ビッグ\s*より\s*大き|BIG\s*より\s*大き|スーパー\s*ビッグ|スーパー\s*BIG|ビッグより/i.test(n))
+    out.push('BIGより大きい');
+  if (/ビッグ|BIG/i.test(n)) out.push('BIG');
+  // L/M/S はサイズ文脈のみ（ローマ字ブランド名などの誤爆を避け、単語境界を要求）
+  if (/(?:^|[^A-Za-z])L(?:サイズ)?(?![A-Za-z])|Lサイズ/.test(n)) out.push('L');
+  if (/(?:^|[^A-Za-z])M(?:サイズ)?(?![A-Za-z])|Mサイズ/.test(n)) out.push('M');
+  if (/(?:^|[^A-Za-z])S(?:サイズ)?(?![A-Za-z])|Sサイズ/.test(n)) out.push('S');
+  return out;
+};
+
+// サブサブ（サイズ/種別）フィルタの共通判定。
+// おむつのサイズは名前から厳密に絞り込み（現状は列が無く常に全件通過していた）。
+// サイズ以外のサブサブ（ゴミ箱・袋の種別、月齢など）は名前一致か、従来通り通す。
+const DIAPER_SIZE_SET = new Set(DIAPER_SIZE_LABELS);
+export const productMatchesSubSub = (product, subsub, category) => {
+  if (!subsub || subsub === 'すべて') return true;
+  if (category === 'おむつ' && DIAPER_SIZE_SET.has(subsub)) {
+    return detectDiaperSizes(product?.name).includes(subsub);
+  }
+  const name = String(product?.name || '');
+  if (name.includes(subsub)) return true;
+  return !product?.subSubCategory || product.subSubCategory === subsub;
 };
 
 // Supabase の products 行をフロントエンド共通フォーマットへ変換（SSR用）

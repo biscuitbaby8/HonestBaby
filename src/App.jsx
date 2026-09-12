@@ -12,7 +12,7 @@ import {
   LayoutGrid, Shirt, Utensils, Moon, Puzzle, Waves, Car, Leaf, Wind, Trash2, Repeat
 } from 'lucide-react';
 // カテゴリ定義は src/lib/products.js を単一の真実の源とする（SSRページと共有）
-import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, getHighResImage, categorizeByName } from './lib/products';
+import { CATEGORY_TREE, CATEGORIES, DIAPER_SIZE_BY_AGE, CATEGORY_AGE_SUGGESTIONS, getProxiedImage, getHighResImage, categorizeByName, sanitizeShops, productMatchesSubSub } from './lib/products';
 
 const CategoryIcon = ({ name, className = "w-4 h-4" }) => {
   const s = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round", className };
@@ -366,7 +366,7 @@ const normalizeShops = (shops) => {
 
 const getLowestPrice = (shops) => {
   if (!shops || shops.length === 0) return 0;
-  const normalized = normalizeShops(shops);
+  const normalized = sanitizeShops(normalizeShops(shops));
   const prices = normalized.map(s => s.lowestPrice).filter(p => p > 0 && isFinite(p));
   return prices.length > 0 ? Math.min(...prices) : 0;
 };
@@ -3216,11 +3216,8 @@ ${userText}
           || (selectedCategory === "おむつ" && p.category === "ゴミ箱・袋");
         const matchSub = selectedSubCategory === "すべて"
           || (p.subCategory || '').trim() === selectedSubCategory.trim();
-        // sub_sub_category（サイズ/月齢）は未保存の商品が多い。未保存なら除外せず通す
-        // （サイズタブが常に空になるのを防ぐ）。
-        const matchSubSub = selectedSubSubCategory === "すべて"
-          || !p.subSubCategory
-          || p.subSubCategory === selectedSubSubCategory;
+        // おむつのサイズは商品名から判定して絞り込む（DBに sub_sub_category 列が無いため）
+        const matchSubSub = productMatchesSubSub(p, selectedSubSubCategory, selectedCategory);
         return matchCat && matchSub && matchSubSub;
       })
       .sort((a, b) => (b.rating || 0) - (a.rating || 0));
