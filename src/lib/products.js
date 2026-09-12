@@ -302,7 +302,10 @@ const DIAPER_SIZE_SET = new Set(DIAPER_SIZE_LABELS);
 export const productMatchesSubSub = (product, subsub, category) => {
   if (!subsub || subsub === 'すべて') return true;
   if (category === 'おむつ' && DIAPER_SIZE_SET.has(subsub)) {
-    return detectDiaperSizes(product?.name).includes(subsub);
+    // 別サイズと明示された商品だけ除外し、サイズ判定不能な商品は残す
+    // （商品名にサイズ表記のない本物のおむつを取りこぼさないため）。
+    const sizes = detectDiaperSizes(product?.name);
+    return sizes.length === 0 ? true : sizes.includes(subsub);
   }
   const name = String(product?.name || '');
   if (name.includes(subsub)) return true;
