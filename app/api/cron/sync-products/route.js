@@ -657,9 +657,9 @@ function extractSubCategory(category, itemName) {
       if (r.match.test(itemName)) return r.sub;
     }
   }
-  if (category === 'ギフトセット') return 'ギフトセット総合';
-  if (category === 'レンタル') return 'レンタル総合';
-  return '本体';
+  // 判定不能は「その他」へ（各カテゴリの CATEGORY_TREE に その他 サブを用意しており、
+  // タブから到達可能。旧値 本体/ギフトセット総合/レンタル総合 も GENERIC 扱いで吸収される）
+  return 'その他';
 }
 
 // node:https でHTTPリクエスト（Referer等の禁止ヘッダーも送れる）
@@ -1384,7 +1384,7 @@ async function runWithConcurrency(items, worker, { concurrency = 2, gapMs = 0, d
 // 商品名がはっきり別のサブを指しているときだけ商品名側を採用し、
 // 判定が付かず総合フォールバックに落ちた場合は従来どおり検索キーワードの
 // sub を使う（サブタブが空のまま残らないようにするため）。
-const GENERIC_SUBS = new Set(['本体', 'ギフトセット総合', 'レンタル総合']);
+const GENERIC_SUBS = new Set(['本体', 'ギフトセット総合', 'レンタル総合', 'その他']);
 function resolveSubCategory(category, itemName, forcedSub) {
   const detected = extractSubCategory(category, itemName);
   if (detected && !GENERIC_SUBS.has(detected) && detected !== forcedSub) return detected;
