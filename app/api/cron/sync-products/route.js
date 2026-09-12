@@ -536,6 +536,13 @@ function extractSubCategory(category, itemName) {
       { match: /プレイマット|引き車|ソフトブロック|積み木|くもん/, sub: "6ヶ月〜" },
       { match: /乗用|ままごと|パズル|型はめ|ブロックセット|シルバニア|木製玩具/, sub: "1歳〜" },
     ],
+    "絵本": [
+      { match: /しかけ|仕掛け|とびだす|飛び出す|穴あき|フラップ|めくる|音が出る|音の出る|おとのでる/, sub: "しかけ絵本" },
+      { match: /2歳|3歳|二歳|三歳|2才|3才/, sub: "2歳〜" },
+      { match: /1歳|一歳|1才/, sub: "1歳〜" },
+      { match: /0歳|0才|あかちゃん|赤ちゃん|ねんね|ファースト|はじめて|新生児/, sub: "0歳〜" },
+      // 収納棚・アルバム・カード等の非書籍は上記に一致せず本体のまま（カテゴリ誤りは別対応）
+    ],
     "ベビーカー": [
       { match: /レインカバー|雨カバー|防雨カバー/, sub: "周辺グッズ" },
       { match: /ドリンクホルダー|カップホルダー|スマホホルダー|スマートフォンホルダー/, sub: "周辺グッズ" },
@@ -543,6 +550,11 @@ function extractSubCategory(category, itemName) {
       { match: /フック|収納ポーチ|サイドバッグ|アームバー/, sub: "周辺グッズ" },
       { match: /アンダーバッグ|ベビーカーバッグ|バギーバッグ|ベビーカー用バッグ|オーガナイザー|トラベルバッグ/, sub: "周辺グッズ" },
       { match: /よだれカバー|防寒ケープ|ベビーカーシート|シートカバー/, sub: "周辺グッズ" },
+      { match: /扇風機|ファンシート|ファン|保冷|冷感/, sub: "周辺グッズ" },
+      // 型記載のない主力モデルは高確度のモデル名から型を補完
+      { match: /メリオ|melio|両対面|両面/i, sub: "AB型" },
+      { match: /スゴカル|すごかる/i, sub: "A型" },
+      { match: /リベル|libelle/i, sub: "B型" },
       { match: /AB型|ＡＢ型/, sub: "AB型" },
       { match: /[AＡ]型/, sub: "A型" },
       { match: /[BＢ]型/, sub: "B型" },
@@ -554,6 +566,9 @@ function extractSubCategory(category, itemName) {
       { match: /ヒップシート/, sub: "ヒップシート" },
       { match: /横抱き|フロントキャリー/, sub: "横抱き" },
       { match: /縦抱き/, sub: "縦抱き" },
+      // 標準的な対面（前向き）キャリアは縦抱き。主力(エルゴ/ベビービョルン等)は
+      // 名前に「縦抱き」等を含まず従来「本体」に落ちていたため、末尾で既定を縦抱きにする。
+      { match: /エルゴ|ergobaby|ベビービョルン|baby\s*bjorn|オムニ|omni|アダプト|adapt|embrace|one\s*kai|ワンカイ|コラン|napnap|ナップナップ|ポグネー|pognae|抱っこひも|だっこひも|抱っこ紐|抱っこベルト|キャリア|キャリー/i, sub: "縦抱き" },
     ],
     "ウェア": [
       { match: /スタイ|よだれかけ|ビブ/, sub: "スタイ" },
@@ -578,7 +593,7 @@ function extractSubCategory(category, itemName) {
     "寝具・ベッド": [
       { match: /スリーパー|スリープバッグ|着る布団|寝袋/, sub: "スリーパー" },
       { match: /まくら|枕|頭の形|頭型/, sub: "まくら" },
-      { match: /布団セット|ふとんセット|掛け布団|敷き布団|羽毛布団|肌布団/, sub: "ベビー布団" },
+      { match: /布団セット|ふとんセット|掛け布団|敷き布団|羽毛布団|肌布団|ベビーふとん|ベビー布団|敷きパッド|防水シーツ|マットレス|お昼寝マット|ベビーマット|サニーマット|すのこマット/, sub: "ベビー布団" },
       { match: /ベビーベッド|ミニベッド|ハーフベッド|ベビーベット|添い寝/, sub: "ベビーベッド" },
     ],
     "安全グッズ": [
@@ -617,7 +632,7 @@ function extractSubCategory(category, itemName) {
       { match: /葉酸|DHA|鉄分|サプリ|マルチビタミン/, sub: "葉酸サプリ" },
       { match: /授乳ブラ|授乳インナー|マタニティブラ|授乳キャミ/, sub: "授乳ブラ" },
       { match: /腹帯|マタニティベルト|骨盤ベルト|サポートベルト|腹巻/, sub: "腹帯" },
-      { match: /マタニティウェア|マタニティ服|マタニティパンツ|マタニティワンピース|授乳服|マタニティジーンズ/, sub: "マタニティウェア" },
+      { match: /マタニティウェア|マタニティ服|マタニティパンツ|マタニティワンピース|授乳服|マタニティジーンズ|レギンス|タイツ|スパッツ|ガウチョ|ワンピース|トップス|ボトム|事務服|パンツ/, sub: "マタニティウェア" },
     ],
     "ギフトセット": [
       { match: /ロンパース|カバーオール|ベビー服|ベビーウェア|肌着|ボディスーツ|コンビ肌着|短肌着/, sub: "ロンパース・服" },
@@ -1518,20 +1533,30 @@ async function backfillSubCategories(log) {
   let totalUpdated = 0;
   let totalErrors = 0;
 
+  let totalScanned = 0;
   while (true) {
     const { data: products, error } = await supabase
       .from('products')
-      .select('id, category, name')
+      .select('id, category, name, sub_category')
       .range(offset, offset + batchSize - 1);
 
     if (error || !products || products.length === 0) break;
+    totalScanned += products.length;
 
-    // upsert は NOT NULL 制約に引っかかるため、個別 update を並列実行
+    // 安全・対象限定: 現在が catch-all（本体/総合）の行だけを対象に再分類し、
+    // 具体化できた（非generic）場合のみ更新する。既に具体サブが付いた行は一切触らず、
+    // 検索キーワード由来で名前から判定できないサブを「本体」へ格下げする事故を防ぐ。
+    const targets = products
+      .map(p => ({ p, next: extractSubCategory(p.category, p.name) }))
+      .filter(({ p, next }) =>
+        GENERIC_SUBS.has(p.sub_category) && !GENERIC_SUBS.has(next) && next !== p.sub_category
+      );
+
     const results = await Promise.all(
-      products.map(p =>
+      targets.map(({ p, next }) =>
         supabase
           .from('products')
-          .update({ sub_category: extractSubCategory(p.category, p.name) })
+          .update({ sub_category: next })
           .eq('id', p.id)
       )
     );
@@ -1542,13 +1567,13 @@ async function backfillSubCategories(log) {
       log.push(`⚠️ offset ${offset}: ${errors.length}件エラー: ${errors[0].error.message}`);
     }
 
-    totalUpdated += products.length;
-    log.push(`📝 backfill: ${totalUpdated}件処理済み`);
+    totalUpdated += targets.length - errors.length;
+    log.push(`📝 backfill: ${totalScanned}件走査 / ${totalUpdated}件を再分類`);
     if (products.length < batchSize) break;
     offset += batchSize;
   }
 
-  log.push(`✅ backfill完了: 合計${totalUpdated}件 (エラー${totalErrors}件)`);
+  log.push(`✅ backfill完了: ${totalScanned}件走査・${totalUpdated}件再分類 (エラー${totalErrors}件)`);
   return totalUpdated;
 }
 
