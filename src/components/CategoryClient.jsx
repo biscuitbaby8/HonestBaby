@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
-import { CATEGORY_TREE, CATEGORY_AGE_SUGGESTIONS, getLowestPrice } from '../lib/products';
+import { CATEGORY_TREE, CATEGORY_AGE_SUGGESTIONS, getLowestPrice, productMatchesSubSub } from '../lib/products';
 import ProductCardLink from './ProductCardLink';
 
 // subs は string | { name, subsubs? } の混在
@@ -64,8 +64,8 @@ export default function CategoryClient({ products, cat, sub = null }) {
   const filtered = useMemo(() => {
     let result = products.filter((p) => {
       const matchSub = subCat === 'すべて' || p.subCategory === subCat;
-      // sub_sub_category（サイズ/月齢）は未保存の商品が多いため、未保存なら除外せず通す
-      const matchSubSub = subSubCat === 'すべて' || !p.subSubCategory || p.subSubCategory === subSubCat;
+      // おむつのサイズは商品名から判定して絞り込む（DBに sub_sub_category 列が無いため）
+      const matchSubSub = productMatchesSubSub(p, subSubCat, cat);
       return matchSub && matchSubSub;
     });
     if (sortOrder === 'popular')

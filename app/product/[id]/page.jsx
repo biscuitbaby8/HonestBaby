@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Trophy, Flame, Lightbulb } from 'lucide-react';
 import { supabaseServer } from '@/src/lib/supabaseServer';
-import { formatDbProduct, getLowestPrice, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
+import { formatDbProduct, getLowestPrice, sanitizeShops, CAT_META, getProxiedImage, cleanProductName } from '@/src/lib/products';
 import { toVCUrl, getAmazonUrl, withAmazonTag } from '@/src/lib/affiliate';
 import { searchAmazonItems, selectAmazonItem } from '@/lib/amazonApi';
 import { saleBadgeLabel, saleMatchesShop, getTodayDeals, getShopBadge } from '@/src/lib/sales';
@@ -217,15 +217,9 @@ export default async function ProductPage({ params }) {
   }
   const todayDeals = getTodayDeals();
   const price = getLowestPrice(product.shops);
-  const shops = (product.shops || [])
-    .filter((s) => {
-      if (Number(s.lowestPrice) <= 0) return false;
-      // 楽天市場名でYahoo URLが入っている古いDBデータを除外
-      const name = (s.name || '').toLowerCase();
-      const url = (s.url || '').toLowerCase();
-      if (name.includes('楽天') && url && !url.includes('rakuten')) return false;
-      return true;
-    })
+  // sanitizeShops で無効行・不正行・安値外れ値を除外。ヒーロー価格(getLowestPrice)と
+  // カード表示・この比較欄が常に同じ集合を見るため、一覧と詳細の価格が一致する。
+  const shops = sanitizeShops(product.shops)
     .sort((a, b) => Number(a.lowestPrice) - Number(b.lowestPrice));
   const reviews = (product.honestReviews || []).slice(0, 5);
 
