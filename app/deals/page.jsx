@@ -15,7 +15,8 @@ const DESC =
   '楽天・Yahoo!ショッピングの価格推移から「今まさに値下がっている」「過去最安（底値）」のベビー用品を自動抽出。おむつ・ベビーカー・抱っこ紐などの買い時をまとめてチェック。';
 
 export const metadata = {
-  title: `${TITLE} | HonestBaby`,
+  // layout の title テンプレート `%s | HonestBaby` が自動付与するため、ここではブランド名を付けない
+  title: TITLE,
   description: DESC,
   alternates: { canonical: `${SITE_URL}/deals` },
   // images未指定 → app/opengraph-image.jsx（1200×630・絶対URL）が自動適用される
