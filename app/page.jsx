@@ -101,6 +101,18 @@ export default async function Page() {
             </Link>
           )}
 
+          {/* 値下げ速報バナー（内部リンク・回遊/再訪の起点） */}
+          <Link
+            href="/deals"
+            className="flex items-center justify-between bg-gradient-to-br from-[#FFF3E8] to-[#FFE9D6] border border-[#F5D5B8] rounded-2xl px-5 py-4 mb-8"
+          >
+            <span className="text-sm font-black text-[#5A4C4C]">
+              <span className="bg-[#E8894A] text-white text-[10px] font-black px-2 py-0.5 rounded-full mr-2">値下げ速報</span>
+              価格推移から「今が買い時」の商品をチェック
+            </span>
+            <span className="text-xs font-black text-[#E8894A] whitespace-nowrap ml-2">見る →</span>
+          </Link>
+
           {/* カテゴリ一覧（内部リンク） */}
           <nav aria-label="カテゴリ" className="mb-8">
             <h2 className="text-lg font-black mb-3">カテゴリから探す</h2>

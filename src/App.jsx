@@ -3403,6 +3403,18 @@ ${userText}
           </a>
         )}
 
+        {/* ─── 値下げ速報バナー（/deals へ・回遊/再訪の起点） ─── */}
+        <a
+          href="/deals"
+          className="flex items-center justify-between bg-gradient-to-br from-[#FFF3E8] to-[#FFE9D6] border border-[#F5D5B8] rounded-[1.75rem] px-5 py-4 mb-4 active:scale-[0.99] transition-transform"
+        >
+          <span className="text-sm font-black text-[#5A4C4C]">
+            <span className="bg-[#E8894A] text-white text-[10px] font-black px-2 py-0.5 rounded-full mr-2">値下げ速報</span>
+            価格推移から「今が買い時」の商品
+          </span>
+          <span className="text-xs font-black text-[#E8894A] whitespace-nowrap ml-2">見る →</span>
+        </a>
+
         {/* ─── 通知オプトインの案内カード（未購読・未却下のときだけ） ─── */}
         {pushStatus === 'off' && !pushPromptDismissed && (
           <div className="flex items-center gap-3 bg-[#FFF9E6] border border-[#F2E3AE] rounded-[1.75rem] p-4 mb-4">
