@@ -117,10 +117,29 @@ export async function generateMetadata({ params }) {
   if (!product) return { title: 'HonestBaby' };
 
   const shortName = cleanProductName(product.name);
-  const title = `${shortName} の最安値・価格比較`;
-  // description はページに実在する情報だけを書く。従来は全商品に固定で
-  // 「忖度なしのリアルレビューも掲載」と書いていたが、レビューが無い商品でも
-  // 出てしまい、スニペットの内容とページの中身が食い違っていた。
+  const price = getLowestPrice(product.shops);
+
+  // 値下げ/底値タグ（price_drops ビュー: 価格履歴から実際に下がった/底値の商品を抽出）。
+  // 検索結果での訴求に使う。取得失敗時は無タグで従来どおり。
+  let deal = null;
+  try {
+    const { data } = await supabaseServer
+      .from('price_drops')
+      .select('off_pct, at_low')
+      .eq('product_id', product.id)
+      .maybeSingle();
+    deal = data || null;
+  } catch { deal = null; }
+  const dealTag = deal ? (Number(deal.off_pct) > 0 ? '【値下げ中】' : deal.at_low ? '【過去最安】' : '') : '';
+
+  // 検索結果のCTRを上げるため、タイトルに 価格・★・（該当時）値下げ を載せる（すべて事実ベース）。
+  // 価格が取れない商品は従来型に落とす。要素を入れる余地を作るため名前は短縮する。
+  const ratingStr = product.rating > 0 ? ` ★${product.rating}` : '';
+  const title = price > 0
+    ? `${dealTag}${cleanProductName(product.name, 28)} 最安¥${price.toLocaleString()}〜${ratingStr}｜価格比較`
+    : `${shortName} の最安値・価格比較`;
+
+  // description はページに実在する情報だけを書く（スニペットと中身の食い違いを避ける）。
   const pricedShops = (product.shops || []).filter((s) => Number(s.lowestPrice) > 0);
   const shopNames = await fetchShopNames(
     product.id,
@@ -130,7 +149,8 @@ export async function generateMetadata({ params }) {
   const hasReviews =
     (product.honestReviews?.length || 0) + (product.snsReviews?.length || 0) > 0;
   const desc = [
-    `${shortName}の最安値・価格比較。`,
+    price > 0 ? `${shortName} 最安¥${price.toLocaleString()}〜。` : `${shortName}の最安値・価格比較。`,
+    dealTag ? `いまが買い時${Number(deal.off_pct) > 0 ? `（${Math.round(deal.off_pct)}%OFF）` : '（過去最安）'}。` : '',
     // 1店舗しか価格が無い商品で「楽天・Yahoo!を比較」と書くと実物と食い違うため、
     // 実際に価格が並ぶショップだけに言及する。
     shopCount > 1
