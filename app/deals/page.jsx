@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { supabaseServer } from '@/src/lib/supabaseServer';
 import { getProxiedImage, cleanProductName } from '@/src/lib/products';
 import { fetchPriceDrops } from '@/src/lib/deals';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
+import ShareButtons, { CopyBox } from '@/src/components/ShareButtons';
 
 const SITE_URL = 'https://honestbaby-care.com';
 
@@ -92,6 +92,27 @@ export default async function DealsPage() {
     deals = [];
   }
 
+  // SNSシェア用テキスト（実データから生成）
+  const dealsUrl = `${SITE_URL}/deals`;
+  const top1 = deals[0];
+  const xText = deals.length
+    ? `🍼ベビー用品の値下げ速報｜本日${deals.length}件がお得！${cleanProductName(top1.product.name, 18)} ${top1.offPct > 0 ? `${Math.round(top1.offPct)}%OFF` : '底値'} ほか #ベビー用品 #出産準備 #育児`
+    : '🍼ベビー用品の値下げ速報（HonestBaby）';
+  const postText = deals.length
+    ? [
+        '🍼ベビー用品の値下げ速報（HonestBaby）',
+        '楽天・Yahooの価格推移から「今が買い時」を自動ピックアップ！',
+        '',
+        ...deals.slice(0, 5).map(
+          (d, i) =>
+            `${i + 1}. ${cleanProductName(d.product.name, 26)} ¥${d.currentPrice.toLocaleString()}${d.offPct > 0 ? `（${Math.round(d.offPct)}%OFF）` : '（底値）'}`
+        ),
+        '',
+        `▼一覧はこちら\n${dealsUrl}`,
+        '#ベビー用品 #出産準備 #育児 #節約',
+      ].join('\n')
+    : '';
+
   const jsonLd = [
     {
       '@context': 'https://schema.org',
@@ -125,6 +146,14 @@ export default async function DealsPage() {
           楽天・Yahoo!ショッピングの価格推移から、<strong>今まさに値下がっている</strong>／
           <strong>過去最安（底値）</strong>のベビー用品だけを自動でピックアップ。毎日更新。
         </p>
+
+        {deals.length > 0 && (
+          <div className="mb-6">
+            <p className="text-[11px] font-black text-[#A5A19E] mb-2">このお得情報をシェア</p>
+            <ShareButtons url={dealsUrl} text={xText} />
+            <CopyBox text={postText} />
+          </div>
+        )}
 
         {deals.length === 0 ? (
           <div className="text-center py-20 text-[#A5A19E]">

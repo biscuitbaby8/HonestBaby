@@ -12,6 +12,7 @@ import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 import ProductCardLink from '@/src/components/ProductCardLink';
 import ProductAppGate from '@/src/components/ProductAppGate';
+import ShareButtons from '@/src/components/ShareButtons';
 import ReviewHelpfulButton from '@/src/components/ReviewHelpfulButton';
 import PriceHistoryChart from '@/src/components/PriceHistoryChart';
 
@@ -264,6 +265,9 @@ export default async function ProductPage({ params }) {
   const hasRating = product.rating > 0 && reviewCount > 0;
 
   const pageUrl = `${SITE_URL}/product/${encodeURIComponent(product.id)}`;
+  const shareText = price > 0
+    ? `${cleanProductName(product.name, 24)} 最安¥${price.toLocaleString()}〜｜HonestBaby`
+    : `${cleanProductName(product.name, 24)}｜HonestBaby`;
   const productLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -502,6 +506,12 @@ export default async function ProductPage({ params }) {
             </div>
 
           </div>
+        </div>
+
+        {/* このページをシェア（配信・回遊の起点） */}
+        <div className="mt-6 flex flex-col items-start gap-2">
+          <p className="text-[11px] font-black text-[#A5A19E]">このページをシェア</p>
+          <ShareButtons url={pageUrl} text={shareText} />
         </div>
 
         {priceHistory.length > 0 && (
