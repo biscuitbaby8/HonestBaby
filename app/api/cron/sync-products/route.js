@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { revalidatePath } from 'next/cache';
 import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
 import { parseQuantity } from '@/src/lib/products';
 import { searchUrl, rankingUrl, withVersionFallback, currentVersion } from '@/src/lib/rakutenApi';
@@ -20,6 +21,8 @@ const supabase = createClient(
 
 // 価格履歴を記録（価格推移チャート用）。1商品×1ショップ×1日=1行、
 // 同日の再同期は最新値で上書き。履歴はベストエフォート（同期本体を止めない）。
+// 併せて商品ページのISRキャッシュも即時無効化する（アクセスの少ない商品ページが
+// 値下がり後も古いキャッシュを配信し続ける問題を防ぐ）。
 async function recordPriceHistory(productId, shopName, price) {
   if (!productId || !(price > 0)) return;
   const jstDate = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -30,6 +33,9 @@ async function recordPriceHistory(productId, shopName, price) {
       price,
       recorded_on: jstDate,
     }], { onConflict: 'product_id,shop_name,recorded_on' });
+  } catch { /* noop */ }
+  try {
+    revalidatePath(`/product/${productId}`);
   } catch { /* noop */ }
 }
 

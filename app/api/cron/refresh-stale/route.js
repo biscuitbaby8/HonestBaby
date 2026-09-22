@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { revalidatePath } from 'next/cache';
 import { searchUrl, withVersionFallback } from '@/src/lib/rakutenApi';
 import { request as httpsRequest } from 'node:https';
 
@@ -54,6 +55,8 @@ function nodeHttpsGet(url) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 価格履歴を記録（1商品×1ショップ×1日=1行）。同期本体は止めない。
+// 併せて商品ページのISRキャッシュも即時無効化する（アクセスの少ない商品ページが
+// 値下がり後も古いキャッシュを配信し続ける問題を防ぐ）。
 async function recordPriceHistory(productId, shopName, price) {
   if (!productId || !(price > 0)) return;
   const jstDate = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -61,6 +64,9 @@ async function recordPriceHistory(productId, shopName, price) {
     await supabase.from('price_history').upsert([{
       product_id: productId, shop_name: shopName, price, recorded_on: jstDate,
     }], { onConflict: 'product_id,shop_name,recorded_on' });
+  } catch { /* noop */ }
+  try {
+    revalidatePath(`/product/${productId}`);
   } catch { /* noop */ }
 }
 
