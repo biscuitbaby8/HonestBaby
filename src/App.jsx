@@ -525,6 +525,11 @@ const SnsLogo = ({ name, className }) => (
   </svg>
 );
 
+// 検索タブの「人気の検索」チップ。検索ログ分析基盤が無いため固定リストで運用する
+// （将来、検索履歴の集計に置き換え可能）。
+const POPULAR_SEARCH_KEYWORDS = [
+  'エルゴ アダプト', 'ニオイポイ', 'ネムリラ', '抱っこ紐 新生児', 'チャイルドシート i-Size',
+];
 
 const App = () => {
   const router = useRouter();
@@ -983,6 +988,13 @@ const App = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
+  // 自サイト内の即時サジェスト（外部APIより先に、入力途中から掲載商品を提示する）
+  const [localSuggestions, setLocalSuggestions] = useState([]);
+  const [isLocalSuggestLoading, setIsLocalSuggestLoading] = useState(false);
+  // 自由入力での検索キーワード履歴（カテゴリ絞り込みの savedSearches とは別物）
+  const [recentSearchTerms, setRecentSearchTerms] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('honestBabyRecentSearchTerms') || '[]'); } catch { return []; }
+  });
 
   // --- ランキング・ギフト States ---
   const [giftProducts, setGiftProducts] = useState([]);
@@ -1040,6 +1052,7 @@ const App = () => {
   useEffect(() => { try { localStorage.setItem('honestBabyRecentlyViewed', JSON.stringify(recentlyViewed)); } catch { } }, [recentlyViewed]);
   useEffect(() => { try { localStorage.setItem('honestBabyPriceAlerts', JSON.stringify(priceAlerts)); } catch { } }, [priceAlerts]);
   useEffect(() => { try { localStorage.setItem('honestBabySavedSearches', JSON.stringify(savedSearches)); } catch { } }, [savedSearches]);
+  useEffect(() => { try { localStorage.setItem('honestBabyRecentSearchTerms', JSON.stringify(recentSearchTerms)); } catch { } }, [recentSearchTerms]);
 
   // モーダル制御
   const [showBabyModal, setShowBabyModal] = useState(false);
@@ -1348,6 +1361,31 @@ const App = () => {
     setSearchTerm(term);
     fetchRemoteProductsWithAI(term);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 検索タブ: 2文字以上打った時点で、外部APIを待たず自サイト掲載商品から
+  // その場で候補を出す（型番・ブランド名で来た「もう決めている」層への即応）。
+  useEffect(() => {
+    const q = searchTerm.trim();
+    if (activeTab !== 'search' || q.length < 2) { setLocalSuggestions([]); setIsLocalSuggestLoading(false); return; }
+    let cancelled = false;
+    setIsLocalSuggestLoading(true);
+    const timer = setTimeout(async () => {
+      const keywords = q.split(/[\s　]+/).filter(Boolean).slice(0, 3);
+      let query = supabase
+        .from('products')
+        .select('id, name, image_url, category, shops:shops_prices(*)')
+        .neq('is_blocked', true)
+        .is('canonical_id', null)
+        .limit(6);
+      for (const kw of keywords) query = query.ilike('name', `%${kw}%`);
+      const { data } = await query;
+      if (!cancelled) {
+        setLocalSuggestions((data || []).map(formatDbProduct));
+        setIsLocalSuggestLoading(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [searchTerm, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SSR商品ページ（/product/[id]）からのリダイレクト: ?product= で商品モーダルを開く
   useEffect(() => {
@@ -2188,6 +2226,10 @@ const App = () => {
 
   const fetchRemoteProductsWithAI = async (keyword) => {
     if (!keyword.trim()) return;
+
+    // 検索履歴に記録（直近8件・重複排除・新しい順）
+    const term = keyword.trim();
+    setRecentSearchTerms(prev => [term, ...prev.filter(t => t !== term)].slice(0, 8));
 
     setIsSearchLoading(true);
     setSearchError(null);
@@ -3389,6 +3431,16 @@ ${userText}
 
     return (
       <div className="animate-in fade-in duration-500">
+        {/* ─── 検索ショートカット（すでに欲しい商品が決まっている人向けの最短動線） ─── */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('search')}
+          className="w-full flex items-center gap-2.5 bg-white border border-[#F4EFEB] rounded-full px-4 py-3.5 mb-5 shadow-[0_4px_14px_rgba(90,76,76,0.05)] active:scale-[0.98] transition-transform text-left"
+        >
+          <Search className="w-4 h-4 text-[#A5A19E] flex-shrink-0" />
+          <span className="text-xs font-bold text-[#A5A19E] flex-1">ブランド・型番・商品名で検索</span>
+        </button>
+
         {/* ─── 開催中のセールバナー（/sale へ） ─── */}
         {activeSale && (
           <a
@@ -4357,7 +4409,7 @@ ${userText}
         {activeTab === 'search' && (
           <div className="animate-in slide-in-from-right duration-300">
             {/* 検索ボックス */}
-            <div className="relative mb-6">
+            <div className="relative mb-2">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#A5A19E]" />
               <input
                 type="text"
@@ -4376,12 +4428,39 @@ ${userText}
               )}
             </div>
 
-            {/* 検索ボタン（入力済みで未検索のとき表示） */}
-            {searchTerm && !isSearchLoading && searchResults.length === 0 && (
-              <div className="text-center mb-8">
+            {/* 自サイト内サジェスト（2文字目から。外部APIより先にその場で候補を出す） */}
+            {searchTerm.trim().length >= 2 && !isSearchLoading && searchResults.length === 0 && (
+              <div className="bg-white rounded-[1.75rem] border border-[#F4EFEB] shadow-[0_6px_20px_rgba(90,76,76,0.06)] overflow-hidden mb-6 mt-3">
+                {isLocalSuggestLoading && localSuggestions.length === 0 ? (
+                  <div className="flex items-center justify-center gap-2 py-6 text-[#A5A19E]">
+                    <div className="w-3.5 h-3.5 border-2 border-[#F2ABAC]/30 border-t-[#F2ABAC] rounded-full animate-spin"></div>
+                    <span className="text-[11px] font-bold">候補をさがしています…</span>
+                  </div>
+                ) : localSuggestions.length > 0 ? (
+                  localSuggestions.map(p => {
+                    const prices = sanitizeShops(p.shops).map(s => Number(s.lowestPrice)).filter(n => n > 0);
+                    const price = prices.length ? Math.min(...prices) : 0;
+                    return (
+                      <div key={p.id}
+                        onClick={() => openProduct(p)}
+                        className="flex items-center gap-3 px-4 py-3 border-b border-[#F9F6F3] last:border-b-0 active:bg-[#FBF9F7] cursor-pointer"
+                      >
+                        <div className="w-10 h-10 rounded-xl overflow-hidden bg-[#F9F6F3] flex-shrink-0">
+                          {p.image ? <img src={getProxiedImage(p.image, 'card')} alt={p.name} className="w-full h-full object-cover" /> : <Package className="w-4 h-4 text-[#A5A19E] m-auto mt-3" />}
+                        </div>
+                        <p className="text-xs font-bold text-[#5A4C4C] leading-snug line-clamp-2 flex-1 min-w-0">{p.name}</p>
+                        {price > 0 && <p className="text-xs font-black text-[#7B8E76] flex-shrink-0">¥{price.toLocaleString()}〜</p>}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-[11px] font-bold text-[#A5A19E] text-center py-5 leading-relaxed">
+                    「{searchTerm}」に一致する掲載商品はありません<br />楽天・Yahooからも検索できます
+                  </p>
+                )}
                 <button onClick={() => fetchRemoteProductsWithAI(searchTerm)}
-                  className="bg-[#5A4C4C] text-white px-8 py-3.5 rounded-full text-sm font-black shadow-lg active:scale-95 transition-all flex items-center gap-2 mx-auto">
-                  <Search className="w-4 h-4" /> 楽天・Yahooから検索する
+                  className="w-full flex items-center justify-center gap-2 bg-[#5A4C4C] text-white text-xs font-black py-3.5">
+                  <Search className="w-3.5 h-3.5" /> 「{searchTerm}」で楽天・Yahooからさらに検索
                 </button>
               </div>
             )}
@@ -4403,18 +4482,64 @@ ${userText}
               </div>
             )}
 
-            {/* 未入力時: 最近見た商品を表示 */}
-            {!searchTerm && recentlyViewed.length > 0 && (
-              <div className="mb-8">
-                <p className="text-xs font-black text-[#A5A19E] mb-3 px-1 uppercase tracking-widest">最近見た商品</p>
-                <div className="flex gap-2 flex-wrap">
-                  {recentlyViewed.slice(0, 5).map(p => (
-                    <button key={p.id} onClick={() => { setSearchTerm(p.name.slice(0, 15)); }}
-                      className="text-xs font-bold bg-[#F9F6F3] text-[#5A4C4C] px-3 py-1.5 rounded-full active:scale-95 transition-transform">
-                      {p.name.slice(0, 15)}
-                    </button>
-                  ))}
+            {/* 未入力時: 人気の検索・カテゴリ・検索履歴・最近見た商品 */}
+            {!searchTerm && (
+              <div className="mt-4 space-y-7">
+                <div>
+                  <p className="text-xs font-black text-[#A5A19E] mb-3 px-1 uppercase tracking-widest">人気の検索</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {POPULAR_SEARCH_KEYWORDS.map((kw, i) => (
+                      <button key={kw} onClick={() => setSearchTerm(kw)}
+                        className="flex items-center gap-1.5 text-xs font-bold bg-[#F9F6F3] border border-[#F4EFEB] text-[#5A4C4C] px-3.5 py-2 rounded-full active:scale-95 transition-transform">
+                        <span className="text-[#F2ABAC] font-black text-[11px]">{i + 1}</span>{kw}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                <div>
+                  <p className="text-xs font-black text-[#A5A19E] mb-3 px-1 uppercase tracking-widest">カテゴリからさがす</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {CATEGORY_TREE.filter(c => c.name !== 'すべて').slice(0, 8).map(cat => (
+                      <button key={cat.name} onClick={() => handleCategoryChange(cat.name)}
+                        className="flex flex-col items-center gap-1.5 bg-[#F9F6F3] rounded-2xl py-3 px-1 active:scale-95 transition-transform">
+                        <CategoryIcon name={cat.name} className="w-4 h-4 text-[#7B8E76]" />
+                        <span className="text-[9.5px] font-bold text-[#5A4C4C] text-center leading-tight">{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {recentSearchTerms.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3 px-1">
+                      <p className="text-xs font-black text-[#A5A19E] uppercase tracking-widest">検索履歴</p>
+                      <button onClick={() => setRecentSearchTerms([])} className="text-[10px] font-bold text-[#A5A19E] underline">クリア</button>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {recentSearchTerms.map(term => (
+                        <button key={term} onClick={() => setSearchTerm(term)}
+                          className="text-xs font-bold text-[#8E8282] border border-[#E8E1DC] px-3.5 py-2 rounded-full active:scale-95 transition-transform">
+                          {term}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {recentlyViewed.length > 0 && (
+                  <div>
+                    <p className="text-xs font-black text-[#A5A19E] mb-3 px-1 uppercase tracking-widest">最近見た商品</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {recentlyViewed.slice(0, 5).map(p => (
+                        <button key={p.id} onClick={() => { setSearchTerm(p.name.slice(0, 15)); }}
+                          className="text-xs font-bold bg-[#F9F6F3] text-[#5A4C4C] px-3 py-1.5 rounded-full active:scale-95 transition-transform">
+                          {p.name.slice(0, 15)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
