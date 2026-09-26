@@ -159,6 +159,14 @@ export const CATEGORY_GUIDES = {
   },
 };
 
+// サブカテゴリ名に対応する親カテゴリの types 解説を探す（前方一致）。
+// 例: types名「テープタイプ（新生児〜寝返り前）」は sub名「テープタイプ」で見つかる。
+export const findTypeGuide = (cat, subName) => {
+  const guide = CATEGORY_GUIDES[cat];
+  if (!guide || !subName) return null;
+  return guide.types?.find((t) => t.name.startsWith(subName)) || null;
+};
+
 // カテゴリのFAQから FAQPage 構造化データ(JSON-LD)を生成する。
 // 検索結果にFAQリッチリザルトが出やすくなり、低順位でもクリックを取りやすくなる。
 // 注意: FAQPageはページ上に同じQ&Aが可視で存在することが条件（当サイトはGuideContentで表示済み）。

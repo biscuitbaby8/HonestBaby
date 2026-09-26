@@ -6,6 +6,7 @@ import { CATEGORY_GUIDES } from '@/src/lib/categoryGuides';
 import GuideModalButton from '@/src/components/GuideModalButton';
 import SiteHeader from '@/src/components/SiteHeader';
 import CategoryClient from '@/src/components/CategoryClient';
+import SubCategoryGuide from '@/src/components/SubCategoryGuide';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 
 const SITE_URL = 'https://honestbaby-care.com';
@@ -124,6 +125,9 @@ export default async function SubCategoryPage({ params }) {
 
         {/* クライアント側: サブカテゴリ(リンク)・サブサブ・ソート・商品グリッド */}
         <CategoryClient products={products} cat={cat} sub={sub} />
+
+        {/* 選び方ガイド＋実データ要約（サーバー描画・SEO本文） */}
+        <SubCategoryGuide cat={cat} sub={sub} products={products} />
       </main>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
