@@ -156,6 +156,8 @@ const NG_KEYWORDS = [
   'ふるさと納税', 'ポイント消化', 'クーポン対象', 'ポイント5倍', 'ポイント10倍',
   'お試しセット', '訳あり', 'アウトレット', '中古', 'リユース',
   'おむつケーキ', 'おむつタワー', 'おむつリース', 'おむつアート', 'おむつフラワー',
+  // ブランド名を装飾・詰め物に使うだけのギフト品（本体の検索結果に混ざりやすい）
+  '出産祝い', 'ギフトセット', '出産準備セット', 'おむつバッグ',
 ];
 const CATEGORY_NG = {
   "おむつ": ["大人用", "介護用", "失禁", "尿漏れ", "介護パンツ", "大人おむつ", "成人用", "シニア用"],
@@ -1378,6 +1380,11 @@ const App = () => {
         .is('canonical_id', null)
         .limit(6);
       for (const kw of keywords) query = query.ilike('name', `%${kw}%`);
+      // ブランド名を装飾に使っただけの「おむつケーキ」「出産祝いギフト」等を除外
+      // （ユーザーがそのNGワード自体を検索している時は除外しない）
+      for (const ng of NG_KEYWORDS) {
+        if (!q.includes(ng)) query = query.not('name', 'ilike', `%${ng}%`);
+      }
       const { data } = await query;
       if (!cancelled) {
         setLocalSuggestions((data || []).map(formatDbProduct));
