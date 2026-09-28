@@ -2247,6 +2247,21 @@ const App = () => {
       const keywordWantsUsed = USED_WORDS.some(w => keyword.includes(w));
       const isUsedListing = (name) => USED_WORDS.some(w => (name || '').includes(w));
 
+      // 「パンパース」のようなブランド名検索で、そのブランドの商品を装飾に使った
+      // 「おむつケーキ」等のギフト品が本体より先に並ぶのを防ぐ。市場網羅検索・AIチャットで
+      // 既に使っているNG_KEYWORDS/CATEGORY_NGを、テキスト検索でも同じ基準で適用する。
+      // ユーザーがそのNGワード自体を探している時（例:「おむつケーキ」検索）は除外しない。
+      const keywordWantsNg = NG_KEYWORDS.some(w => keyword.includes(w));
+      const matchedCatForNg = CATEGORY_TREE.find(cat =>
+        cat.name !== "すべて" && (
+          keyword.includes(cat.name) ||
+          (cat.keyword && keyword.includes(cat.keyword)) ||
+          cat.subs?.some(s => keyword.includes(typeof s === 'string' ? s : s.name))
+        )
+      );
+      const ngWords = NG_KEYWORDS.concat(CATEGORY_NG[matchedCatForNg?.name] || []);
+      const isNgListing = (name) => ngWords.some(w => (name || '').includes(w));
+
       // 表記ゆれ（中黒・長音・波ダッシュ・全半角・記号）＋ブランド別表記（グーン≡GOO.N）を
       // 吸収して関連性を判定する。ジャンル無し検索時に「トイストーリーの枕」等の無関係品
       // （＝検索語の一部しか含まない商品）が混ざるのを防ぐ。単語検索は絞りすぎない。
@@ -2284,7 +2299,9 @@ const App = () => {
         const raw = [...rakutenItems, ...yahooItems];
         // 中古品を除外（ユーザーが中古を明示検索した時は除外しない）
         const afterUsed = keywordWantsUsed ? raw : raw.filter(it => !isUsedListing(it.name));
-        const base = keywordIsAccessory ? afterUsed : afterUsed.filter(it => !isAccessoryName(it.name));
+        const afterAccessory = keywordIsAccessory ? afterUsed : afterUsed.filter(it => !isAccessoryName(it.name));
+        // おむつケーキ等のギフト品を除外（ユーザーがそれ自体を探している時は除外しない）
+        const base = keywordWantsNg ? afterAccessory : afterAccessory.filter(it => !isNgListing(it.name));
         // 関連性フィルタで無関係品（検索語の一部しか含まない商品）を除外
         const allItems = base.filter(it => relevant(it.name));
         return { raw, allItems };
