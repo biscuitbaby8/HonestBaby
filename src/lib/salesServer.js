@@ -15,3 +15,18 @@ export async function fetchActiveSale() {
     return null;
   }
 }
+
+// セール特集の「注目商品」(Amazon価格は手動登録、商品本体は自サイトDBから)
+export async function fetchSalePicks(saleId) {
+  if (!saleId) return [];
+  try {
+    const { data } = await supabaseServer
+      .from('sale_picks')
+      .select('id, amazon_url, amazon_price, display_order, product:products(id, name, category, image_url, shops:shops_prices(*))')
+      .eq('sale_id', saleId)
+      .order('display_order', { ascending: true });
+    return (data || []).filter((p) => p.product);
+  } catch {
+    return [];
+  }
+}

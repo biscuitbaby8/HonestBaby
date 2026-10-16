@@ -3031,6 +3031,90 @@ ${userText}
   const [saleAdminList, setSaleAdminList] = useState([]);
   const [saleForm, setSaleForm] = useState(EMPTY_SALE_FORM);
 
+  // --- セール特集「注目商品」(sale_picks) 管理 ---
+  // Amazonは価格を自動取得できないため、既存の自サイト商品を検索して選び、
+  // Amazonの現在価格・URLだけ手入力する（楽天/Yahoo価格・90日推移は既存データを使う）。
+  const [picksList, setPicksList] = useState([]);
+  const [pickSearchQuery, setPickSearchQuery] = useState('');
+  const [pickSearchResults, setPickSearchResults] = useState([]);
+  const [pickSearchLoading, setPickSearchLoading] = useState(false);
+  const [pickSelectedProduct, setPickSelectedProduct] = useState(null);
+  const [pickAmazonUrl, setPickAmazonUrl] = useState('');
+  const [pickAmazonPrice, setPickAmazonPrice] = useState('');
+  const [pickEditingId, setPickEditingId] = useState(null);
+
+  const callSalePicksApi = async (payload) => {
+    const res = await fetch('/api/admin-sale-picks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: getAdminPassword(), ...payload }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.status);
+    return data;
+  };
+
+  const loadPicks = async (saleId) => {
+    if (!saleId) { setPicksList([]); return; }
+    try {
+      const data = await callSalePicksApi({ action: 'list', sale_id: saleId });
+      setPicksList(data.picks || []);
+    } catch (e) { alert('注目商品の取得に失敗: ' + e.message); }
+  };
+
+  const resetPickForm = () => {
+    setPickEditingId(null);
+    setPickSelectedProduct(null);
+    setPickSearchQuery('');
+    setPickSearchResults([]);
+    setPickAmazonUrl('');
+    setPickAmazonPrice('');
+  };
+
+  // 商品名のあいまい検索（記事エディタの商品検索と同じ ilike パターン）
+  const searchPickProducts = async (q) => {
+    if (!q.trim()) { setPickSearchResults([]); return; }
+    setPickSearchLoading(true);
+    const keywords = q.trim().split(/\s+/).filter(Boolean);
+    let query = supabase
+      .from('products')
+      .select('id, name, category, image_url')
+      .neq('is_blocked', true)
+      .is('canonical_id', null)
+      .limit(8);
+    for (const kw of keywords) query = query.ilike('name', `%${kw}%`);
+    const { data } = await query;
+    setPickSearchResults(data || []);
+    setPickSearchLoading(false);
+  };
+
+  const savePick = async () => {
+    if (!saleForm.id) { alert('先にセールを登録・選択してください'); return; }
+    if (!pickSelectedProduct) { alert('商品を選択してください'); return; }
+    if (!pickAmazonUrl.trim()) { alert('AmazonのURLを入力してください'); return; }
+    if (!(Number(pickAmazonPrice) > 0)) { alert('Amazonの現在価格を入力してください'); return; }
+    try {
+      await callSalePicksApi({
+        action: 'save',
+        id: pickEditingId || undefined,
+        sale_id: saleForm.id,
+        product_id: pickSelectedProduct.id,
+        amazon_url: pickAmazonUrl.trim(),
+        amazon_price: Number(pickAmazonPrice),
+      });
+      resetPickForm();
+      await loadPicks(saleForm.id);
+    } catch (e) { alert('保存に失敗: ' + e.message); }
+  };
+
+  const deletePick = async (id) => {
+    if (!window.confirm('この注目商品を削除しますか？')) return;
+    try {
+      await callSalePicksApi({ action: 'delete', id });
+      await loadPicks(saleForm.id);
+    } catch (e) { alert('削除に失敗: ' + e.message); }
+  };
+
   const callSaleAdminApi = async (payload) => {
     const res = await fetch('/api/admin-sales', {
       method: 'POST',
@@ -4752,12 +4836,106 @@ ${userText}
                     {saleForm.id ? '更新する' : '登録する'}
                   </button>
                   {saleForm.id && (
-                    <button onClick={() => setSaleForm(EMPTY_SALE_FORM)} className="px-4 py-3 bg-[#F4EFEB] text-[#8E8282] rounded-full text-xs font-black">
+                    <button onClick={() => { setSaleForm(EMPTY_SALE_FORM); setPicksList([]); resetPickForm(); }} className="px-4 py-3 bg-[#F4EFEB] text-[#8E8282] rounded-full text-xs font-black">
                       新規に戻す
                     </button>
                   )}
                 </div>
               </div>
+
+              {/* 注目商品（Amazonのセールを編集中のときだけ表示） */}
+              {saleForm.id && saleForm.shop === 'amazon' && (
+                <div className="bg-white border border-[#F4EFEB] rounded-2xl p-4 space-y-3">
+                  <p className="text-xs font-black text-[#5A4C4C]">注目商品（Amazon vs 楽天/Yahoo比較）</p>
+                  <p className="text-[10px] text-[#A5A19E] font-bold leading-relaxed">
+                    自サイトの既存商品を検索して選び、Amazonの今の価格とURLだけ入力してください。
+                    楽天/Yahooの現在価格・90日推移は既存データから自動で出ます。
+                  </p>
+
+                  {/* 商品検索 */}
+                  <div className="relative">
+                    <input
+                      value={pickSelectedProduct ? pickSelectedProduct.name : pickSearchQuery}
+                      onChange={(e) => {
+                        setPickSelectedProduct(null);
+                        setPickSearchQuery(e.target.value);
+                        searchPickProducts(e.target.value);
+                      }}
+                      placeholder="商品名で検索（例: アップリカ ニオイポイ）"
+                      className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-xl px-3 py-2.5 text-sm"
+                    />
+                    {!pickSelectedProduct && pickSearchQuery && (
+                      <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-[#F4EFEB] rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                        {pickSearchLoading ? (
+                          <p className="text-[11px] text-[#A5A19E] font-bold px-3 py-2.5">検索中…</p>
+                        ) : pickSearchResults.length === 0 ? (
+                          <p className="text-[11px] text-[#A5A19E] font-bold px-3 py-2.5">一致する商品がありません</p>
+                        ) : (
+                          pickSearchResults.map((p) => (
+                            <button
+                              key={p.id}
+                              onClick={() => { setPickSelectedProduct(p); setPickSearchResults([]); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#F9F6F3]"
+                            >
+                              <img src={getProxiedImage(p.image_url, 'card')} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0 bg-[#F9F6F3]" />
+                              <span className="text-xs font-bold text-[#5A4C4C] line-clamp-1">{p.name}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    value={pickAmazonUrl}
+                    onChange={(e) => setPickAmazonUrl(e.target.value)}
+                    placeholder="AmazonのURL（アソシエイトリンクでなくてOK）"
+                    className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-xl px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={pickAmazonPrice}
+                    onChange={(e) => setPickAmazonPrice(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="Amazonの現在価格（円・数字のみ）"
+                    inputMode="numeric"
+                    className="w-full bg-[#FFFDFB] border border-[#F4EFEB] rounded-xl px-3 py-2.5 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={savePick} className="flex-1 py-3 bg-[#7B8E76] text-white rounded-full text-xs font-black active:scale-95 transition-transform">
+                      {pickEditingId ? '更新する' : 'この商品を追加'}
+                    </button>
+                    {pickEditingId && (
+                      <button onClick={resetPickForm} className="px-4 py-3 bg-[#F4EFEB] text-[#8E8282] rounded-full text-xs font-black">
+                        キャンセル
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 登録済みの注目商品 */}
+                  {picksList.length > 0 && (
+                    <ul className="space-y-2 pt-2 border-t border-[#F4EFEB]">
+                      {picksList.map((pk) => (
+                        <li key={pk.id} className="flex items-center gap-2 bg-[#FBF9F7] rounded-xl px-3 py-2">
+                          <img src={getProxiedImage(pk.product?.image_url, 'card')} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0 bg-[#F9F6F3]" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-[#5A4C4C] line-clamp-1">{pk.product?.name || '(削除済み商品)'}</p>
+                            <p className="text-[10px] text-[#A5A19E] font-bold">Amazon ¥{Number(pk.amazon_price).toLocaleString()}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setPickEditingId(pk.id);
+                              setPickSelectedProduct(pk.product ? { id: pk.product_id, name: pk.product.name } : { id: pk.product_id, name: '(削除済み商品)' });
+                              setPickAmazonUrl(pk.amazon_url);
+                              setPickAmazonPrice(String(pk.amazon_price));
+                            }}
+                            className="text-[10px] font-black text-[#7B8E76] bg-[#EBF0EA] px-2.5 py-1.5 rounded-full flex-shrink-0"
+                          >編集</button>
+                          <button onClick={() => deletePick(pk.id)} className="text-[10px] font-black text-white bg-red-400 px-2.5 py-1.5 rounded-full flex-shrink-0">削除</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
 
               {/* 登録済み一覧 */}
               <div>
@@ -4782,11 +4960,15 @@ ${userText}
                             </p>
                           </div>
                           <div className="flex gap-1.5 flex-shrink-0">
-                            <button onClick={() => setSaleForm({
-                              id: s.id, shop: s.shop, name: s.name, short_name: s.short_name || '',
-                              start_at: isoToLocalInput(s.start_at), main_start_at: isoToLocalInput(s.main_start_at),
-                              end_at: isoToLocalInput(s.end_at), period_label: s.period_label || '',
-                            })} className="text-[10px] font-black text-[#7B8E76] bg-[#EBF0EA] px-2.5 py-1.5 rounded-full">編集</button>
+                            <button onClick={() => {
+                              setSaleForm({
+                                id: s.id, shop: s.shop, name: s.name, short_name: s.short_name || '',
+                                start_at: isoToLocalInput(s.start_at), main_start_at: isoToLocalInput(s.main_start_at),
+                                end_at: isoToLocalInput(s.end_at), period_label: s.period_label || '',
+                              });
+                              resetPickForm();
+                              if (s.shop === 'amazon') loadPicks(s.id); else setPicksList([]);
+                            }} className="text-[10px] font-black text-[#7B8E76] bg-[#EBF0EA] px-2.5 py-1.5 rounded-full">編集</button>
                             <button onClick={() => deleteSaleRow(s.id)} className="text-[10px] font-black text-white bg-red-400 px-2.5 py-1.5 rounded-full">削除</button>
                           </div>
                         </li>

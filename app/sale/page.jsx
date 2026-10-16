@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { saleStatusLabel, SALE_CALENDAR, SALE_KEYWORDS } from '@/src/lib/sales';
-import { fetchActiveSale } from '@/src/lib/salesServer';
+import { fetchActiveSale, fetchSalePicks } from '@/src/lib/salesServer';
+import { formatDbProduct, getLowestPrice, getProxiedImage } from '@/src/lib/products';
 import {
-  getAmazonUrl, getAmazonDealsUrl,
+  getAmazonUrl, getAmazonDealsUrl, withAmazonTag,
   getYahooSearchUrl, getYahooTopUrl,
 } from '@/src/lib/affiliate';
 import SiteHeader from '@/src/components/SiteHeader';
@@ -73,6 +74,33 @@ export default async function SalePage() {
   const sale = await fetchActiveSale();
   // 未知のshop値でも導線が壊れないようAmazonにフォールバック
   const saleShop = (sale && SALE_SHOP_LINKS[sale.shop]) || SALE_SHOP_LINKS.amazon;
+
+  // Amazon開催中のときだけ「注目商品」比較セクションを出す（Amazon価格は手動登録分のみ）。
+  // 楽天/Yahooの現在最安値は既存のshops_pricesデータから計算するので、
+  // ここではAmazon価格との単純比較だけ行う。
+  const rawPicks = sale?.shop === 'amazon' ? await fetchSalePicks(sale.id) : [];
+  const picks = rawPicks.map((pk) => {
+    const product = formatDbProduct(pk.product);
+    const otherPrice = getLowestPrice(product.shops);
+    const amazonPrice = Number(pk.amazon_price);
+    return {
+      id: pk.id,
+      amazonUrl: withAmazonTag(pk.amazon_url),
+      amazonPrice,
+      otherPrice,
+      product,
+      verdict: otherPrice > 0 && amazonPrice < otherPrice
+        ? 'amazon-cheaper'
+        : otherPrice > 0 && amazonPrice > otherPrice
+          ? 'other-cheaper'
+          : 'tie',
+    };
+  });
+  const picksByCategory = picks.reduce((acc, p) => {
+    const cat = p.product.category || 'その他';
+    (acc[cat] ||= []).push(p);
+    return acc;
+  }, {});
 
   const jsonLd = [
     {
@@ -152,6 +180,67 @@ export default async function SalePage() {
                   </Link>
                 )
               )}
+            </div>
+          </section>
+        )}
+
+        {/* 注目商品の比較（Amazon開催中 + 登録済みピックがある時だけ） */}
+        {picks.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-base font-black mb-1">本当にお得？ 注目商品を比較</h2>
+            <p className="text-[11px] text-[#8E8282] font-bold mb-4 leading-relaxed">
+              Amazonのセール価格を、楽天・Yahoo!ショッピングの今の最安値と比べました。
+            </p>
+            <div className="space-y-6">
+              {Object.entries(picksByCategory).map(([cat, items]) => (
+                <div key={cat}>
+                  <h3 className="text-xs font-black text-[#A5A19E] uppercase tracking-widest mb-2">{cat}</h3>
+                  <div className="space-y-3">
+                    {items.map((p) => (
+                      <div key={p.id} className="bg-white rounded-[1.75rem] border border-[#F4EFEB] p-4">
+                        <div className="flex gap-3 mb-3">
+                          <Link href={`/product/${encodeURIComponent(p.product.id)}`} className="w-16 h-16 rounded-xl overflow-hidden bg-[#F9F6F3] flex-shrink-0">
+                            <img src={getProxiedImage(p.product.image, 'card')} alt={p.product.name} className="w-full h-full object-cover" />
+                          </Link>
+                          <div className="min-w-0 flex-1">
+                            <Link href={`/product/${encodeURIComponent(p.product.id)}`} className="text-xs font-bold text-[#5A4C4C] leading-snug line-clamp-2 hover:underline">
+                              {p.product.name}
+                            </Link>
+                            {p.verdict === 'amazon-cheaper' && (
+                              <span className="inline-block mt-1.5 text-[9.5px] font-black text-white bg-[#7B8E76] px-2 py-0.5 rounded-full">本当にお得</span>
+                            )}
+                            {p.verdict === 'other-cheaper' && (
+                              <span className="inline-block mt-1.5 text-[9.5px] font-black text-white bg-[#D98A8B] px-2 py-0.5 rounded-full">楽天/Yahooの方が安い</span>
+                            )}
+                            {p.verdict === 'tie' && (
+                              <span className="inline-block mt-1.5 text-[9.5px] font-black text-[#8E8282] bg-[#F4EFEB] px-2 py-0.5 rounded-full">同じくらい</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <a href={p.amazonUrl} target="_blank" rel="noopener noreferrer sponsored"
+                            className={`rounded-xl p-3 border ${p.verdict === 'amazon-cheaper' ? 'bg-[#F3F7F1] border-[#7B8E76]' : 'bg-[#FBF9F7] border-[#F4EFEB]'}`}>
+                            <p className="text-[10px] font-black text-[#A5A19E] mb-0.5">Amazon（セール中）</p>
+                            <p className="text-sm font-black text-[#232F3E]">¥{p.amazonPrice.toLocaleString()}</p>
+                          </a>
+                          {p.otherPrice > 0 ? (
+                            <Link href={`/product/${encodeURIComponent(p.product.id)}`}
+                              className={`rounded-xl p-3 border ${p.verdict === 'other-cheaper' ? 'bg-[#FFF0F0] border-[#D98A8B]' : 'bg-[#FBF9F7] border-[#F4EFEB]'}`}>
+                              <p className="text-[10px] font-black text-[#A5A19E] mb-0.5">楽天/Yahoo最安</p>
+                              <p className="text-sm font-black text-[#BF3F3F]">¥{p.otherPrice.toLocaleString()}</p>
+                            </Link>
+                          ) : (
+                            <div className="rounded-xl p-3 border bg-[#FBF9F7] border-[#F4EFEB]">
+                              <p className="text-[10px] font-black text-[#A5A19E] mb-0.5">楽天/Yahoo</p>
+                              <p className="text-[11px] font-bold text-[#A5A19E]">取扱なし</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
         )}
