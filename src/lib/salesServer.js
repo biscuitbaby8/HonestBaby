@@ -22,7 +22,7 @@ export async function fetchSalePicks(saleId) {
   try {
     const { data } = await supabaseServer
       .from('sale_picks')
-      .select('id, amazon_url, amazon_price, display_order, product:products(id, name, category, image_url, shops:shops_prices(*))')
+      .select('id, amazon_url, amazon_price, amazon_qty, other_qty, unit_label, display_order, product:products(id, name, category, image_url, shops:shops_prices(*))')
       .eq('sale_id', saleId)
       .order('display_order', { ascending: true });
     return (data || []).filter((p) => p.product);

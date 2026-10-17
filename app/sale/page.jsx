@@ -83,15 +83,32 @@ export default async function SalePage() {
     const product = formatDbProduct(pk.product);
     const otherPrice = getLowestPrice(product.shops);
     const amazonPrice = Number(pk.amazon_price);
+    // 消耗品はパック数量がAmazonと楽天/Yahooで違うことが多く、総額の
+    // 単純比較は「5ロール¥2952」と「1ロール¥1080」を同じ土俵で比べてしまい
+    // 誤った「お得」判定になる。amazon_qty/other_qty/unit_labelが揃っている
+    // 行だけ、1単位あたりの単価で比較する（揃っていなければ総額で比較）。
+    const unitLabel = pk.unit_label || null;
+    const amazonQty = Number(pk.amazon_qty) || 0;
+    const otherQty = Number(pk.other_qty) || 0;
+    const hasUnit = !!unitLabel && amazonQty > 0 && otherQty > 0;
+    const amazonUnitPrice = hasUnit ? amazonPrice / amazonQty : null;
+    const otherUnitPrice = hasUnit && otherPrice > 0 ? otherPrice / otherQty : null;
+    const cmpAmazon = hasUnit ? amazonUnitPrice : amazonPrice;
+    const cmpOther = hasUnit ? otherUnitPrice : otherPrice;
     return {
       id: pk.id,
       amazonUrl: withAmazonTag(pk.amazon_url),
       amazonPrice,
       otherPrice,
+      unitLabel,
+      amazonQty,
+      otherQty,
+      amazonUnitPrice,
+      otherUnitPrice,
       product,
-      verdict: otherPrice > 0 && amazonPrice < otherPrice
+      verdict: cmpOther > 0 && cmpAmazon < cmpOther
         ? 'amazon-cheaper'
-        : otherPrice > 0 && amazonPrice > otherPrice
+        : cmpOther > 0 && cmpAmazon > cmpOther
           ? 'other-cheaper'
           : 'tie',
     };
@@ -221,13 +238,27 @@ export default async function SalePage() {
                           <a href={p.amazonUrl} target="_blank" rel="noopener noreferrer sponsored"
                             className={`rounded-xl p-3 border ${p.verdict === 'amazon-cheaper' ? 'bg-[#F3F7F1] border-[#7B8E76]' : 'bg-[#FBF9F7] border-[#F4EFEB]'}`}>
                             <p className="text-[10px] font-black text-[#A5A19E] mb-0.5">Amazon（セール中）</p>
-                            <p className="text-sm font-black text-[#232F3E]">¥{p.amazonPrice.toLocaleString()}</p>
+                            {p.amazonUnitPrice != null ? (
+                              <>
+                                <p className="text-sm font-black text-[#232F3E]">¥{Math.round(p.amazonUnitPrice).toLocaleString()}<span className="text-[10px] font-bold">/{p.unitLabel}</span></p>
+                                <p className="text-[9.5px] text-[#A5A19E] font-bold mt-0.5">¥{p.amazonPrice.toLocaleString()}（{p.amazonQty}{p.unitLabel}）</p>
+                              </>
+                            ) : (
+                              <p className="text-sm font-black text-[#232F3E]">¥{p.amazonPrice.toLocaleString()}</p>
+                            )}
                           </a>
                           {p.otherPrice > 0 ? (
                             <Link href={`/product/${encodeURIComponent(p.product.id)}`}
                               className={`rounded-xl p-3 border ${p.verdict === 'other-cheaper' ? 'bg-[#FFF0F0] border-[#D98A8B]' : 'bg-[#FBF9F7] border-[#F4EFEB]'}`}>
                               <p className="text-[10px] font-black text-[#A5A19E] mb-0.5">楽天/Yahoo最安</p>
-                              <p className="text-sm font-black text-[#BF3F3F]">¥{p.otherPrice.toLocaleString()}</p>
+                              {p.otherUnitPrice != null ? (
+                                <>
+                                  <p className="text-sm font-black text-[#BF3F3F]">¥{Math.round(p.otherUnitPrice).toLocaleString()}<span className="text-[10px] font-bold">/{p.unitLabel}</span></p>
+                                  <p className="text-[9.5px] text-[#A5A19E] font-bold mt-0.5">¥{p.otherPrice.toLocaleString()}（{p.otherQty}{p.unitLabel}）</p>
+                                </>
+                              ) : (
+                                <p className="text-sm font-black text-[#BF3F3F]">¥{p.otherPrice.toLocaleString()}</p>
+                              )}
                             </Link>
                           ) : (
                             <div className="rounded-xl p-3 border bg-[#FBF9F7] border-[#F4EFEB]">
@@ -236,6 +267,9 @@ export default async function SalePage() {
                             </div>
                           )}
                         </div>
+                        {p.unitLabel && (
+                          <p className="text-[9.5px] text-[#A5A19E] font-bold mt-2">※ パック数量が異なるため、1{p.unitLabel}あたりの単価で比較しています</p>
+                        )}
                       </div>
                     ))}
                   </div>

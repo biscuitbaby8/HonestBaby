@@ -33,7 +33,7 @@ export async function POST(request) {
     }
 
     if (action === 'save') {
-      const { id, sale_id, product_id, amazon_url, amazon_price, display_order } = params;
+      const { id, sale_id, product_id, amazon_url, amazon_price, display_order, amazon_qty, other_qty, unit_label } = params;
       if (!sale_id || !product_id) return Response.json({ error: 'sale_id・product_idは必須です' }, { status: 400 });
       if (!amazon_url || !/^https:\/\//.test(amazon_url)) {
         return Response.json({ error: 'amazon_urlが不正です' }, { status: 400 });
@@ -47,6 +47,11 @@ export async function POST(request) {
         amazon_url,
         amazon_price: Math.round(price),
         display_order: Number(display_order) || 0,
+        // 消耗品のパック数量（例: Amazon 5ロール vs 楽天 1ロール）。
+        // 3つとも指定された時だけ単価比較を表示する（/sale側のロジックと対応）。
+        amazon_qty: Number(amazon_qty) > 0 ? Number(amazon_qty) : null,
+        other_qty: Number(other_qty) > 0 ? Number(other_qty) : null,
+        unit_label: unit_label || null,
       };
       const query = id
         ? supabaseServer.from('sale_picks').update(row).eq('id', id).select().single()
