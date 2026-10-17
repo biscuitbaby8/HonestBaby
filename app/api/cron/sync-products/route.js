@@ -800,7 +800,7 @@ function passesCategoryFilters(itemName, category) {
 async function fetchYahooSupplement(keyword, category) {
   if (!YAHOO_CLIENT_ID) return [];
   try {
-    const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=50&sort=-review_count`;
+    const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=50&sort=-review_count&condition=new`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
@@ -819,7 +819,7 @@ async function fetchYahooSearchFallback(keyword, category) {
   try {
     for (let page = 1; page <= 3; page++) {
       const start = (page - 1) * 100;
-      const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=100&start=${start}&sort=-review_count`;
+      const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=100&start=${start}&sort=-review_count&condition=new`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -838,7 +838,7 @@ async function fetchYahooSearchFallback(keyword, category) {
 // --- Yahoo API呼び出し（価格取得用） ---
 async function fetchYahooPrice(keyword) {
   if (!YAHOO_CLIENT_ID) return [];
-  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=5&sort=-review_count`;
+  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=5&sort=-review_count&condition=new`;
   try {
     const res = await fetch(url);
     if (!res.ok) return [];

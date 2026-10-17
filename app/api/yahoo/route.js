@@ -27,7 +27,7 @@ export async function GET(request) {
     : noGenre === '1'
       ? '&price_from=500'
       : '&category_id=13457&price_from=500';
-  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${clientId}&query=${encodeURIComponent(query || '')}&results=30${filterParams}`;
+  const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${clientId}&query=${encodeURIComponent(query || '')}&results=30&condition=new${filterParams}`;
 
   // Yahoo Shopping URL に ValueCommerce アフィリエイトパラメータを付与
   const addAffiliate = (rawUrl) => {

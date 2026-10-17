@@ -115,7 +115,7 @@ async function refetchYahoo(fullCode, productName) {
   const q = String(productName || '').split(/[\s　]+/).slice(0, 4).join(' ');
   const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch`
     + `?appid=${YAHOO_CLIENT_ID}&seller_id=${encodeURIComponent(sellerId)}`
-    + `&query=${encodeURIComponent(q)}&results=50`;
+    + `&query=${encodeURIComponent(q)}&results=50&condition=new`;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
