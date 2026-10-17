@@ -217,6 +217,7 @@ export default async function SalePage() {
             <h2 className="text-base font-black mb-1">本当にお得？ 注目商品を比較</h2>
             <p className="text-[11px] text-[#8E8282] font-bold mb-4 leading-relaxed">
               Amazonのセール価格を、楽天・Yahoo!ショッピングの今の最安値と比べました。
+              商品名・価格ボタンはすべて別タブで開くので、このページに戻って続きを見られます。
             </p>
             {sortedCategoryEntries.length > 1 && (
               <div className="flex flex-wrap gap-2 mb-5">
@@ -235,12 +236,15 @@ export default async function SalePage() {
                     {items.map((p) => (
                       <div key={p.id} className="bg-white rounded-[1.75rem] border border-[#F4EFEB] p-4">
                         <div className="flex gap-3 mb-3">
-                          <Link href={`/product/${encodeURIComponent(p.product.id)}`} className="w-16 h-16 rounded-xl overflow-hidden bg-[#F9F6F3] flex-shrink-0">
+                          {/* 商品詳細は別タブで開く。同じ/saleタブに留まるので、戻るボタンで
+                              迷子にならず一覧の続きから比較できる(Amazon/楽天Yahooの価格リンクと動作を揃える)。 */}
+                          <Link href={`/product/${encodeURIComponent(p.product.id)}`} target="_blank" rel="noopener" className="w-16 h-16 rounded-xl overflow-hidden bg-[#F9F6F3] flex-shrink-0">
                             <img src={getProxiedImage(p.product.image, 'card')} alt={p.product.name} className="w-full h-full object-cover" />
                           </Link>
                           <div className="min-w-0 flex-1">
-                            <Link href={`/product/${encodeURIComponent(p.product.id)}`} className="text-xs font-bold text-[#5A4C4C] leading-snug line-clamp-2 hover:underline">
+                            <Link href={`/product/${encodeURIComponent(p.product.id)}`} target="_blank" rel="noopener" className="text-xs font-bold text-[#5A4C4C] leading-snug line-clamp-2 hover:underline">
                               {p.product.name}
+                              <span className="text-[#A5A19E] font-normal"> ↗</span>
                             </Link>
                             {p.verdict === 'amazon-cheaper' && (
                               <span className="inline-block mt-1.5 text-[9.5px] font-black text-white bg-[#7B8E76] px-2 py-0.5 rounded-full">本当にお得</span>
@@ -267,9 +271,9 @@ export default async function SalePage() {
                             )}
                           </a>
                           {p.otherPrice > 0 ? (
-                            <Link href={`/product/${encodeURIComponent(p.product.id)}`}
+                            <Link href={`/product/${encodeURIComponent(p.product.id)}`} target="_blank" rel="noopener"
                               className={`rounded-xl p-3 border ${p.verdict === 'other-cheaper' ? 'bg-[#FFF0F0] border-[#D98A8B]' : 'bg-[#FBF9F7] border-[#F4EFEB]'}`}>
-                              <p className="text-[10px] font-black text-[#A5A19E] mb-0.5">楽天/Yahoo最安</p>
+                              <p className="text-[10px] font-black text-[#A5A19E] mb-0.5">楽天/Yahoo最安 ↗</p>
                               {p.otherUnitPrice != null ? (
                                 <>
                                   <p className="text-sm font-black text-[#BF3F3F]">¥{Math.round(p.otherUnitPrice).toLocaleString()}<span className="text-[10px] font-bold">/{p.unitLabel}</span></p>
