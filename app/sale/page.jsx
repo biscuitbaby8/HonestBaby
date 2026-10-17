@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { saleStatusLabel, SALE_CALENDAR, SALE_KEYWORDS } from '@/src/lib/sales';
 import { fetchActiveSale, fetchSalePicks } from '@/src/lib/salesServer';
-import { formatDbProduct, getLowestPrice, getProxiedImage } from '@/src/lib/products';
+import { formatDbProduct, getLowestPrice, getProxiedImage, CATEGORIES } from '@/src/lib/products';
 import {
   getAmazonUrl, getAmazonDealsUrl, withAmazonTag,
   getYahooSearchUrl, getYahooTopUrl,
@@ -118,6 +118,16 @@ export default async function SalePage() {
     (acc[cat] ||= []).push(p);
     return acc;
   }, {});
+  // カテゴリの並び順を一覧ページ等と同じ順序（CATEGORY_TREE）に揃える。
+  // 未知のカテゴリ値が混在しても表示から漏れないよう、末尾にまとめて出す。
+  const categoryOrder = [...CATEGORIES, 'その他'];
+  const categoryRank = (cat) => {
+    const i = categoryOrder.indexOf(cat);
+    return i === -1 ? categoryOrder.length : i;
+  };
+  const sortedCategoryEntries = Object.entries(picksByCategory).sort(
+    ([a], [b]) => categoryRank(a) - categoryRank(b)
+  );
 
   const jsonLd = [
     {
@@ -208,10 +218,19 @@ export default async function SalePage() {
             <p className="text-[11px] text-[#8E8282] font-bold mb-4 leading-relaxed">
               Amazonのセール価格を、楽天・Yahoo!ショッピングの今の最安値と比べました。
             </p>
+            {sortedCategoryEntries.length > 1 && (
+              <div className="flex flex-wrap gap-2 mb-5">
+                {sortedCategoryEntries.map(([cat, items]) => (
+                  <a key={cat} href={`#sale-cat-${encodeURIComponent(cat)}`} className={chipClass}>
+                    {cat}（{items.length}）
+                  </a>
+                ))}
+              </div>
+            )}
             <div className="space-y-6">
-              {Object.entries(picksByCategory).map(([cat, items]) => (
-                <div key={cat}>
-                  <h3 className="text-xs font-black text-[#A5A19E] uppercase tracking-widest mb-2">{cat}</h3>
+              {sortedCategoryEntries.map(([cat, items]) => (
+                <div key={cat} id={`sale-cat-${encodeURIComponent(cat)}`}>
+                  <h3 className="text-xs font-black text-[#A5A19E] uppercase tracking-widest mb-2">{cat}（{items.length}）</h3>
                   <div className="space-y-3">
                     {items.map((p) => (
                       <div key={p.id} className="bg-white rounded-[1.75rem] border border-[#F4EFEB] p-4">
