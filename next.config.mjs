@@ -14,11 +14,17 @@ const withPWA = withPWAInit({
 // (object-src, base-uri, form-action, frame-ancestors 等)を締める方針。
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://aml.valuecommerce.com",
+  // ValueCommerce の AutoMyLink は aml から dalc / pti など別サブドメインのスクリプトを
+  // 追加で読み込む。aml だけ許可していたため後続がブロックされ、リンクの
+  // アフィリエイト変換が動いていなかった（実ブラウザで確認）。
+  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://*.valuecommerce.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co https://*.google-analytics.com https://www.googletagmanager.com https://aml.valuecommerce.com https://ck.jp.ap.valuecommerce.com",
+  // GA4 は計測の送信先に www.google.com/g/collect や analytics.google.com、
+  // doubleclick を使うことがある（Googleの公式CSPガイドに記載）。google-analytics.com
+  // だけ許可していたため、送信がブロックされて計測が欠けていた。
+  "connect-src 'self' https://*.supabase.co https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.google.com https://www.google.co.jp https://*.g.doubleclick.net https://*.valuecommerce.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
