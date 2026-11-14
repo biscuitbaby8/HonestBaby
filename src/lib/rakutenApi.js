@@ -85,3 +85,14 @@ export async function withVersionFallback(call) {
   }
   return last;
 }
+
+// 楽天の検索APIは半角1文字の検索語を含むと 400 wrong_parameter を返す
+// （「パンパース テープ M」のようなサイズ指定で検索が丸ごと失敗していた）。
+// S/M/L は「Mサイズ」に読み替え、それ以外の半角1文字は落とす。
+export function rakutenSafeKeyword(keyword) {
+  const tokens = String(keyword || '').trim().split(/[\s　]+/).filter(Boolean);
+  const safe = tokens
+    .map((t) => (/^[SMLsml]$/.test(t) ? `${t.toUpperCase()}サイズ` : t))
+    .filter((t) => !/^[\x21-\x7e]$/.test(t));
+  return safe.length > 0 ? safe.join(' ') : String(keyword || '').trim();
+}

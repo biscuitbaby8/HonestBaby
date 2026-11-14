@@ -91,7 +91,7 @@ const LINES = [
     line: 'Genki!', lineSlug: 'genki',
     must: [['ゲンキ', 'Genki', 'GENKI', 'genki']],
     not: ['おやすみ', '夜用'],
-    tape: ['nb', 's', 'm', 'l'], pants: ['m', 'l', 'big', 'xbig'],
+    tape: [], pants: ['m', 'l', 'big', 'xbig'],
   },
 ];
 

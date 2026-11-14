@@ -37,7 +37,8 @@ export default async function OmutsuPage() {
     const staples = STAPLES.filter((s) => s.type === t.key);
     const sizes = SIZE_ORDER.filter((sz) => staples.some((s) => s.size === sz));
     const lineKeys = [...new Set(staples.map((s) => s.lineKey))];
-    const rows = lineKeys.map((lk) => {
+    // 出品が1件も無い銘柄の行は出さない
+    const rows = lineKeys.filter((lk) => staples.some((s) => s.lineKey === lk && best[s.id])).map((lk) => {
       const members = staples.filter((s) => s.lineKey === lk);
       const head = members[0];
       return {
@@ -136,7 +137,7 @@ export default async function OmutsuPage() {
                       <th scope="row" className="sticky left-0 bg-white text-left font-bold px-3 py-3 leading-snug">{r.label}</th>
                       {r.cells.map((c, i) => {
                         if (!c) return <td key={i} className="text-center text-[#D5CFCA] px-2">—</td>;
-                        if (!c.offer) return <td key={i} className="text-center text-[10px] text-[#C5BFBA] px-2">集計中</td>;
+                        if (!c.offer) return <td key={i} className="text-center text-[#D5CFCA] px-2">—</td>;
                         const isMin = t.colMin[i] !== null && c.offer.unit_price === t.colMin[i];
                         return (
                           <td key={i} className="text-center px-1.5 py-1.5">

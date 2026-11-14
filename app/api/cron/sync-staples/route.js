@@ -6,13 +6,13 @@ import { STAPLES, matchOffer, dropOutliers } from '@/src/lib/staples';
 
 // 定番おむつ（銘柄×タイプ×サイズ）ごとに楽天・Yahooを検索し、
 // 商品名から突合できた出品を1枚あたりの単価つきで保存する。
-// 68定番を1回で回すと楽天のレート制限（約1回/秒）で60秒を超えるため、
-// ?part=0..2 の3分割で実行する。
+// 楽天のレート制限（約1回/秒）と429時の再試行を見込むと1回で回せるのは
+// 十数件まで。3分割では末尾の定番が時間切れで飛ばされたため、?part=0..4 の5分割にする。
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const PARTS = 3;
+const PARTS = 5;
 const KEEP_PER_MALL = 8;
 const DEADLINE_MS = 52000;
 
@@ -82,7 +82,11 @@ async function searchYahoo(keyword) {
   if (!YAHOO_CLIENT_ID) return null;
   const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&query=${encodeURIComponent(keyword)}&results=50&condition=new&in_stock=true`;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    let res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (res.status === 429) {
+      await sleep(1200);
+      res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    }
     if (!res.ok) return null;
     const data = await res.json();
     return (data.hits || []).map((it) => {

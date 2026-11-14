@@ -5,6 +5,7 @@ import { fetchOffers, fetchAllOffers, fetchLowestEver, groupByStaple, bestOffer 
 import { fmtUnit, fmtYen, fmtDateJa, MALL_LABEL, MALL_SHORT, SHIPPING_LABEL } from '@/src/lib/staplesFormat';
 import { toVCUrl } from '@/src/lib/affiliate';
 import { getProxiedImage } from '@/src/lib/products';
+import { NOINDEX_ROBOTS } from '@/src/lib/seo';
 import SiteHeader from '@/src/components/SiteHeader';
 import SpaBottomNav from '@/src/components/SpaBottomNav';
 
@@ -32,6 +33,8 @@ export async function generateMetadata({ params }) {
   return {
     title,
     description,
+    // 出品が1件も無いページは中身が薄いので検索結果には出さない
+    ...(best ? {} : { robots: NOINDEX_ROBOTS }),
     alternates: { canonical: url },
     openGraph: { title, description, url, type: 'website' },
     twitter: { card: 'summary_large_image', title, description },
@@ -61,7 +64,7 @@ export default async function StaplePage({ params }) {
 
   // 同じ銘柄のサイズ違い
   const siblings = STAPLES
-    .filter((s) => s.lineKey === staple.lineKey)
+    .filter((s) => s.lineKey === staple.lineKey && (s.id === staple.id || bestOf(s.id)))
     .sort((a, b) => SIZE_ORDER.indexOf(a.size) - SIZE_ORDER.indexOf(b.size));
   // 同じタイプ・同じサイズの他銘柄（単価の安い順）
   const rivals = STAPLES
@@ -84,7 +87,7 @@ export default async function StaplePage({ params }) {
         { '@type': 'ListItem', position: 3, name: staple.name, item: url },
       ],
     },
-    ...(offers.length > 0
+    ...(best
       ? [{
           '@context': 'https://schema.org',
           '@type': 'Product',
@@ -175,7 +178,7 @@ export default async function StaplePage({ params }) {
           </section>
         )}
 
-        {offers.length > 0 && (
+        {best && (
           <section className="mb-10">
             <h2 className="text-base font-black mb-1">ショップ別・1枚あたりの安い順</h2>
             <p className="text-[11px] text-[#8E8282] font-bold mb-3">入数が違っても比べられるよう、1枚あたりの単価で並べています。</p>
@@ -231,7 +234,7 @@ export default async function StaplePage({ params }) {
                   className={`px-3.5 py-2 rounded-2xl text-xs font-black border ${current ? 'bg-[#7B8E76] text-white border-[#7B8E76]' : 'bg-white text-[#5A4C4C] border-[#F4EFEB] hover:bg-[#FBF9F7]'}`}
                 >
                   {sizeInfo(s.size).label}
-                  <span className={`block text-[10px] font-bold ${current ? 'text-white/80' : 'text-[#A5A19E]'}`}>{o ? `${fmtUnit(o.unit_price)}/枚` : '集計中'}</span>
+                  <span className={`block text-[10px] font-bold ${current ? 'text-white/80' : 'text-[#A5A19E]'}`}>{o ? `${fmtUnit(o.unit_price)}/枚` : '—'}</span>
                 </Link>
               );
             })}

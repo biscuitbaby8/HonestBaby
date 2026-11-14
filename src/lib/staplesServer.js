@@ -50,8 +50,10 @@ function normalize(o) {
 
 // 見出しに出す「最安」。送料別の出品は送料を足すと逆転しうるので、
 // 送料無料の出品があればその中の最安を採る（無ければ全体の最安）。
+// 出品が1件しか無い定番は、転売価格など相場から外れた値である可能性が高いので
+// 「最安」として出さない（比べる相手がいて初めて最安と言える）。
 export function bestOffer(offers) {
-  if (!offers || offers.length === 0) return null;
+  if (!offers || offers.length < 2) return null;
   const sorted = [...offers].sort((a, b) => a.unit_price - b.unit_price);
   return sorted.find((o) => o.shipping === 'free') || sorted[0];
 }

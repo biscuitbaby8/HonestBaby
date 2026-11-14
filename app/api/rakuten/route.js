@@ -1,6 +1,6 @@
 import { request as httpsRequest } from 'node:https';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { searchUrl, rankingUrl, withVersionFallback } from '@/src/lib/rakutenApi';
+import { searchUrl, rankingUrl, withVersionFallback, rakutenSafeKeyword } from '@/src/lib/rakutenApi';
 
 // 新・楽天API(openapi.rakuten.co.jp)は Referer と Origin の両方が
 // アプリ登録時の「許可するWebサイト」と一致しないと
@@ -46,7 +46,7 @@ async function fetchBatchItems({ appId, accessKey, affiliateId, keyword, genreId
   const fetches = SORTS.flatMap(sort =>
     [1, 2, 3].map(async (page) => {
       const genreParam = (genreId && !skipGenreId) ? `&genreId=${genreId}` : '';
-      const params = `applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(keyword)}&sort=${sort}&hits=30&page=${page}&availability=1${genreParam}&affiliateId=${affiliateId}`;
+      const params = `applicationId=${appId}&accessKey=${accessKey}&keyword=${encodeURIComponent(rakutenSafeKeyword(keyword))}&sort=${sort}&hits=30&page=${page}&availability=1${genreParam}&affiliateId=${affiliateId}`;
       try {
         const { statusCode, text } = await withVersionFallback((v) => nodeHttpsGet(searchUrl(v, params)));
         if (statusCode !== 200) return [];
@@ -130,7 +130,7 @@ export async function GET(request) {
       ? '&minPrice=500'
       : '&genreId=566382&minPrice=500';
   const shopCodeParam = shopCode ? `&shopCode=${encodeURIComponent(shopCode)}` : '';
-  const params = `applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(query || '')}&hits=30&sort=standard&availability=1${filterParams}${shopCodeParam}&affiliateId=${affiliateId || ''}`;
+  const params = `applicationId=${appId}&accessKey=${accessKey || ''}&keyword=${encodeURIComponent(rakutenSafeKeyword(query))}&hits=30&sort=standard&availability=1${filterParams}${shopCodeParam}&affiliateId=${affiliateId || ''}`;
 
   try {
     const { statusCode, text } = await withVersionFallback((v) => nodeHttpsGet(searchUrl(v, params)));
@@ -152,7 +152,7 @@ export async function GET(request) {
         name: '楽天市場',
         price: item.Item.itemPrice,
         url: item.Item.affiliateUrl || item.Item.itemUrl,
-        shipping: item.Item.postageFlag === 1 ? 0 : null,
+        shipping: Number(item.Item.postageFlag) === 0 ? 0 : null,
         points: item.Item.pointRate || 0,
       }],
     }));

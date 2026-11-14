@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
 import { parseQuantity } from '@/src/lib/products';
-import { searchUrl, rankingUrl, withVersionFallback, currentVersion } from '@/src/lib/rakutenApi';
+import { searchUrl, rankingUrl, withVersionFallback, currentVersion, rakutenSafeKeyword } from '@/src/lib/rakutenApi';
 import { request as httpsRequest } from 'node:https';
 
 export const maxDuration = 60;
@@ -727,7 +727,7 @@ async function fetchRakutenSearch(keyword, genreId, page = 1) {
   // genreId が指定されたときだけジャンルで絞る。サブカテゴリ補完は genreId 無しで広く探す
   // （ニッチ商品が隣接ジャンルに居て取りこぼすため。sub_category は呼び出し側で確定する）。
   const genrePart = genreId ? `&genreId=${genreId}` : '';
-  const params = `applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(keyword)}&sort=-reviewCount&hits=30&page=${page}&availability=1${genrePart}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
+  const params = `applicationId=${RAKUTEN_APP_ID}&accessKey=${RAKUTEN_ACCESS_KEY}&keyword=${encodeURIComponent(rakutenSafeKeyword(keyword))}&sort=-reviewCount&hits=30&page=${page}&availability=1${genrePart}&affiliateId=${RAKUTEN_AFFILIATE_ID}`;
   return fetchWithRetry((v) => searchUrl(v, params));
 }
 
@@ -901,7 +901,7 @@ function normalizeRakutenItems(items, category) {
           shop_name: item.Item.shopName || '楽天市場',
           price: item.Item.itemPrice,
           url: item.Item.affiliateUrl || item.Item.itemUrl,
-          shipping: item.Item.postageFlag === 1 ? 0 : null,
+          shipping: Number(item.Item.postageFlag) === 0 ? 0 : null,
           points: item.Item.pointRate || 0,
           rating: parseFloat(item.Item.reviewAverage) || 0,
           reviews_count: parseInt(item.Item.reviewCount) || 0,
@@ -1446,7 +1446,7 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
           shop_name: item.Item.shopName || '楽天市場',
           price: item.Item.itemPrice,
           url: item.Item.affiliateUrl || item.Item.itemUrl,
-          shipping: item.Item.postageFlag === 1 ? 0 : null,
+          shipping: Number(item.Item.postageFlag) === 0 ? 0 : null,
           points: item.Item.pointRate || 0,
           rating: parseFloat(item.Item.reviewAverage) || 0,
           reviews_count: parseInt(item.Item.reviewCount) || 0,
