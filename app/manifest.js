@@ -2,7 +2,7 @@ export default function manifest() {
   return {
     name: 'HonestBaby',
     short_name: 'HonestBaby',
-    description: '子育てグッズの忖度なし比較・レビューPWA',
+    description: 'ベビー用品の最安値と買い時がわかる価格比較',
     start_url: '/',
     display: 'standalone',
     background_color: '#FFF5E4',

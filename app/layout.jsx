@@ -1,11 +1,12 @@
 import Script from 'next/script';
+import { Analytics } from '@vercel/analytics/next';
 import AffiliateClickTracker from '../src/components/AffiliateClickTracker';
 import '../src/index.css';
 
 const SITE_URL = 'https://honestbaby-care.com';
-const TITLE = 'HonestBaby - 子育てグッズの忖度なし比較・レビュー';
+const TITLE = 'HonestBaby - ベビー用品の最安値と買い時がわかる価格比較';
 const DESCRIPTION =
-  'パパ・ママのリアルな口コミと価格比較で、本当に良いベビー用品が見つかるAIコンサルタントアプリ。エルゴ、コンビ、アップリカなど人気ブランドを網羅。';
+  '楽天・Yahoo!ショッピングの価格を毎日チェックし、おむつ・おしりふきは1枚あたりの単価で比較。価格推移から「今が買い時か」もわかる、ベビー用品の価格比較サイト。';
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
@@ -24,14 +25,14 @@ export const metadata = {
     url: SITE_URL + '/',
     title: TITLE,
     description:
-      'パパ・ママのリアルな口コミと価格比較で、本当に良いベビー用品が見つかるAIコンサルタントアプリ。',
+      DESCRIPTION,
     // og:image は app/opengraph-image.jsx（1200×630）が自動適用される
   },
   twitter: {
     card: 'summary_large_image',
     title: TITLE,
     description:
-      'パパ・ママのリアルな口コミと価格比較で、本当に良いベビー用品が見つかるAIコンサルタントアプリ。',
+      DESCRIPTION,
   },
   verification: {
     google: 'bapS2y_EyERyWlNqP1F_SSbxEhm01lyv1Sb7E8u-5qI',
@@ -79,6 +80,7 @@ export default function RootLayout({ children }) {
         />
         {children}
         <AffiliateClickTracker />
+        <Analytics />
 
         {/* Google Analytics (GA4) */}
         <Script

@@ -27,8 +27,8 @@ export async function generateMetadata({ params }) {
   const { name } = await params;
   const cat = resolveName(name);
   const meta = CAT_META[cat] || {
-    title: `${cat}のベビー用品 価格比較・口コミ`,
-    desc: `${cat}のベビー用品を価格比較。最安値・口コミ・評価をまとめてチェック。`,
+    title: `${cat}のベビー用品 価格比較・最安値`,
+    desc: `${cat}のベビー用品を価格比較。最安値・購入者評価をまとめてチェック。`,
   };
   const url = `${SITE_URL}/category/${encodeURIComponent(cat)}`;
   return {
@@ -131,10 +131,10 @@ export default async function CategoryPage({ params }) {
         <h1 className="text-xl font-black mb-1 mt-4">
           {cat === 'すべて'
             ? 'おすすめピックアップ'
-            : meta?.title || `${cat}のベビー用品 価格比較・口コミ`}
+            : meta?.title || `${cat}のベビー用品 価格比較・最安値`}
         </h1>
         <p className="text-xs text-[#8E8282] font-bold mb-4 leading-relaxed">
-          {meta?.desc || `${cat}のベビー用品を楽天・Yahooの最安値と口コミで比較。`}
+          {meta?.desc || `${cat}のベビー用品を楽天・Yahooの最安値と購入者評価で比較。`}
         </p>
 
         {/* 選び方ガイド・ランキングへのショートカット */}

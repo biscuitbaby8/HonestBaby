@@ -37,7 +37,7 @@ function nowLabel() {
 function rankMeta(cat) {
   return {
     title: `【${nowLabel()}】${cat}おすすめ人気ランキングTOP${RANK_LIMIT}`,
-    desc: `${cat}の売れ筋・人気商品をランキングで紹介。楽天・Yahoo!ショッピングの最安値とパパママの口コミをまとめてチェック。毎日更新。`,
+    desc: `${cat}の売れ筋・人気商品をランキングで紹介。楽天・Yahoo!ショッピングの最安値と購入者評価をまとめてチェック。毎日更新。`,
   };
 }
 

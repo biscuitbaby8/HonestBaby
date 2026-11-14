@@ -234,7 +234,7 @@ export default async function SalePage() {
                   <h3 className="text-xs font-black text-[#A5A19E] uppercase tracking-widest mb-2">{cat}（{items.length}）</h3>
                   <div className="space-y-3">
                     {items.map((p) => (
-                      <div key={p.id} className="bg-white rounded-[1.75rem] border border-[#F4EFEB] p-4">
+                      <div key={p.id} data-product-id={p.product.id} className="bg-white rounded-[1.75rem] border border-[#F4EFEB] p-4">
                         <div className="flex gap-3 mb-3">
                           {/* 商品詳細は別タブで開く。同じ/saleタブに留まるので、戻るボタンで
                               迷子にならず一覧の続きから比較できる(Amazon/楽天Yahooの価格リンクと動作を揃える)。 */}

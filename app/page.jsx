@@ -79,12 +79,12 @@ export default async function Page() {
       <div className="min-h-screen bg-[#FFFDFB] text-[#5A4C4C]">
         <main className="max-w-5xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-black leading-snug mb-3">
-            本当に良いベビー用品が見つかる、忖度なし比較サイト HonestBaby
+            ベビー用品の最安値と買い時がわかる価格比較サイト HonestBaby
           </h1>
           <p className="text-sm text-[#8E8282] font-bold leading-relaxed mb-6">
-            パパ・ママのリアルな口コミと、楽天・Yahoo!ショッピングの最安値比較で、
-            おむつ・ベビーカー・抱っこ紐・チャイルドシートなど人気のベビー用品を
-            ブランド横断で比較できます。エルゴ・コンビ・アップリカ・ピジョンなど主要ブランドを網羅。
+            楽天・Yahoo!ショッピングの価格を毎日チェック。おむつ・おしりふきは1枚あたりの単価で、
+            ベビーカー・抱っこ紐・チャイルドシートは価格推移で「今が買い時か」がわかります。
+            パンパース・メリーズ・エルゴ・コンビ・アップリカなど主要ブランドを網羅。
           </p>
 
           {/* 開催中のセールバナー */}
