@@ -2,7 +2,7 @@ import { supabaseServer } from '@/src/lib/supabaseServer';
 import { CATEGORY_TREE, UNIT_PRICE_CATEGORIES } from '@/src/lib/products';
 import { fetchBrandCounts } from '@/src/lib/brands';
 import { AGE_GUIDES } from '@/src/lib/ageGuides';
-import { STAPLES } from '@/src/lib/staples';
+import { STAPLES, GROUPS } from '@/src/lib/staples';
 import { fetchAllOffers, groupByStaple, bestOffer } from '@/src/lib/staplesServer';
 
 const SITE_URL = 'https://honestbaby-care.com';
@@ -55,9 +55,9 @@ export default async function sitemap() {
   const stapleOffers = groupByStaple(await fetchAllOffers());
   const stapleIdsWithOffers = new Set(Object.keys(stapleOffers).filter((id) => bestOffer(stapleOffers[id])));
   const stapleEntries = [
-    { url: `${SITE_URL}/omutsu`, changeFrequency: 'daily', priority: 0.9 },
+    ...Object.values(GROUPS).map((g) => ({ url: `${SITE_URL}${g.path}`, changeFrequency: 'daily', priority: 0.9 })),
     ...STAPLES.filter((st) => stapleIdsWithOffers.has(st.id))
-      .map((st) => ({ url: `${SITE_URL}/omutsu/${st.id}`, changeFrequency: 'daily', priority: 0.8 })),
+      .map((st) => ({ url: `${SITE_URL}${GROUPS[st.group].path}/${st.id}`, changeFrequency: 'daily', priority: 0.8 })),
   ];
 
   // サブカテゴリ（/category/[name]/[sub]）。subs は string | { name } の混在。

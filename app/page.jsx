@@ -113,6 +113,11 @@ export default async function Page() {
             <span className="text-xs font-black text-[#5F7359] whitespace-nowrap ml-2">見る →</span>
           </Link>
 
+          <div className="flex gap-2 mb-3">
+            <Link href="/oshirifuki" className="flex-1 text-center bg-white border border-[#CFDDCC] rounded-2xl px-3 py-3 text-xs font-black text-[#5F7359]">おしりふきの最安値 →</Link>
+            <Link href="/milk" className="flex-1 text-center bg-white border border-[#CFDDCC] rounded-2xl px-3 py-3 text-xs font-black text-[#5F7359]">粉ミルクの最安値 →</Link>
+          </div>
+
           {/* 値下げ速報バナー（内部リンク・回遊/再訪の起点） */}
           <Link
             href="/deals"

@@ -3,8 +3,19 @@ export const MALL_LABEL = { rakuten: '楽天市場', yahoo: 'Yahoo!ショッピ�
 export const MALL_SHORT = { rakuten: '楽天', yahoo: 'Yahoo!' };
 export const SHIPPING_LABEL = { free: '送料無料', cond: '条件付き送料無料', paid: '送料別' };
 
-// 単価は小数1桁まで（おむつは1枚あたり数十円で、整数だと差が見えない）
-export const fmtUnit = (v) => `¥${(Math.round(Number(v) * 10) / 10).toFixed(1)}`;
+import { GROUPS } from './staples';
+
+// 単価の表示。おむつは1枚あたり小数1桁、おしりふきは小数2桁、
+// 粉ミルクは100gあたりの整数円（保存値は1gあたりなので100倍する）。
+export const fmtUnit = (v, group = 'omutsu') => {
+  const g = GROUPS[group] || GROUPS.omutsu;
+  return `¥${(Number(v) * g.scale).toFixed(g.decimals)}`;
+};
+export const perLabel = (group = 'omutsu') => (GROUPS[group] || GROUPS.omutsu).perLabel;
+export const fmtQty = (qty, group = 'omutsu') => {
+  const g = GROUPS[group] || GROUPS.omutsu;
+  return `${Number(qty).toLocaleString()}${g.qtyUnit}`;
+};
 export const fmtYen = (v) => `¥${Number(v).toLocaleString()}`;
 
 export const fmtDateJa = (iso) => {

@@ -7,12 +7,12 @@ import { STAPLES, matchOffer, dropOutliers } from '@/src/lib/staples';
 // 定番おむつ（銘柄×タイプ×サイズ）ごとに楽天・Yahooを検索し、
 // 商品名から突合できた出品を1枚あたりの単価つきで保存する。
 // 楽天のレート制限（約1回/秒）と429時の再試行を見込むと1回で回せるのは
-// 十数件まで。3分割では末尾の定番が時間切れで飛ばされたため、?part=0..4 の5分割にする。
+// 十数件まで。3分割では末尾の定番が時間切れで飛ばされたため、?part=0..5 の6分割にする（おしりふき・粉ミルクも含め78定番）。
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const PARTS = 5;
+const PARTS = 6;
 const KEEP_PER_MALL = 8;
 const DEADLINE_MS = 52000;
 
@@ -203,8 +203,10 @@ export async function GET(request) {
   }
 
   try {
-    revalidatePath('/omutsu');
-    revalidatePath('/omutsu/[id]', 'page');
+    for (const base of ['/omutsu', '/oshirifuki', '/milk']) {
+      revalidatePath(base);
+      revalidatePath(`${base}/[id]`, 'page');
+    }
   } catch { /* noop */ }
 
   return Response.json({ part, count: targets.length, ms: Date.now() - started, results });

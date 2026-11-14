@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { STAPLES, SIZE_ORDER, sizeInfo } from '@/src/lib/staples';
+import { staplesOf, SIZE_ORDER, sizeInfo } from '@/src/lib/staples';
+
+const STAPLES = staplesOf('omutsu');
 import { fetchAllOffers, groupByStaple, bestOffer } from '@/src/lib/staplesServer';
 import { fmtUnit, fmtDateJa, MALL_SHORT } from '@/src/lib/staplesFormat';
 import SiteHeader from '@/src/components/SiteHeader';
@@ -174,7 +176,8 @@ export default async function OmutsuPage() {
 
         <div className="flex flex-wrap gap-2 mb-8">
           <Link href="/category/おむつ" className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]">おむつカテゴリを見る</Link>
-          <Link href="/unit-price/おむつ" className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]">おしりふき・防臭袋の単価</Link>
+          <Link href="/oshirifuki" className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]">おしりふきの最安値</Link>
+          <Link href="/milk" className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]">粉ミルクの最安値</Link>
           <Link href="/sale" className="inline-block px-4 py-2 rounded-full text-xs font-bold bg-[#F4EFEB] text-[#5A4C4C] hover:bg-[#E8E1DC]">セール・買い時カレンダー</Link>
         </div>
 

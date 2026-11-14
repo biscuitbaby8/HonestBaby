@@ -97,12 +97,13 @@ const LINES = [
 
 const TYPES = { tape: 'テープ', pants: 'パンツ' };
 
-export const STAPLES = LINES.flatMap((ln) =>
+const DIAPER_STAPLES = LINES.flatMap((ln) =>
   Object.keys(TYPES).flatMap((type) =>
     (ln[type] || []).map((size) => {
       const sz = sizeInfo(size);
       const sameAsBrand = ln.line === ln.brand;
       return {
+        group: 'omutsu',
         id: `${ln.brandSlug}-${ln.lineSlug}-${type}-${size}`.replace(`${ln.brandSlug}-${ln.brandSlug}-`, `${ln.brandSlug}-`),
         brand: ln.brand,
         maker: ln.maker,
@@ -123,6 +124,43 @@ export const STAPLES = LINES.flatMap((ln) =>
     })
   )
 );
+
+// ---- おしりふき・粉ミルク（サイズが無いので 銘柄=1定番） ----
+// keyword は Yahoo/楽天共通（半角1文字の語を含めないこと。楽天APIが拒否する）。
+const simple = (group, defs) => defs.map((d) => ({
+  group, type: null, size: null, not: [], rakutenKeyword: d.keyword, lineKey: d.id, line: d.name, ...d,
+}));
+
+const WIPE_STAPLES = simple('oshirifuki', [
+  { id: 'wipes-pampers-hadaichi', brand: 'パンパース', maker: 'P&G', name: 'パンパース 肌へのいちばん おしりふき', keyword: 'パンパース 肌へのいちばん おしりふき', must: [['パンパース'], ['おしりふき', 'おしり拭き']], not: ['おむつセット'] },
+  { id: 'wipes-moony-soft', brand: 'ムーニー', maker: 'ユニ・チャーム', name: 'ムーニー おしりふき やわらか素材', keyword: 'ムーニー おしりふき やわらか素材', must: [['ムーニー'], ['おしりふき'], ['やわらか素材']], not: ['厚手', '流せる'] },
+  { id: 'wipes-moony-thick', brand: 'ムーニー', maker: 'ユニ・チャーム', name: 'ムーニー おしりふき やわらか厚手', keyword: 'ムーニー おしりふき 厚手', must: [['ムーニー'], ['おしりふき'], ['厚手']], not: ['流せる'] },
+  { id: 'wipes-goon', brand: 'グーン', maker: '大王製紙', name: 'グーン おしりふき', keyword: 'グーン おしりふき', must: [['グーン', 'GOO.N', 'Goo.N'], ['おしりふき']], not: ['流せる'] },
+  { id: 'wipes-pigeon-thick', brand: 'ピジョン', maker: 'ピジョン', name: 'ピジョン おしりナップ やわらか厚手仕上げ', keyword: 'ピジョン おしりナップ やわらか厚手仕上げ', must: [['おしりナップ'], ['厚手仕上げ', 'やわらか厚手']], not: ['流せる', 'ふんわり'] },
+  { id: 'wipes-pigeon-nagaseru', brand: 'ピジョン', maker: 'ピジョン', name: 'ピジョン トイレに流せるおしりナップ ふんわり厚手', keyword: 'ピジョン 流せる おしりナップ ふんわり厚手', must: [['おしりナップ'], ['流せる'], ['ふんわり']], not: [] },
+  { id: 'wipes-lec-999', brand: 'レック', maker: 'レック', name: 'レック 水99.9% おしりふき', keyword: 'レック 水99.9 おしりふき', must: [['レック', 'LEC', 'lec'], ['99.9'], ['おしりふき']], not: ['流せる', '手口'] },
+]);
+
+const MILK_STAPLES = simple('milk', [
+  { id: 'milk-hohoemi', brand: 'ほほえみ', maker: '明治', name: '明治 ほほえみ 800g缶', keyword: '明治 ほほえみ 800g', must: [['ほほえみ']], not: ['キューブ', 'らくらくミルク', 'ステップ'] },
+  { id: 'milk-haihai', brand: 'はいはい', maker: '和光堂', name: '和光堂 レーベンスミルク はいはい 810g缶', keyword: '和光堂 はいはい 810g', must: [['はいはい'], ['和光堂', 'レーベンス', 'アサヒ']], not: ['ぐんぐん'] },
+  { id: 'milk-icreo', brand: 'アイクレオ', maker: 'グリコ', name: 'アイクレオ バランスミルク 800g缶', keyword: 'アイクレオ バランスミルク 800g', must: [['アイクレオ'], ['バランスミルク']], not: ['グローアップ'] },
+  { id: 'milk-hagukumi', brand: 'はぐくみ', maker: '森永乳業', name: '森永 はぐくみ 800g缶', keyword: '森永 はぐくみ 800g', must: [['はぐくみ']], not: ['チルミル', 'エコらく', 'E赤ちゃん'] },
+  { id: 'milk-e-akachan', brand: 'E赤ちゃん', maker: '森永乳業', name: '森永 E赤ちゃん 800g缶', keyword: '森永 E赤ちゃん 800g', must: [['E赤ちゃん']], not: ['エコらく'] },
+  { id: 'milk-sukoyaka', brand: 'すこやかM1', maker: '雪印ビーンスターク', name: 'ビーンスターク すこやかM1 800g缶', keyword: 'ビーンスターク すこやか 800g', must: [['すこやか']], not: ['つよいこ'] },
+  { id: 'milk-pure', brand: 'ぴゅあ', maker: '雪印メグミルク', name: '雪印メグミルク ぴゅあ 820g缶', keyword: '雪印メグミルク ぴゅあ 820g', must: [['ぴゅあ'], ['雪印', 'メグミルク']], not: ['たっち'] },
+]);
+
+export const STAPLES = [...DIAPER_STAPLES, ...WIPE_STAPLES, ...MILK_STAPLES];
+
+// グループごとの表示設定。unitPrice は「1枚」「1g」あたりで保存し、
+// 粉ミルクは表示のときだけ100gあたりに直す。
+export const GROUPS = {
+  omutsu: { path: '/omutsu', hub: 'おむつ1枚あたりの最安値', perLabel: '枚', scale: 1, decimals: 1, qtyUnit: '枚' },
+  oshirifuki: { path: '/oshirifuki', hub: 'おしりふき1枚あたりの最安値', perLabel: '枚', scale: 1, decimals: 2, qtyUnit: '枚' },
+  milk: { path: '/milk', hub: '粉ミルク100gあたりの最安値', perLabel: '100g', scale: 100, decimals: 0, qtyUnit: 'g' },
+};
+export const staplesOf = (group) => STAPLES.filter((s) => s.group === group);
 
 export const getStaple = (id) => STAPLES.find((s) => s.id === id) || null;
 
@@ -159,35 +197,45 @@ export function detectSizes(name) {
   return [...found];
 }
 
-// 総枚数を返す。読み取れない・矛盾する場合は null。
-// 例: 「M248枚(62枚x4袋)」→248 / 「62枚入x4個」→248 / 「M52枚 2袋 104枚」→104 / 「L 54枚」→54
-export function parseTotalSheets(name) {
-  const sheets = [...name.matchAll(/(\d{1,4})\s*枚/g)].map((m) => parseInt(m[1], 10)).filter((v) => v > 0);
-  if (sheets.length === 0) return null;
+// 総量（枚数またはグラム数）と、1個あたりの量を返す。読み取れない・矛盾する場合は null。
+// 例(枚): 「M248枚(62枚x4袋)」→248 / 「62枚入x4個」→248 / 「M52枚 2袋 104枚」→104 / 「L 54枚」→54
+// 例(g) : 「800gx2缶」→1600 / 「800g 2缶セット(1600g)」→1600
+export function parseTotal(name, unit = '枚') {
+  const unitRe = unit === 'g' ? /(\d{2,4})\s*(?:g|ｇ|グラム)/g : /(\d{1,4})\s*枚/g;
+  const values = [...name.matchAll(unitRe)].map((m) => parseInt(m[1], 10)).filter((v) => v > 0);
+  if (values.length === 0) return null;
+  const notUnit = unit === 'g' ? '(?!\\d|\\s*(?:g|ｇ))' : '(?!\\d|\\s*枚)';
+  const xMults = [...name.matchAll(new RegExp(`x\\s*(\\d{1,2})${notUnit}`, 'g'))].map((m) => parseInt(m[1], 10)).filter((v) => v >= 2 && v <= 60);
   const mults = [
-    ...[...name.matchAll(/x\s*(\d{1,2})(?!\d|\s*枚)/g)].map((m) => parseInt(m[1], 10)),
-    ...[...name.matchAll(/(?<!\d)(\d{1,2})\s*(?:個|袋|パック|セット|箱|コ)(?!\s*あたり)/g)].map((m) => parseInt(m[1], 10)),
-  ].filter((v) => v >= 2 && v <= 12);
-  const uniqSheets = [...new Set(sheets)];
+    ...xMults,
+    ...[...name.matchAll(/(?<!\d)(\d{1,2})\s*(?:個|袋|パック|セット|箱|コ|缶|ケース)(?!\s*あたり)/g)].map((m) => parseInt(m[1], 10)),
+  ].filter((v) => v >= 2 && v <= 60);
+  const uniq = [...new Set(values)];
   const uniqMults = [...new Set(mults)];
-  const per = Math.min(...uniqSheets);
-  const max = Math.max(...uniqSheets);
+  const per = Math.min(...uniq);
+  const max = Math.max(...uniq);
 
-  if (uniqSheets.length === 1) {
-    if (uniqMults.length === 0) return per;
-    if (uniqMults.length === 1) return per * uniqMults[0];
+  if (uniq.length === 1) {
+    if (uniqMults.length === 0) return { total: per, per };
+    if (uniqMults.length === 1) return { total: per * uniqMults[0], per };
+    // 「54枚x2個 x5個セット」のように掛け算が2段になっている形（どちらも x つき）
+    if (xMults.length === 2 && uniqMults.length === 2 && uniqMults.every((v) => xMults.includes(v))) {
+      return { total: per * xMults[0] * xMults[1], per };
+    }
     return null; // 「3個 4個」など入数が複数 = バリエーション出品
   }
-  if (uniqSheets.length === 2) {
-    // 「1袋あたり枚数」と「合計枚数」が両方書いてある形だけ認める
+  if (uniq.length === 2) {
+    // 「1個あたりの量」と「合計」が両方書いてある形だけ認める
     const ratio = max / per;
-    if (Number.isInteger(ratio) && ratio >= 2 && ratio <= 12 && (uniqMults.length === 0 || uniqMults.includes(ratio))) {
-      return max;
+    if (Number.isInteger(ratio) && ratio >= 2 && ratio <= 60 && (uniqMults.length === 0 || uniqMults.includes(ratio))) {
+      return { total: max, per };
     }
     return null;
   }
-  return null; // 3種類以上の枚数 = サイズ違いをまとめた出品
+  return null; // 3種類以上 = サイズ違いをまとめた出品
 }
+
+export const parseTotalSheets = (name) => parseTotal(name, '枚')?.total ?? null;
 
 // 1枚あたりの単価がおむつとして妥当な範囲か（解析ミスや別商品の混入を弾く）
 const UNIT_MIN = 9;
@@ -195,6 +243,8 @@ const UNIT_MAX = 90;
 
 // 出品が定番 staple に該当すれば { qty, unitPrice } を返す。該当しなければ null。
 export function matchOffer(staple, rawName, price) {
+  if (staple.group === 'oshirifuki') return matchSimple(staple, rawName, price, WIPE_RULE);
+  if (staple.group === 'milk') return matchSimple(staple, rawName, price, MILK_RULE);
   const full = normalizeName(rawName);
   const p = Number(price);
   if (!(p > 0)) return null;
@@ -226,6 +276,45 @@ export function matchOffer(staple, rawName, price) {
   const unitPrice = p / qty;
   if (unitPrice < UNIT_MIN || unitPrice > UNIT_MAX) return null;
   return { qty, unitPrice: Math.round(unitPrice * 100) / 100 };
+}
+
+// おしりふき・粉ミルクの照合ルール。
+// perMin/perMax は1個（1パック・1缶）あたりの量の範囲で、別規格の混入を防ぐ
+// （粉ミルクなら 300g小缶・スティック・キューブを大缶の定番に混ぜない）。
+const WIPE_RULE = {
+  unit: '枚',
+  ng: /ウォーマー|ケースのみ|フタ|ふた|ホルダー|中古|訳あり|わけあり|アウトレット|サンプル|お試し|試供|福袋|ギフトセット|おむつケーキ|選べる|よりどり|ふるさと納税|ペット|犬|猫|大人用|介護/,
+  perMin: 30, perMax: 120, totalMin: 30, totalMax: 6000,
+  unitMin: 0.6, unitMax: 8,
+};
+const MILK_RULE = {
+  unit: 'g',
+  ng: /キューブ|スティック|液体|フォローアップ|小缶|中古|訳あり|わけあり|アウトレット|サンプル|お試し|試供|福袋|ギフトセット|選べる|よりどり|ふるさと納税|賞味期限間近|期限間近/,
+  perMin: 750, perMax: 850, totalMin: 750, totalMax: 13600,
+  unitMin: 1.8, unitMax: 5.5,
+};
+
+function matchSimple(staple, rawName, price, rule) {
+  const full = normalizeName(rawName);
+  const p = Number(price);
+  if (!(p > 0)) return null;
+  if (rule.ng.test(full)) return null;
+  const compact = full.replace(/ /g, '');
+  for (const group of staple.must) {
+    if (!group.some((w) => compact.includes(w))) return null;
+  }
+  if (staple.not.some((w) => compact.includes(w))) return null;
+
+  const name = full.split(/[|｜]/)[0];
+  const parsed = parseTotal(name, rule.unit);
+  if (!parsed) return null;
+  if (parsed.per < rule.perMin || parsed.per > rule.perMax) return null;
+  if (parsed.total < rule.totalMin || parsed.total > rule.totalMax) return null;
+
+  const unitPrice = p / parsed.total;
+  if (unitPrice < rule.unitMin || unitPrice > rule.unitMax) return null;
+  // 粉ミルクは1gあたり数円なので小数4桁まで持つ（DBは numeric(10,4)）
+  return { qty: parsed.total, unitPrice: Math.round(unitPrice * 10000) / 10000 };
 }
 
 // 同じ定番の中で、中央値から大きく外れて安い出品は解析ミスの可能性が高いので落とす
