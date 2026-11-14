@@ -2,6 +2,7 @@ import { supabaseServer } from '@/src/lib/supabaseServer';
 import { CATEGORY_TREE, UNIT_PRICE_CATEGORIES } from '@/src/lib/products';
 import { fetchBrandCounts } from '@/src/lib/brands';
 import { AGE_GUIDES } from '@/src/lib/ageGuides';
+import { STAPLES } from '@/src/lib/staples';
 
 const SITE_URL = 'https://honestbaby-care.com';
 
@@ -47,6 +48,12 @@ export default async function sitemap() {
     changeFrequency: 'daily',
     priority: 0.8,
   }));
+
+  // 定番おむつの単価ページ（/omutsu と /omutsu/[id]）。毎日更新される。
+  const stapleEntries = [
+    { url: `${SITE_URL}/omutsu`, changeFrequency: 'daily', priority: 0.9 },
+    ...STAPLES.map((st) => ({ url: `${SITE_URL}/omutsu/${st.id}`, changeFrequency: 'daily', priority: 0.8 })),
+  ];
 
   // サブカテゴリ（/category/[name]/[sub]）。subs は string | { name } の混在。
   const subCategoryEntries = categories.flatMap((c) =>
@@ -120,6 +127,7 @@ export default async function sitemap() {
     ...ageEntries,
     ...rankingEntries,
     ...unitPriceEntries,
+    ...stapleEntries,
     ...subCategoryEntries,
     ...brandEntries,
     ...articleEntries,

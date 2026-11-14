@@ -101,6 +101,18 @@ export default async function Page() {
             </Link>
           )}
 
+          {/* おむつ単価一覧（このサイトの主力ページへの導線） */}
+          <Link
+            href="/omutsu"
+            className="flex items-center justify-between bg-gradient-to-br from-[#F3F7F1] to-[#EAF1E8] border border-[#CFDDCC] rounded-2xl px-5 py-4 mb-3"
+          >
+            <span className="text-sm font-black text-[#5A4C4C]">
+              <span className="bg-[#7B8E76] text-white text-[10px] font-black px-2 py-0.5 rounded-full mr-2">毎日更新</span>
+              おむつ1枚あたりの最安値を銘柄・サイズ別に比較
+            </span>
+            <span className="text-xs font-black text-[#5F7359] whitespace-nowrap ml-2">見る →</span>
+          </Link>
+
           {/* 値下げ速報バナー（内部リンク・回遊/再訪の起点） */}
           <Link
             href="/deals"

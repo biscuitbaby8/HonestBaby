@@ -1,5 +1,6 @@
 'use client';
 import { useEffect } from 'react';
+import { track } from '@vercel/analytics';
 import { trackOutbound, installTrackingFlush } from '../lib/tracking';
 
 // アフィリエイトリンクのクリックを GA4 に送る委譲リスナー。
@@ -44,6 +45,9 @@ export default function AffiliateClickTracker() {
       const productId = idEl?.getAttribute('data-product-id')
         || window.location.pathname.match(/^\/product\/([0-9a-f-]{36})/i)?.[1];
       if (productId) trackOutbound(productId, shop, { surface: 'product' });
+
+      // Vercel Web Analytics にも送る（GA4が広告ブロッカーで落ちても数えられる）
+      try { track('affiliate_click', { shop, cta: ctaPosition, path: window.location.pathname.slice(0, 120) }); } catch { /* noop */ }
 
       if (typeof window.gtag !== 'function') return;
       window.gtag('event', 'affiliate_click', {

@@ -23,7 +23,13 @@
     { "path": "/api/cron/refresh-stale?limit=80", "schedule": "15 14 * * *" },
     { "path": "/api/cron/refresh-stale?limit=80", "schedule": "45 20 * * *" },
     { "path": "/api/cron/rebuild-home-score", "schedule": "30 23 * * *" },
-    { "path": "/api/cron/post-deals", "schedule": "0 1 * * *" }
+    { "path": "/api/cron/post-deals", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/sync-staples?part=0", "schedule": "10 17 * * *" },
+    { "path": "/api/cron/sync-staples?part=1", "schedule": "20 17 * * *" },
+    { "path": "/api/cron/sync-staples?part=2", "schedule": "40 17 * * *" },
+    { "path": "/api/cron/sync-staples?part=0", "schedule": "5 9 * * *" },
+    { "path": "/api/cron/sync-staples?part=1", "schedule": "25 9 * * *" },
+    { "path": "/api/cron/sync-staples?part=2", "schedule": "45 9 * * *" }
   ],
   "redirects": [
     {
