@@ -3566,6 +3566,31 @@ ${userText}
           </a>
         )}
 
+        {/* ─── 消耗品の単価比較（このサイトの主力。最初の画面で見せる） ─── */}
+        <div className="bg-gradient-to-br from-[#F3F7F1] to-[#EAF1E8] border border-[#CFDDCC] rounded-[1.75rem] p-4 mb-4">
+          <p className="text-sm font-black text-[#5A4C4C] mb-1">
+            <span className="bg-[#7B8E76] text-white text-[10px] font-black px-2 py-0.5 rounded-full mr-2">毎日更新</span>
+            いま一番安いショップがわかる
+          </p>
+          <p className="text-[11px] font-bold text-[#8E8282] mb-3">楽天とYahoo!の出品を、1枚・100gあたりの単価で比較</p>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { href: '/omutsu', label: 'おむつ', sub: '1枚あたり' },
+              { href: '/oshirifuki', label: 'おしりふき', sub: '1枚あたり' },
+              { href: '/milk', label: '粉ミルク', sub: '100gあたり' },
+            ].map((c) => (
+              <a
+                key={c.href}
+                href={c.href}
+                className="bg-white border border-[#CFDDCC] rounded-2xl px-2 py-3 text-center active:scale-95 transition-transform"
+              >
+                <span className="block text-xs font-black text-[#5F7359]">{c.label}</span>
+                <span className="block text-[9.5px] font-bold text-[#A5A19E] mt-0.5">{c.sub}の最安値 →</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
         {/* ─── 値下げ速報バナー（/deals へ・回遊/再訪の起点） ─── */}
         <a
           href="/deals"
