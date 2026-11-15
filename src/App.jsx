@@ -3585,7 +3585,7 @@ ${userText}
                 className="bg-white border border-[#CFDDCC] rounded-2xl px-2 py-3 text-center active:scale-95 transition-transform"
               >
                 <span className="block text-xs font-black text-[#5F7359]">{c.label}</span>
-                <span className="block text-[9.5px] font-bold text-[#A5A19E] mt-0.5">{c.sub}の最安値 →</span>
+                <span className="block text-[9.5px] font-bold text-[#A5A19E] mt-0.5 whitespace-nowrap">{c.sub} →</span>
               </a>
             ))}
           </div>

@@ -12,6 +12,8 @@ export const fmtUnit = (v, group = 'omutsu') => {
   return `¥${(Number(v) * g.scale).toFixed(g.decimals)}`;
 };
 export const perLabel = (group = 'omutsu') => (GROUPS[group] || GROUPS.omutsu).perLabel;
+// 文中で使う言い方（「1枚あたり」「100gあたり」）
+export const perPhrase = (group = 'omutsu') => (group === 'milk' ? '100gあたり' : '1枚あたり');
 export const fmtQty = (qty, group = 'omutsu') => {
   const g = GROUPS[group] || GROUPS.omutsu;
   return `${Number(qty).toLocaleString()}${g.qtyUnit}`;

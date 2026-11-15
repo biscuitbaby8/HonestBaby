@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { STAPLES, GROUPS, SIZE_ORDER, sizeInfo } from '@/src/lib/staples';
 import { fetchOffers, fetchAllOffers, fetchLowestEver, groupByStaple, bestOffer } from '@/src/lib/staplesServer';
-import { fmtUnit, fmtYen, fmtQty, perLabel, fmtDateJa, MALL_LABEL, MALL_SHORT, SHIPPING_LABEL } from '@/src/lib/staplesFormat';
+import { fmtUnit, fmtYen, fmtQty, perLabel, perPhrase, fmtDateJa, MALL_LABEL, MALL_SHORT, SHIPPING_LABEL } from '@/src/lib/staplesFormat';
 import { toVCUrl } from '@/src/lib/affiliate';
 import { getProxiedImage } from '@/src/lib/products';
 import { NOINDEX_ROBOTS } from '@/src/lib/seo';
@@ -14,15 +14,15 @@ const SITE_URL = 'https://honestbaby-care.com';
 export async function buildStapleMetadata(staple) {
   if (!staple) return { title: 'HonestBaby' };
   const g = GROUPS[staple.group];
-  const per = perLabel(staple.group);
+  const perA = perPhrase(staple.group);
   const best = bestOffer(await fetchOffers(staple.id));
   const url = `${SITE_URL}${g.path}/${staple.id}`;
   const title = best
-    ? `${staple.name}の最安値 ${per}あたり${fmtUnit(best.unit_price, staple.group)}〜｜楽天・Yahoo!比較`
+    ? `${staple.name}の最安値 ${perA}${fmtUnit(best.unit_price, staple.group)}〜｜楽天・Yahoo!比較`
     : `${staple.name}の最安値｜楽天・Yahoo!比較`;
   const description = best
-    ? `${staple.name}を${per}あたりの単価で比較。現在の最安は${MALL_LABEL[best.mall]}の${best.shop_name}で${fmtQty(best.qty, staple.group)}${fmtYen(best.price)}（${per}あたり${fmtUnit(best.unit_price, staple.group)}）。楽天とYahoo!の出品を毎日チェックしています。`
-    : `${staple.name}を${per}あたりの単価で比較。楽天とYahoo!の出品を毎日チェックしています。`;
+    ? `${staple.name}を${perA}の単価で比較。現在の最安は${MALL_LABEL[best.mall]}の${best.shop_name}で${fmtQty(best.qty, staple.group)}${fmtYen(best.price)}（${perA}${fmtUnit(best.unit_price, staple.group)}）。楽天とYahoo!の出品を毎日チェックしています。`
+    : `${staple.name}を${perA}の単価で比較。楽天とYahoo!の出品を毎日チェックしています。`;
   return {
     title,
     description,
@@ -41,6 +41,7 @@ export default async function StapleDetail({ staple }) {
   const G = staple.group;
   const g = GROUPS[G];
   const per = perLabel(G);
+  const perA = perPhrase(G);
   const isDiaper = G === 'omutsu';
 
   const [offers, allOffers, lowestEver] = await Promise.all([
@@ -90,7 +91,7 @@ export default async function StapleDetail({ staple }) {
           brand: { '@type': 'Brand', name: staple.brand },
           url,
           ...(image ? { image } : {}),
-          description: `${staple.name}の楽天市場・Yahoo!ショッピングでの販売価格と${per}あたりの単価。`,
+          description: `${staple.name}の楽天市場・Yahoo!ショッピングでの販売価格と${perA}の単価。`,
           offers: {
             '@type': 'AggregateOffer',
             priceCurrency: 'JPY',
@@ -175,8 +176,8 @@ export default async function StapleDetail({ staple }) {
 
         {best && (
           <section className="mb-10">
-            <h2 className="text-base font-black mb-1">ショップ別・{per}あたりの安い順</h2>
-            <p className="text-[11px] text-[#8E8282] font-bold mb-3">入数が違っても比べられるよう、{per}あたりの単価で並べています。</p>
+            <h2 className="text-base font-black mb-1">ショップ別・{perA}の安い順</h2>
+            <p className="text-[11px] text-[#8E8282] font-bold mb-3">入数が違っても比べられるよう、{perA}の単価で並べています。</p>
             <ul className="space-y-2">
               {offers.map((o, i) => (
                 <li key={`${o.mall}-${i}`}>
