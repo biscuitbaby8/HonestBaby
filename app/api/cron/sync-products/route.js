@@ -4,6 +4,7 @@ import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
 import { parseQuantity } from '@/src/lib/products';
 import { searchUrl, rankingUrl, withVersionFallback, currentVersion, rakutenSafeKeyword } from '@/src/lib/rakutenApi';
 import { request as httpsRequest } from 'node:https';
+import { detectBrand } from '@/src/lib/brandDict';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -473,23 +474,8 @@ function cleanName(name) {
   return s || name.slice(0, 30).trim();
 }
 
-// ブランド名推定
-function extractBrand(itemName) {
-  const brands = [
-    'パンパース', 'メリーズ', 'ムーニー', 'グーン', 'マミーポコ',
-    'コンビ', 'アップリカ', 'ピジョン', 'エルゴベビー', 'ベビービョルン',
-    'サイベックス', 'ジョイー', 'エアバギー', 'グレコ', 'カトージ',
-    'リッチェル', 'コンビ', 'ミキハウス', 'ファミリア', '西松屋',
-    'アカチャンホンポ', 'ユニクロ', 'ナイキ', 'ニューバランス',
-    'ビーンスターク', '和光堂', 'キューピー', 'まるごと鶏レバー',
-    'タカタ', 'レカロ', 'ブリタックス', 'マキシコシ', 'ネビオ',
-    'ボバ', 'ナップナップ', 'ベビーアムール', 'ケラッタ'
-  ];
-  for (const brand of brands) {
-    if (itemName.includes(brand)) return brand;
-  }
-  return '';
-}
+// ブランド名推定（辞書は src/lib/brandDict.js に一本化）
+const extractBrand = (itemName) => detectBrand(itemName);
 
 // おむつ枚数パーサー。
 // 以前はここに独自の簡易実装があり、products.js の parseQuantity と挙動が

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { Heart, Star, Award, ShieldCheck } from 'lucide-react';
-import { getProxiedImage, getLowestPrice } from '../lib/products';
+import { getProxiedImage, getLowestPrice, cleanProductName } from '../lib/products';
 import { trackImpression, trackClick } from '../lib/tracking';
 
 const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favoriteIds, isAdminMode, onBlock, surface = 'home', position = null }) => {
@@ -101,7 +101,7 @@ const ProductCard = ({ product, localRank = null, onOpen, onToggleFavorite, favo
           <span className="text-[10px] font-black">{Number(product.rating).toFixed(2)}</span>
         </div>
       </div>
-      <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{product.name}</h3>
+      <h3 className="text-sm font-bold text-[#5A4C4C] line-clamp-2 leading-snug mb-3">{cleanProductName(product.name, 60)}</h3>
 
       <div className="mt-auto">
         {(product.shops?.length || 0) >= 2 && (

@@ -1,6 +1,8 @@
 // 共有データユーティリティ（サーバー/クライアント両用、Reactに依存しない）
 // SSRページ（app/category, app/product）と ProductCard で利用する。
 
+import { KNOWN_BRANDS } from './brandDict.js';
+
 export const CATEGORY_TREE = [
   { name: "すべて", id: "100533", keyword: "", subs: [] },
   {
@@ -90,7 +92,7 @@ const PROMO_WORDS_RE = /(送料無料|送料込|ポイント\d*倍|クーポン|
 // 「送料無料 袴 ロンパース…」「エントリーで全品P5倍 森永ノンラクト 300g」のように
 // 括弧なしで商品名の先頭に付くケースが実データに多く、そのまま <title> に
 // 入って品質を下げていたため、商品名の一部になり得ない語だけを追加している。
-const PROMO_FREETEXT_RE = /(芸能人愛用|助産師推薦|高評価|口コミ\s*\d*\s*位|楽天(ランキング)?\s*\d+\s*位|\d+冠|レビュー特典(あり)?|満足度\s*No\.?\s*1|売上\s*No\.?\s*1|雑誌掲載|メディア紹介|TV紹介|送料無料|送料込み?|エントリーで(全品)?\s*P?\d*倍|ポイント\s*\d+\s*倍|P\d+倍|最大\s*\d+\s*倍|あす楽|即納|翌日発送|\d+\s*位受賞|お買い物マラソン|スーパー\s*(SALE|セール)|タイムセール)/gi;
+const PROMO_FREETEXT_RE = /([＼\\][^／\/]{0,24}[／\/]|口コミ\s*\d+\s*件|高評価\s*\d+\s*件|TVで紹介|ランキング\s*1位|スーパーSALE限定セール|限定セール|新色登場|ギフト無料|芸能人愛用|助産師推薦|高評価|口コミ\s*\d*\s*位|楽天(ランキング)?\s*\d+\s*位|\d+冠|レビュー特典(あり)?|満足度\s*No\.?\s*1|売上\s*No\.?\s*1|雑誌掲載|メディア紹介|TV紹介|送料無料|送料込み?|エントリーで(全品)?\s*P?\d*倍|ポイント\s*\d+\s*倍|P\d+倍|最大\s*\d+\s*倍|あす楽|即納|翌日発送|\d+\s*位受賞|お買い物マラソン|スーパー\s*(SALE|セール)|タイムセール)/gi;
 
 // 商品名から内容量（枚数）を解析する。「10枚入×24パック」等の掛け算も展開する。
 // 数量が違う出品（例: おしりふき 単品 vs 24パック）を単価(¥/枚)で正しく比較するために使う。
@@ -461,6 +463,10 @@ export const bayesianRating = (p) => {
 //   0.45 満足度（ベイズ平均）
 //   0.35 売れている量の代理（レビュー数の対数）
 //   0.20 モールでの人気順（popularity_rank）
+const KNOWN_BRAND_BOOST = 1.3;
+const PROMO_NAME_PENALTY = 0.75;
+const PROMO_HEAVY_NAME_RE = /楽天\s*\d*\s*位|ランキング\s*\d*\s*位|\d+冠|芸能人|口コミ\s*\d+|高評価|TVで紹介|[＼\\].{0,24}[／\/]|SALE|セール|クーポン|ポッキリ|最安値挑戦/i;
+
 export const demandScore = (p) => {
   const bayes = bayesianRating(p);
   const satisfaction = (bayes - 4.3) / 0.7;          // 4.3〜5.0 を 0〜1 へ
@@ -471,7 +477,11 @@ export const demandScore = (p) => {
   const base = 0.45 * satisfaction + 0.35 * volume + 0.20 * rankScore;
   const weight = CATEGORY_DEMAND_WEIGHT[p?.category] ?? DEFAULT_CATEGORY_WEIGHT;
   const accessory = ACCESSORY_SUBS.has(p?.subCategory ?? p?.sub_category) ? ACCESSORY_PENALTY : 1;
-  return base * weight * accessory;
+  // 指名買いされる定番ブランドを優先し、販促文句を商品名に詰め込んだ出品は下げる。
+  // レビュー数だけで並べると、ブランド不明の雑貨が上位を占めてしまうため。
+  const brand = KNOWN_BRANDS.has(String(p?.brand || '')) ? KNOWN_BRAND_BOOST : 1;
+  const promo = PROMO_HEAVY_NAME_RE.test(String(p?.name || '')) ? PROMO_NAME_PENALTY : 1;
+  return base * weight * accessory * brand * promo;
 };
 
 // 出場資格（L0）。画像・価格・レビュー数の最低線。
