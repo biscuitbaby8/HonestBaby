@@ -122,6 +122,18 @@ export const parseQuantity = (name) => {
 // 単価(¥/枚)ページを用意するカテゴリ。内容量が「枚」で数えられ、かつ
 // 解析できる商品が20件以上あるカテゴリだけに限定している（実データで確認）。
 // 「おむつ117件・トイレ用品23件」に対し他カテゴリは1桁のため対象外。
+// 名入れ・オーダーメイドなど、同じ商品が他店に無く価格を比べられない一点物。
+// 価格比較サイトとして並べる意味が無いので、取り込み時に除外する。
+// 「名入れ無料」「名入れ可」のように、普通の既製品に名入れを選べるだけのものは残す。
+const PERSONALIZED_RE = /名入れ|名入り|名前入|ネーム入|お名前入|名前刺繍|オーダーメイド|セミオーダー|受注生産|受注製作|体重米|抱っこできるお米|ウェイトライス/;
+const PERSONALIZED_OPTIONAL_RE = /名入れ(無料|可|対応|OK|できる|サービス)|名入れ刻印可|名入れ刻印半額/;
+export const isPersonalizedItem = (name) => {
+  const n = String(name || '');
+  if (!PERSONALIZED_RE.test(n)) return false;
+  if (/オーダーメイド|セミオーダー|受注生産|受注製作|体重米|抱っこできるお米|ウェイトライス/.test(n)) return true;
+  return !PERSONALIZED_OPTIONAL_RE.test(n);
+};
+
 export const UNIT_PRICE_CATEGORIES = ['おむつ', 'トイレ用品'];
 
 // iHerb特集（/iherb）と内容が直結するカテゴリだけに導線を絞る。

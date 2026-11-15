@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { sendPushNotification, isPushConfigured } from '@/lib/webPush';
-import { parseQuantity } from '@/src/lib/products';
+import { parseQuantity, isPersonalizedItem } from '@/src/lib/products';
 import { searchUrl, rankingUrl, withVersionFallback, currentVersion, rakutenSafeKeyword } from '@/src/lib/rakutenApi';
 import { request as httpsRequest } from 'node:https';
 import { detectBrand } from '@/src/lib/brandDict';
@@ -775,6 +775,7 @@ function passesCategoryFilters(itemName, category) {
   if (!name) return false;
   if (JUNK_EXACT_NAMES.has(name)) return false;
   if (NG_KEYWORDS.some((kw) => name.includes(kw))) return false;
+  if (isPersonalizedItem(name)) return false;
   const extraNG = CATEGORY_NG_KEYWORDS[category] || [];
   if (extraNG.some((kw) => name.includes(kw))) return false;
   const required = REQUIRED_KEYWORDS[category] || [];
@@ -1397,7 +1398,7 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
     try {
       const res = await fetchRakutenSearch(q.keyword, q.genreId ?? null, 1);
       rakutenItems = (res.Items || [])
-        .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)))
+        .filter(item => !ngKeywords.some(kw => item.Item.itemName.includes(kw)) && !isPersonalizedItem(item.Item.itemName))
         .filter(item => isRelevant(item.Item.itemName));
     } catch {
       rakutenItems = [];
@@ -1447,7 +1448,7 @@ async function syncSubCategoryQueries(log, { category, genreId, ngKeywords, subQ
       source = 'Yahoo';
       const yahooKeyword = q.yahooKeyword || q.keyword;
       const yahooItems = (await fetchYahooSearchFallback(yahooKeyword, category))
-        .filter(it => !ngKeywords.some(kw => it.name.includes(kw)))
+        .filter(it => !ngKeywords.some(kw => it.name.includes(kw)) && !isPersonalizedItem(it.name))
         .filter(it => isRelevant(it.name));
       let j = 0;
       for (const it of yahooItems.slice(0, 20)) {
