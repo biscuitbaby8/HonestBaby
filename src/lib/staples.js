@@ -200,15 +200,24 @@ export function detectSizes(name) {
 // 総量（枚数またはグラム数）と、1個あたりの量を返す。読み取れない・矛盾する場合は null。
 // 例(枚): 「M248枚(62枚x4袋)」→248 / 「62枚入x4個」→248 / 「M52枚 2袋 104枚」→104 / 「L 54枚」→54
 // 例(g) : 「800gx2缶」→1600 / 「800g 2缶セット(1600g)」→1600
+// 単位ごとの「量」の書き方。粒は「1日4粒」のような目安量を拾わないよう2桁以上だけを見る。
+const UNIT_PATTERNS = {
+  '枚': { re: /(\d{1,4})\s*枚/g, not: '(?!\\d|\\s*枚)' },
+  'g': { re: /(\d{2,4})\s*(?:g|ｇ|グラム)/g, not: '(?!\\d|\\s*(?:g|ｇ))' },
+  // 「10.3ml」のような小数も読む（輸入サプリは米国の容量表記を換算したものが多い）
+  'ml': { re: /(?<![\d.])(\d{1,4}(?:\.\d{1,2})?)\s*(?:ml|mL|ML|Ml|ミリリットル)/g, not: '(?!\\d|\\s*(?:ml|mL|ML))' },
+  '粒': { re: /(\d{2,3})\s*(?:粒|錠|カプセル|ソフトジェル|タブレット|tablets?|capsules?|caps|softgels?)/gi, not: '(?!\\d|\\s*(?:粒|錠|カプセル|ソフトジェル))' },
+};
+
 export function parseTotal(name, unit = '枚') {
-  const unitRe = unit === 'g' ? /(\d{2,4})\s*(?:g|ｇ|グラム)/g : /(\d{1,4})\s*枚/g;
-  const values = [...name.matchAll(unitRe)].map((m) => parseInt(m[1], 10)).filter((v) => v > 0);
+  const u = UNIT_PATTERNS[unit] || UNIT_PATTERNS['枚'];
+  const values = [...name.matchAll(u.re)].map((m) => parseFloat(m[1])).filter((v) => v > 0);
   if (values.length === 0) return null;
-  const notUnit = unit === 'g' ? '(?!\\d|\\s*(?:g|ｇ))' : '(?!\\d|\\s*枚)';
+  const notUnit = u.not;
   const xMults = [...name.matchAll(new RegExp(`x\\s*(\\d{1,2})${notUnit}`, 'g'))].map((m) => parseInt(m[1], 10)).filter((v) => v >= 2 && v <= 60);
   const mults = [
     ...xMults,
-    ...[...name.matchAll(/(?<!\d)(\d{1,2})\s*(?:個|袋|パック|セット|箱|コ|缶|ケース)(?!\s*あたり)/g)].map((m) => parseInt(m[1], 10)),
+    ...[...name.matchAll(/(?<!\d)(\d{1,2})\s*(?:個|袋|パック|セット|箱|コ|缶|ケース|本|瓶)(?!\s*あたり)/g)].map((m) => parseInt(m[1], 10)),
   ].filter((v) => v >= 2 && v <= 60);
   const uniq = [...new Set(values)];
   const uniqMults = [...new Set(mults)];
@@ -245,6 +254,14 @@ const UNIT_MAX = 90;
 export function matchOffer(staple, rawName, price) {
   if (staple.group === 'oshirifuki') return matchSimple(staple, rawName, price, WIPE_RULE);
   if (staple.group === 'milk') return matchSimple(staple, rawName, price, MILK_RULE);
+  if (staple.group === 'iherb') {
+    return matchSimple(staple, rawName, price, {
+      unit: staple.unit, ng: IMPORT_NG,
+      perMin: staple.perMin, perMax: staple.perMax,
+      totalMin: staple.perMin, totalMax: staple.perMax * 12,
+      unitMin: staple.unitMin, unitMax: staple.unitMax,
+    });
+  }
   const full = normalizeName(rawName);
   const p = Number(price);
   if (!(p > 0)) return null;
@@ -293,6 +310,9 @@ const MILK_RULE = {
   perMin: 750, perMax: 850, totalMin: 750, totalMax: 13600,
   unitMin: 1.8, unitMax: 5.5,
 };
+
+// 輸入サプリ・スキンケア（/iherb 特集の価格比較）。サンプル・中古・詰め合わせ等を除く。
+const IMPORT_NG = /中古|訳あり|わけあり|アウトレット|サンプル|お試し|試供|トライアル|ミニサイズ|福袋|ギフトセット|選べる|よりどり|ふるさと納税|期限間近|賞味期限|空容器|空ボトル/;
 
 function matchSimple(staple, rawName, price, rule) {
   const full = normalizeName(rawName);

@@ -3,6 +3,10 @@ import { revalidatePath } from 'next/cache';
 import { request as httpsRequest } from 'node:https';
 import { searchUrl, withVersionFallback } from '@/src/lib/rakutenApi';
 import { STAPLES, matchOffer, dropOutliers } from '@/src/lib/staples';
+import { IHERB_STAPLES } from '@/src/lib/iherbPicks';
+
+// おむつ・おしりふき・粉ミルクに加え、/iherb 特集の輸入品も同じ仕組みで楽天・Yahoo!を比べる
+const SYNC_TARGETS = [...STAPLES, ...IHERB_STAPLES];
 
 // 定番おむつ（銘柄×タイプ×サイズ）ごとに楽天・Yahooを検索し、
 // 商品名から突合できた出品を1枚あたりの単価つきで保存する。
@@ -12,7 +16,7 @@ import { STAPLES, matchOffer, dropOutliers } from '@/src/lib/staples';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const PARTS = 6;
+const PARTS = 7;
 const KEEP_PER_MALL = 8;
 const DEADLINE_MS = 52000;
 
@@ -185,7 +189,7 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const part = Math.max(0, Math.min(PARTS - 1, parseInt(searchParams.get('part') || '0', 10) || 0));
-  const targets = STAPLES.filter((_, i) => i % PARTS === part);
+  const targets = SYNC_TARGETS.filter((_, i) => i % PARTS === part);
 
   const started = Date.now();
   const results = [];
@@ -203,6 +207,7 @@ export async function GET(request) {
   }
 
   try {
+    revalidatePath('/iherb');
     for (const base of ['/omutsu', '/oshirifuki', '/milk']) {
       revalidatePath(base);
       revalidatePath(`${base}/[id]`, 'page');
