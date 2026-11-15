@@ -501,6 +501,9 @@ export const demandScore = (p) => {
 // ニッチなサブカテゴリが空になるため。
 export const passesPickupGate = (p) => {
   if (!p) return false;
+  // ホームの上位は指名買いされる定番品に絞る。ブランド不明の雑貨は
+  // 「落とす」のではなく後ろに回す（rankForPickup 参照）。
+  if (!KNOWN_BRANDS.has(String(p.brand || ''))) return false;
   if (reviewsOf(p) < PICKUP_MIN_REVIEWS) return false;
   if (num(p.rating) <= 0) return false;
   if (!p.image && !p.image_url) return false;
