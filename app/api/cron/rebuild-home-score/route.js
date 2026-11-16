@@ -37,25 +37,44 @@ async function loadPriceSignals() {
   const since = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
   const byKey = new Map(); // `${product_id}|${shop_name}` -> [{d, price}]
 
-  // price_history は数万行あるので範囲指定でページングして読む
+  // price_history は90日で約6万行ある。1ページずつ順番に読むと60秒の上限に
+  // 届いてしまう（2026-11 に実際に時間切れが発生）ので、件数を先に数えて
+  // ページを並列に読む。順序は recorded_on と id で固定し、取りこぼしを防ぐ。
   const PAGE = 1000;
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from('price_history')
-      .select('product_id, shop_name, price, recorded_on')
-      .gte('recorded_on', since)
-      .order('recorded_on', { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    for (const r of data) {
-      const price = Number(r.price);
-      if (!(price > 0)) continue;
-      const key = `${r.product_id}|${r.shop_name}`;
-      if (!byKey.has(key)) byKey.set(key, []);
-      byKey.get(key).push({ d: r.recorded_on, price });
+  const PARALLEL = 8;
+  const { count, error: cErr } = await supabase
+    .from('price_history')
+    .select('id', { count: 'exact', head: true })
+    .gte('recorded_on', since);
+  if (cErr) throw cErr;
+  const pages = Math.ceil((count || 0) / PAGE);
+  const rowsAll = [];
+  for (let p0 = 0; p0 < pages; p0 += PARALLEL) {
+    const batch = [];
+    for (let p = p0; p < Math.min(p0 + PARALLEL, pages); p++) {
+      batch.push(
+        supabase
+          .from('price_history')
+          .select('product_id, shop_name, price, recorded_on')
+          .gte('recorded_on', since)
+          .order('recorded_on', { ascending: true })
+          .order('id', { ascending: true })
+          .range(p * PAGE, p * PAGE + PAGE - 1)
+      );
     }
-    if (data.length < PAGE) break;
+    const results = await Promise.all(batch);
+    for (const { data, error } of results) {
+      if (error) throw error;
+      rowsAll.push(...(data || []));
+    }
+  }
+  rowsAll.sort((a, b) => (a.recorded_on < b.recorded_on ? -1 : a.recorded_on > b.recorded_on ? 1 : 0));
+  for (const r of rowsAll) {
+    const price = Number(r.price);
+    if (!(price > 0)) continue;
+    const key = `${r.product_id}|${r.shop_name}`;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push({ d: r.recorded_on, price });
   }
 
   const signals = new Map(); // product_id -> { dropped, atLow }
@@ -110,7 +129,7 @@ export async function GET(request) {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, brand, category, rating, reviews_count, popularity_rank, image_url, shops:shops_prices(lowest_price)')
+        .select('id, name, brand, category, rating, reviews_count, popularity_rank, image_url, home_score, home_rank, is_indexable, shops:shops_prices(lowest_price)')
         .or('is_blocked.is.null,is_blocked.eq.false')
         .is('canonical_id', null)
         .range(from, from + PAGE - 1);
@@ -160,7 +179,8 @@ export async function GET(request) {
       if (indexable) indexableCount++;
 
       // diversify はブランド判定に brand / name を使うのでそのまま渡す
-      return { id: p.id, name: p.name, brand: p.brand, category: p.category, score, indexable };
+      return { id: p.id, name: p.name, brand: p.brand, category: p.category, score, indexable,
+        prev: { score: p.home_score == null ? null : Number(p.home_score), rank: p.home_rank, indexable: p.is_indexable } };
     });
     log.push(`値下がり加点: ${dropped}件 / 底値圏加点: ${atLow}件`);
     log.push(`検索エンジンに見せる商品ページ: ${indexableCount}/${products.length}件`);
@@ -173,26 +193,27 @@ export async function GET(request) {
     const ordered = diversify(scored);
 
     // 4) 書き戻し。upsert だと NOT NULL 列に引っかかるので個別 update を分割並列で。
-    const CHUNK = 100;
+    //    全5千件を毎回書くと60秒を超えるため、値が変わった行だけを書く。
+    const changes = [];
+    ordered.forEach((s, idx) => {
+      const score = Number(s.score.toFixed(6));
+      const rank = idx + 1;
+      if (s.prev.score === score && s.prev.rank === rank && s.prev.indexable === s.indexable) return;
+      changes.push({ id: s.id, home_score: score, home_rank: rank, is_indexable: s.indexable });
+    });
+    log.push(`変更のある行: ${changes.length}/${ordered.length}件`);
+    const CHUNK = 250;
     let updated = 0;
-    for (let i = 0; i < ordered.length; i += CHUNK) {
-      const chunk = ordered.slice(i, i + CHUNK);
+    for (let i = 0; i < changes.length; i += CHUNK) {
+      const chunk = changes.slice(i, i + CHUNK);
       const results = await Promise.all(
-        chunk.map((s, j) =>
-          supabase.from('products')
-            .update({
-              home_score: Number(s.score.toFixed(6)),
-              home_rank: i + j + 1,
-              is_indexable: s.indexable,
-            })
-            .eq('id', s.id)
-        )
+        chunk.map(({ id, ...vals }) => supabase.from('products').update(vals).eq('id', id))
       );
       updated += results.filter((r) => !r.error).length;
       const firstErr = results.find((r) => r.error);
       if (firstErr) log.push(`⚠️ 更新エラー: ${firstErr.error.message}`);
     }
-    log.push(`✅ 更新: ${updated}/${ordered.length}件`);
+    log.push(`✅ 更新: ${updated}/${changes.length}件`);
 
     return Response.json({
       ok: true,
